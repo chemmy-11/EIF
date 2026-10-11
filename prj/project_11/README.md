@@ -11,7 +11,7 @@
 | `xdc/` | prj10 基底 + UART 引脚（AE33/AF34 LVCMOS18，project_1 M1 同款） |
 | `scripts/` | `create_project.tcl`（幂等建工程，**末尾自动 source BD 生成**）/ `create_bd_b.tcl`（mb_ctrl BD：MicroBlaze+MDM+UARTLite+**axi_interconnect**+axi_lite_regs 模块引用；SmartConnect 版已弃）/ `build_debug.tcl`（四域 ILA + B1 lite 探针 + XSA 导出）/ `probe_dbgcfg.tcl`、`export_p1_bd.tcl`（BD 配方导出工具） |
 | `sim/` | 回归 TB + 一键 bats：W2 六用例 / W4 联合（含负向）/ W5 命令通道（含负向）/ 泵压力（orig vs L1）/ 仲裁器 / **B1 `run_lite_tb.bat`（axi_lite_regs 正负对照）** |
-| `sw/` | MicroBlaze 软件：`src/main.c`（hello + 寄存器自测 + 心跳，判决行 `[B1-SELFTEST] PASS`）+ `build_sw.tcl`（xsct 一键平台+应用） |
+| `sw/` | MicroBlaze 软件：`src/main.c`（自检 + T0 排空 + `rd_reg()` 读冲刷 + 心跳，判决行 `[B1-SELFTEST] PASS`）+ `build_sw.tcl`（xsct 首建平台+应用）/ `rebuild_sw.tcl`（增量重编，秒级——Vitis `app create` 不幂等，坑 #41） |
 | `vivado/` | Vivado 工程（**不入库**，由 create_project.tcl 再生） |
 
 ## fork 完整性判据（B0⑥，2026-10-10 全过）
@@ -26,7 +26,7 @@
 - **mb_ctrl BD**：MicroBlaze(64KB LMB+Debug) + MDM + proc_sys_reset + UARTLite(9600) + **axi_interconnect**（2026-10-11 换：SmartConnect 的 M01 Lite 写转换与自研从机在真硬件上交互楔死，详见坑账本 #36；axi_interconnect 为 M1 本板验证组件），**axi_lite_regs 以 RTL 模块引用入 BD**（地址 0x44A00000；UART 0x40600000 与 M1 同款）；配方基底 = project_1 `write_bd_tcl` 导出（已验证 BD 导出重建脚本，比猜自动化参数可靠）；
 - **owner 仲裁 = 最近写者胜**：UDP 命令通道与软核并存，任一侧写选通翻转 ctl_owner，复位后默认 UDP；读触发两路 OR；
 - **六套仿真回归全绿**（W2/W4/W5/泵/仲裁器/lite，负向 ×3 按预期 FAIL）；
-- **J_B1 板上会话半程（2026-10-10～11，板断电暂停）**：A 基线复现全过（数据面零破坏）；读通道全链通（COM5 串口 + JTAG 双源）；**写通道真硬件挂死 → 三段缺陷链**（AW/W 分拍修复 / BD 模块引用 OOC DCP 缓存坑 / SmartConnect M01 写转换交互楔死）→ **换 axi_interconnect**（M1 本板验证组件）；换互联版构建全绿（Explore 重掷 WNS +0.004），产物归档 `out/archive/b1_ic_v2_2026-10-11/`（bit `D14425F2…A114`）。**板上恢复清单五步**见毕设 B1 记录 §六。
+- **J_B1 板上会话三步全过（2026-10-10～11，✅ B1 全收口）**：①A 基线复现全过（数据面零破坏；interconnect 位流二次复验四档全 PASS、与软核心跳共存）；②写通道真硬件挂死三段缺陷链（AW/W 分拍修复 / BD 模块引用 OOC DCP 缓存坑 / SmartConnect M01 写转换交互楔死 → 换 axi_interconnect）→ **恢复场 `[B1-SELFTEST] PASS (0 errors)`**（owner 位域修复 + `rd_reg()` 读冲刷，ELF `3eaa12f3…`；JTAG mwr 第三源证写通路）；③**ILA 九项交叉全一致**（trig=9/exec=10 精确对齐）。产物归档 `out/archive/b1_ic_v2_2026-10-11/`（bit `D14425F2…A114`）。**残留已知问题一项**：M01 读陈旧重投递（坑 #39，`rd_reg` 已缓解；根治需 ILA 挂 Lite 总线 AR/R 信号重建位流）——详见毕设 B1 记录 §五/§六。
 
 ## 用法
 

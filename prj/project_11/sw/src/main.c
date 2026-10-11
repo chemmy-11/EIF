@@ -11,7 +11,7 @@
  *     +0x0C WM_RD   R  [15:0] u_rd_frame
  *     +0x10 WM_DROP R  [15:0] u_buf_drop
  *     +0x14 SLOTMAP R  [31:24]=rule 1, [23:16]=wr slot ptr
- *     +0x18 STATUS  R  [17:16]=ctl_owner (0 UDP / 1 soft-core), [15:0]=trig cnt
+ *     +0x18 STATUS  R  [17]=ctl_owner (0 UDP / 1 soft-core), [16]=0, [15:0]=trig cnt
  *     +0x1C ID      R  0x50314231 ("P1B1")
  *
  * Self-test cases (offline + on-board identical):
@@ -80,6 +80,19 @@ static void busy_ms(unsigned ms)    /* ~100 MHz: 100 cycles/us, crude */
         n--;
 }
 
+/* M01 read-path flush (J_B1 2026-10-11 board evidence): an axi_lite_regs
+ * read issued directly after UART (M00) traffic returns the data of the
+ * PREVIOUS M01 read; a WRITE preceding the read makes it fresh (diag: 8/8).
+ * A dummy write to the ignored-offset window (OKAY response, no register
+ * effect, no counter side effect) flushes the path. Double-read does NOT
+ * (second consecutive read was still stale on board). */
+static unsigned rd_reg(volatile unsigned *r)
+{
+    *(volatile unsigned *)(REGS_BASE + 0x2Cu) = 0u;  /* ignored offset */
+    busy_ms(1);                                      /* let the write land */
+    return *r;
+}
+
 int main(void)
 {
     int fail = 0;
@@ -88,16 +101,32 @@ int main(void)
     busy_ms(50);                    /* let the UART side settle */
     uputs("\r\n=== prj11 B1: MicroBlaze control plane ===\r\n");
 
+    /* T0 bus-pipeline drain: the axi_interconnect M01 conversion may leave
+     * up to two stale R beats queued across a master idle/handoff (J_B1
+     * 2026-10-11: the first reads after a JTAG<->CPU handoff returned
+     * one-behind data; steady-state reads were always correct). Read the
+     * CONSTANT ID register until two consecutive reads return the magic --
+     * self-synchronizing, no fixed drain depth assumed. */
+    {
+        int consec = 0, n = 0;
+        while (n < 8 && consec < 2) {
+            if (R_ID == 0x50314231u) consec++;
+            else                     consec = 0;
+            n++;
+        }
+        uputs("[T0] drain = "); uputd((unsigned)n); uputs(" reads\r\n");
+    }
+
     /* T1: ID magic */
-    id = R_ID;
+    id = rd_reg(&R_ID);
     uputs("[T1] ID reg   = "); uputh(id);
     if (id == 0x50314231u) uputs("  PASS\r\n");
     else                   { uputs("  FAIL\r\n"); fail++; }
 
     /* T2: boot defaults -- owner = UDP(0), trig = 0 */
-    st0 = R_STAT;
+    st0 = rd_reg(&R_STAT);
     uputs("[T2] boot STAT= "); uputh(st0);
-    if (((st0 >> 16) & 3u) == 0u && (st0 & 0xffffu) == 0u)
+    if (((st0 >> 17) & 1u) == 0u && (st0 & 0xffffu) == 0u)
         uputs("  PASS (owner=UDP, trig=0)\r\n");
     else { uputs("  FAIL\r\n"); fail++; }
 
@@ -106,16 +135,16 @@ int main(void)
     R_MODE = 1u;
     R_SLOT = 0x5Au;
     busy_ms(2);                     /* mailbox round trip is ~us scale */
-    st1 = R_STAT;
+    st1 = rd_reg(&R_STAT);
     uputs("[T3] after MODE+RD_SLOT: STAT = "); uputh(st1);
-    uputs("  owner=");  uputd((st1 >> 16) & 3u);
+    uputs("  owner=");  uputd((st1 >> 17) & 1u);
     uputs(" trig=");    uputd(st1 & 0xffffu);
-    if (((st1 >> 16) & 3u) == 1u && (st1 & 0xffffu) == 1u)
+    if (((st1 >> 17) & 1u) == 1u && (st1 & 0xffffu) == 1u)
         uputs("  PASS (owner=soft, trig=1)\r\n");
     else { uputs("  FAIL\r\n"); fail++; }
 
     /* T4: live read-only registers (frame counters, rule/ptr) */
-    wm  = R_WM_WR;  rd = R_WM_RD;  dr = R_WM_DRP;  sm = R_SMAP;
+    wm  = rd_reg(&R_WM_WR);  rd = rd_reg(&R_WM_RD);  dr = rd_reg(&R_WM_DRP);  sm = rd_reg(&R_SMAP);
     uputs("[T4] wm_wr=");   uputd(wm & 0xffffu);
     uputs("  wm_rd=");      uputd(rd & 0xffffu);
     uputs("  wm_drop=");    uputd(dr & 0xffffu);
@@ -130,13 +159,30 @@ int main(void)
         uputs("[B1-SELFTEST] FAIL ("); uputd((unsigned)fail); uputs(" errors)\r\n");
     }
 
+    /* diagnostic: deterministic data marker via trig counter (RD_SLOT
+     * writes increment [15:0] of STATUS). After a ~ms idle gap following
+     * a WRITE, read STATUS three times back-to-back: fresh path must
+     * return the same trig value on all three (J_B1 2026-10-11). */
+    for (unsigned k = 0; k < 8; k++) {
+        unsigned a, b, c;
+        R_SLOT = 0x5Au;             /* trig++ (deterministic marker) */
+        busy_ms(1);                 /* idle gap before first read */
+        a = R_STAT;
+        b = R_STAT;
+        c = R_STAT;
+        uputs("[DG] trig a="); uputd(a & 0xffffu);
+        uputs(" b=");               uputd(b & 0xffffu);
+        uputs(" c=");               uputd(c & 0xffffu);
+        uputs("\r\n");
+    }
+
     /* heartbeat: live counters every ~2 s (board session observation) */
     for (;;) {
         busy_ms(2000);
-        wm = R_WM_WR; rd = R_WM_RD;
+        wm = rd_reg(&R_WM_WR); rd = rd_reg(&R_WM_RD);
         uputs("[HB] wm_wr="); uputd(wm & 0xffffu);
         uputs(" wm_rd=");     uputd(rd & 0xffffu);
-        uputs(" trig=");      uputd(R_STAT & 0xffffu);
+        uputs(" trig=");      uputd(rd_reg(&R_STAT) & 0xffffu);
         uputs("\r\n");
     }
 }
