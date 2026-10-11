@@ -94,17 +94,18 @@ set psr [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_100m
 set xl [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_1]
 
 # ---- fabric + peripherals ----
-create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:1.0 smartconnect_0
-set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {2} CONFIG.NUM_CLKS {1}] [get_bd_cells smartconnect_0]
+# 2026-10-11 板上换 axi_interconnect(M1 本板验证过): SmartConnect 的 M01 AXI4-Lite 写转换与本从机在真硬件上交互楔死 —— 未映射写/UART 写/读全通、TB 三种 AW/W 次序全过仍不复现, 唯写此从机挂
+create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0
+set_property -dict [list CONFIG.NUM_MI {2} CONFIG.NUM_SI {1}] [get_bd_cells axi_interconnect_0]
 set u [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_uartlite:2.0 axi_uartlite_0]
 set_property -dict [list CONFIG.C_BAUDRATE {9600}] $u
 create_bd_cell -type module -reference axi_lite_regs axi_lite_regs_0
 puts "BD_STEP: cells created"
 
 # ---- interface connections ----
-connect_bd_intf_net [get_bd_intf_pins microblaze_0/M_AXI_DP] [get_bd_intf_pins smartconnect_0/S00_AXI]
-connect_bd_intf_net [get_bd_intf_pins smartconnect_0/M00_AXI] [get_bd_intf_pins axi_uartlite_0/S_AXI]
-connect_bd_intf_net [get_bd_intf_pins smartconnect_0/M01_AXI] [get_bd_intf_pins axi_lite_regs_0/S_AXI]
+connect_bd_intf_net [get_bd_intf_pins microblaze_0/M_AXI_DP] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
+connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M00_AXI] [get_bd_intf_pins axi_uartlite_0/S_AXI]
+connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M01_AXI] [get_bd_intf_pins axi_lite_regs_0/S_AXI]
 connect_bd_intf_net [get_bd_intf_pins mdm_1/MBDEBUG_0] [get_bd_intf_pins microblaze_0/DEBUG]
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/DLMB] [get_bd_intf_pins microblaze_0_local_memory/DLMB]
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/ILMB] [get_bd_intf_pins microblaze_0_local_memory/ILMB]
@@ -123,11 +124,17 @@ connect_bd_net [get_bd_ports clk_100m] \
     [get_bd_pins microblaze_0_local_memory/LMB_Clk] \
     [get_bd_pins rst_100m/slowest_sync_clk] \
     [get_bd_pins mdm_1/CLK] \
-    [get_bd_pins smartconnect_0/aclk] \
+    [get_bd_pins axi_interconnect_0/ACLK] \
+    [get_bd_pins axi_interconnect_0/S00_ACLK] \
+    [get_bd_pins axi_interconnect_0/M00_ACLK] \
+    [get_bd_pins axi_interconnect_0/M01_ACLK] \
     [get_bd_pins axi_uartlite_0/s_axi_aclk] \
     [get_bd_pins axi_lite_regs_0/aclk]
 connect_bd_net [get_bd_pins rst_100m/peripheral_aresetn] \
-    [get_bd_pins smartconnect_0/aresetn] \
+    [get_bd_pins axi_interconnect_0/ARESETN] \
+    [get_bd_pins axi_interconnect_0/S00_ARESETN] \
+    [get_bd_pins axi_interconnect_0/M00_ARESETN] \
+    [get_bd_pins axi_interconnect_0/M01_ARESETN] \
     [get_bd_pins axi_uartlite_0/s_axi_aresetn] \
     [get_bd_pins axi_lite_regs_0/aresetn]
 puts "BD_STEP: nets connected"

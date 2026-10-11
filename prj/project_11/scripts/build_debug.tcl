@@ -17,6 +17,14 @@ open_project $proj/vivado/prj11.xpr
 reset_target  all [get_ips ddr4_0]
 generate_target all [get_ips ddr4_0]
 if {[llength [get_runs -quiet ddr4_0_synth_1]] > 0} { reset_run ddr4_0_synth_1 }
+# ---- prj11 B1: BD 模块引用/内部 IP 的 OOC 综合必须重置 ----
+#     reset_run synth_1 不级联 mb_ctrl_* 的 OOC runs: RTL 变更后旧 DCP 被
+#     复用, 修复进不了位流(2026-10-11 板上实证: axi_lite_regs 修复版
+#     没生效, DCP 时间戳停在旧综合)。
+foreach mr [get_runs -quiet -filter {NAME =~ mb_ctrl_*}] {
+    reset_run $mr
+    puts "MODULE_REF_RESET: $mr"
+}
 reset_run synth_1
 launch_runs synth_1 -jobs 8
 wait_on_run synth_1

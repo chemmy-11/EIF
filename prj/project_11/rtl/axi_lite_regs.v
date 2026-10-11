@@ -123,11 +123,19 @@ module axi_lite_regs (
     end
 
     //=========================================================================
-    // lite domain: write channel (accept AW+W together; one mailbox cycle per
-    // write; the next write waits until a_ack has fully deasserted)
+    // lite domain: write channel -- AW and W are latched SEPARATELY, each on
+    // its own channel handshake (Xilinx canonical Lite-slave shape).
+    // WHY: an AXI4->AXI4-Lite conversion master (SmartConnect) may present AW
+    // in an earlier cycle than W; accepting only on awvalid&&wvalid in the
+    // SAME cycle consumes-and-forgets the AW handshake -> bvalid never comes
+    // -> the fabric wedges (2026-10-10 on-board isolation: reads OK, UART
+    // writes OK, only this slave's write stalled the bus).
     //=========================================================================
     localparam [1:0] LW_IDLE = 2'd0, LW_EXEC = 2'd1, LW_CLOSE = 2'd2;
     reg [1:0] lwst;
+    reg       aw_pending, w_pending;
+    reg [5:0] aw_word;                    // latched awaddr[7:2]
+    reg [7:0] wd_byte;                    // latched wdata[7:0]
 
     always @(posedge aclk) begin
         if (!aresetn) begin
@@ -138,31 +146,46 @@ module axi_lite_regs (
             s_axi_bresp   <= 2'b00;
             a_req         <= 1'b0;
             a_data        <= 16'd0;
+            aw_pending    <= 1'b0;
+            w_pending     <= 1'b0;
+            aw_word       <= 6'd0;
+            wd_byte       <= 8'd0;
         end
         else begin
             case (lwst)
             LW_IDLE: begin
                 // single-driver discipline: bvalid cleared ONLY here
                 if (s_axi_bvalid && s_axi_bready) s_axi_bvalid <= 1'b0;
-                // no new acceptance while a response is still being taken
-                if (!s_axi_bvalid || s_axi_bready) begin
-                    s_axi_awready <= 1'b1;
-                    s_axi_wready  <= 1'b1;
-                    if (s_axi_awvalid && s_axi_wvalid) begin
-                        if (s_axi_awaddr[7:2] == 6'h00)
-                            a_data <= {OP_SET_MODE, s_axi_wdata[7:0]};
-                        else if (s_axi_awaddr[7:2] == 6'h01)
-                            a_data <= {OP_READ_SLOT, s_axi_wdata[7:0]};
-                        else
-                            a_data <= 16'd0;          // ignored offset, OKAY
-                        a_req <= 1'b1;
-                        lwst  <= LW_EXEC;
-                    end
+                // each ready reflects ONLY its own channel: after AW is
+                // latched, wready must STAY HIGH for the late W (dropping
+                // both deadlocks the split-timing case)
+                s_axi_awready <= !aw_pending;
+                s_axi_wready  <= !w_pending;
+                // AW handshake: latch independently (whenever it occurs)
+                if (s_axi_awvalid && s_axi_awready && !aw_pending) begin
+                    aw_word     <= s_axi_awaddr[7:2];
+                    aw_pending  <= 1'b1;
+                end
+                // W handshake: latch independently (whenever it occurs)
+                if (s_axi_wvalid && s_axi_wready && !w_pending) begin
+                    wd_byte     <= s_axi_wdata[7:0];
+                    w_pending   <= 1'b1;
+                end
+                // both captured -> decode and fire the mailbox
+                if (aw_pending && w_pending) begin
+                    if (aw_word == 6'h00)
+                        a_data <= {OP_SET_MODE,  wd_byte};
+                    else if (aw_word == 6'h01)
+                        a_data <= {OP_READ_SLOT, wd_byte};
+                    else
+                        a_data <= 16'd0;              // ignored offset, OKAY
+                    a_req      <= 1'b1;
+                    aw_pending <= 1'b0;
+                    w_pending  <= 1'b0;
+                    lwst       <= LW_EXEC;
                 end
             end
             LW_EXEC: begin
-                s_axi_awready <= 1'b0;
-                s_axi_wready  <= 1'b0;
                 if (a_ack_s[1]) begin
                     a_req        <= 1'b0;             // user has the command
                     s_axi_bvalid <= 1'b1;

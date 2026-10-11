@@ -110,6 +110,21 @@ module axi_lite_regs_tb;
         end
     endtask
 
+    // ---- split-timing write: AW presented ALONE for 3 cycles, then W
+    //      (the SmartConnect AXI4->Lite conversion shape that wedged the
+    //       first B1 bitstream -- regression case, 2026-10-10)
+    task automatic lite_wr_split(input [31:0] a, input [31:0] d);
+        begin
+            @(negedge aclk);
+            awaddr = a; awvalid = 1; wdata = d;   // AW alone
+            repeat (3) @(negedge aclk);
+            wvalid = 1;                            // W arrives late
+            while (!bvalid) @(negedge aclk);
+            awvalid = 0; wvalid = 0;
+            @(negedge aclk);
+        end
+    endtask
+
     task automatic lite_rd(input [31:0] a, output [31:0] d);
         begin
             @(negedge aclk);
@@ -173,12 +188,21 @@ module axi_lite_regs_tb;
         $display("[P4] back-to-back: pulses=%0d slot=%02x trig=%0d",
                  pulse_cnt, cfg_rd_slot, lite_rd_trig_cnt);
 
+        // ---- P4b split AW/W timing (SmartConnect conversion shape)
+        lite_wr_split(32'h4, 32'h0000_005A);
+        repeat (12) @(negedge aclk);
+        chk(pulse_cnt == 4, "P4b split write accepted (no deadlock)");
+        chk(cfg_rd_slot === 8'h5A, "P4b split slot value");
+        chk(cap_slot === 8'h5A, "P4b split capture");
+        $display("[P4b] split AW/W: pulses=%0d slot=%02x trig=%0d",
+                 pulse_cnt, cfg_rd_slot, lite_rd_trig_cnt);
+
         // ---- P5 reads
         lite_rd(32'h08, rd); $display("[P5] rd@08=%08x", rd); chk(rd[15:0] === 16'h1234, "P5 WM_WR");
         lite_rd(32'h0C, rd); $display("[P5] rd@0C=%08x", rd); chk(rd[15:0] === 16'h0456, "P5 WM_RD");
         lite_rd(32'h10, rd); $display("[P5] rd@10=%08x", rd); chk(rd[15:0] === 16'd7,    "P5 WM_DROP");
         lite_rd(32'h14, rd); $display("[P5] rd@14=%08x", rd); chk(rd[31:24] === 8'd1 && rd[23:16] === 8'h34, "P5 SLOTMAP rule/ptr");
-        lite_rd(32'h18, rd); $display("[P5] rd@18=%08x", rd); chk(rd[17:16] === 2'b10 && rd[15:0] === 16'd3, "P5 STATUS owner/trig");
+        lite_rd(32'h18, rd); $display("[P5] rd@18=%08x", rd); chk(rd[17:16] === 2'b10 && rd[15:0] === 16'd4, "P5 STATUS owner/trig");
         lite_rd(32'h1C, rd); $display("[P5] rd@1C=%08x", rd); chk(rd === 32'h5031_4231, "P5 ID magic");
         // change inputs, re-read (fresh snapshot, not stale)
         u_wr_frame = 16'hBEEF; u_rd_frame = 16'hCAFE; u_buf_drop = 16'd0;
@@ -191,8 +215,8 @@ module axi_lite_regs_tb;
         lite_wr(32'h08, 32'hFFFF_FFFF);     // WM_WR is RO
         repeat (12) @(negedge aclk);
         chk(pulse_cnt == 0, "P6 no pulse on RO write");
-        chk(cfg_rd_slot === 8'hC3, "P6 slot unchanged");
-        chk(lite_exec_cnt === 16'd4, "P6 ignored write not counted");  // P2+P3+P4x2 = 4
+        chk(cfg_rd_slot === 8'h5A, "P6 slot unchanged");
+        chk(lite_exec_cnt === 16'd5, "P6 ignored write not counted");  // P2+P3+P4x2+P4b = 5
         $display("[P6] RO write ignored (exec=%0d)", lite_exec_cnt);
 
         // ---- P7 response held until ready
@@ -200,7 +224,7 @@ module axi_lite_regs_tb;
         fork
             lite_wr(32'h0, 32'h0);          // MODE=0 (back to SEQ)
         join_none
-        repeat (6) @(negedge aclk);
+        repeat (10) @(negedge aclk);        // 邮箱往返 ~6-8 aclk
         chk(bvalid === 1'b1, "P7 bvalid held while !bready");
         repeat (10) @(negedge aclk);
         chk(bvalid === 1'b1, "P7 bvalid still held");
