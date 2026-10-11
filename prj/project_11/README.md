@@ -28,6 +28,13 @@
 - **六套仿真回归全绿**（W2/W4/W5/泵/仲裁器/lite，负向 ×3 按预期 FAIL）；
 - **J_B1 板上会话三步全过（2026-10-10～11，✅ B1 全收口）**：①A 基线复现全过（数据面零破坏；interconnect 位流二次复验四档全 PASS、与软核心跳共存）；②写通道真硬件挂死三段缺陷链（AW/W 分拍修复 / BD 模块引用 OOC DCP 缓存坑 / SmartConnect M01 写转换交互楔死 → 换 axi_interconnect）→ **恢复场 `[B1-SELFTEST] PASS (0 errors)`**（owner 位域修复 + `rd_reg()` 读冲刷，ELF `3eaa12f3…`；JTAG mwr 第三源证写通路）；③**ILA 九项交叉全一致**（trig=9/exec=10 精确对齐）。产物归档 `out/archive/b1_ic_v2_2026-10-11/`（bit `D14425F2…A114`）。**残留已知问题一项**：M01 读陈旧重投递（坑 #39，`rd_reg` 已缓解；根治需 ILA 挂 Lite 总线 AR/R 信号重建位流）——详见毕设 B1 记录 §五/§六。
 
+## B2 增量（2026-10-11 离线部分收口，板场次待电）
+
+- **角色互换**：J3 的控制命令（SET_MODE/READ_SLOT）全部改由软核经 AXI-Lite 下发（`sw/src_j3/main.c` = C 驱动 j3_soft，ELF `439f99c6…`），UDP 命令通道降级为对照；PC 只剩数据面 + COM5 场次编排（**UART 两段协议**：`'M'`→SEQ 预热窗刷 ARP→同字符 GO→RND+基线+自动"等写满 256→逆序读→DONE 计数行"；RND 下板发不出 ARP 应答是预热窗存在的原因）；
+- **PC 引擎** `scripts/j3_soft_verify.py`：真机（COM5）/`--mock` 双模式，载荷编解码只读 import prj10 `j3_random_read.py`（单一事实源）；判据全部 PC 侧独立推导（逆序对按实收序、集合级判决对全量集）；
+- **离线自证矩阵**：正常 M/A/B 全 PASS + 三缺陷负向对照（byte 内容翻转三轮 FAIL / order 顺读三轮 FAIL / noretire 不退休仅 B FAIL——命中面精确）；
+- 坑账本 #42（Vitis app build TCF reset 静默空转→make 直跑）/ #43（负向对照须核对 FAIL 原因=注入缺陷本身）；板场次判读表见毕设 `操作文档/阶段三_prj11_B2软核J3上板验证单_2026-10-11.md`。
+
 ## 用法
 
 ```powershell
