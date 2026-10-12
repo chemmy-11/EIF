@@ -113,6 +113,48 @@ static char urx_get(void)
     return (char)(UART_RX & 0xffu);   /* 读 RX 即清 FIFO */
 }
 
+/* GO 等待: 只认类型字符, 其余字符 (串扰/DDR 周期校准窗在 RX 上的幻影字节,
+ * 2026-10-12 板上实证: 每次打印突发期间 RX 会进 1 个非命令字节) 打印告警后
+ * 继续等 —— 幽灵值恰好等于类型字符的概率极低, 且 PC 侧有整轮重试兜底。 */
+static char wait_go(char type)
+{
+    unsigned ms = 0;
+    for (;;) {
+        char c, d;
+        if (urx_poll()) {
+            c = urx_get();
+            if (c != type) {                 /* 非类型字符: 幽灵字节, 过滤 */
+                uputs("[B2] RXGHOST ");
+                uputc("0123456789abcdef"[(c >> 4) & 0xf]);
+                uputc("0123456789abcdef"[c & 0xf]);
+                uputs("\r\n");
+                continue;
+            }
+            /* 类型字符到达: 等补码字节 */
+            {
+                unsigned k;
+                for (k = 0; k < 30000u; k++) {
+                    if (urx_poll()) break;
+                    busy_ms(1);
+                }
+                if (!urx_poll())
+                    return 0;
+                d = urx_get();
+                if ((unsigned char)d == ((~(unsigned char)c) & 0xffu))
+                    return c;
+                uputs("[B2] RXGHOST ");
+                uputc("0123456789abcdef"[(d >> 4) & 0xf]);
+                uputc("0123456789abcdef"[d & 0xf]);
+                uputs("\r\n");
+            }
+            continue;
+        }
+        busy_ms(1);
+        if (++ms >= 200000u)             /* 上限, 防永久卡死 */
+            return 0;
+    }
+}
+
 /* ---------------------------------------------------------------------------
  * 一轮 J3 (主轮 M / 负向 A / 负向 B)。进入时模式已是 RND、基线已取好。
  * 返回 0 = 正常跑完; 1 = 等写超时; 2 = 读停摆。
@@ -200,10 +242,9 @@ static void round_command(char type)
 
     R_MODE = MODE_SEQ;                   /* 段0: SEQ 窗 (PC 预热 ARP) */
     uputs("[B2] SEQOK t="); uputc(type); uputs("\r\n");
-    (void)rd_reg(&R_WM_WR);              /* 等段1 字符期间不做事 */
-    while (!urx_poll()) { }              /* 等 PC 预热后回送同一字符 = GO */
-    if (urx_get() != type) {             /* 协议约定: GO 字符 = 类型字符 */
-        uputs("[B2] GO-CHAR-MISMATCH\r\n");
+    (void)rd_reg(&R_WM_WR);
+    if (wait_go(type) == 0) {            /* 段1 字符 = 类型字符; 幽灵字节过滤 */
+        uputs("[B2] GOWAIT-FAIL t="); uputc(type); uputs("\r\n");
         return;
     }
 
@@ -223,9 +264,8 @@ static void round_command(char type)
     uputs(" rd0="); uputd(rd0); uputs("\r\n");
 
     run_round(type, wr0, rd0);
-
-    R_MODE = MODE_SEQ;                   /* 恢复 SEQ (在 DONE 打印之后, 不污染对账) */
-    uputs("[B2] SEQRESTORED t="); uputc(type); uputs("\r\n");
+    /* 不在此恢复 SEQ: 恢复写会使 u_wr_frame +1 污染轮后 'I' 对账; 且下一轮
+     * 段0 本就先切 SEQ (预热窗需要)。脚本收尾显式发 'S' 恢复。 */
 }
 
 int main(void)
@@ -252,19 +292,45 @@ int main(void)
 
     uputs("[B2-SOFT] WAITCMD (M/A/B/S/I)\r\n");
     for (;;) {
-        char c;
+        char c, d;
         while (!urx_poll()) { }
         c = urx_get();
-        if (c == 'M' || c == 'A' || c == 'B')
+        /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。
+         * 策略: 单字节命令 (S/I) 在「命令间」直接执行; 轮命令 M/A/B 要求
+         * 紧跟补码字节 (~c) —— 幻影字节凑不齐补码对, 不会误触发整轮。 */
+        if (c == 'M' || c == 'A' || c == 'B') {
+            unsigned k;
+            for (k = 0; k < 30000u; k++) {          /* 等补码字节, ~秒级 */
+                if (urx_poll()) break;
+                busy_ms(1);
+            }
+            if (!urx_poll()) {
+                uputs("[B2] NOPAIR "); uputc(c); uputs("\r\n");
+                continue;
+            }
+            d = urx_get();
+            if ((unsigned char)d != ((~(unsigned char)c) & 0xffu)) {
+                uputs("[B2] BADPAIR "); uputc(c); uputs("\r\n");
+                continue;
+            }
             round_command(c);
+        }
         else if (c == 'S') {
             R_MODE = MODE_SEQ;
             uputs("[B2] SEQRESTORED (cmd S)\r\n");
         } else if (c == 'I') {
-            uputs("[B2] ID=");   uputd(rd_reg(&R_ID) & 0xffffu);
-            uputs(" wr=");       uputd(rd_reg(&R_WM_WR) & 0xffffu);
-            uputs(" rd=");       uputd(rd_reg(&R_WM_RD) & 0xffffu);
-            uputs(" drop=");     uputd(rd_reg(&R_WM_DRP) & 0xffffu);
+            /* 板上实证 (2026-10-12): 打印中途穿插 AXI 读 (rd_reg) 会使 TX 行
+             * 中后段字节损坏 (PDRC-203 引脚组; READY/DONE 等纯打印行完好,
+             * 唯 I 行必挂) —— 故先读完 4 个寄存器, 再一次性纯打印。 */
+            unsigned v_id, v_wr, v_rd, v_dr;
+            v_id = rd_reg(&R_ID)    & 0xffffu;
+            v_wr = rd_reg(&R_WM_WR) & 0xffffu;
+            v_rd = rd_reg(&R_WM_RD) & 0xffffu;
+            v_dr = rd_reg(&R_WM_DRP) & 0xffffu;
+            uputs("[B2] ID="); uputd(v_id);
+            uputs(" wr=");     uputd(v_wr);
+            uputs(" rd=");     uputd(v_rd);
+            uputs(" drop=");   uputd(v_dr);
             uputs("\r\n");
         }
         /* 其余字符 (\r\n 等) 忽略 */

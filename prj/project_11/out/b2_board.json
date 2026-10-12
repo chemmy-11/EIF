@@ -1,0 +1,63 @@
+{
+ "ok": true,
+ "rounds": {
+  "M": {
+   "type": "M",
+   "ok": true,
+   "errors": [],
+   "warnings": [
+    "wr+16142 > 256 (多发, 非丢帧)"
+   ],
+   "wr0": 803,
+   "n_expected": 256,
+   "missing": [],
+   "extra": 0,
+   "byte_diff": 0,
+   "order_ok": true,
+   "inv": 24905,
+   "wr_delta": 16142,
+   "rd_delta": 256,
+   "dup_nodata": false,
+   "seq_base": 5000,
+   "rd0": 803
+  },
+  "A": {
+   "type": "A",
+   "ok": true,
+   "errors": [],
+   "warnings": [],
+   "wr0": 1060,
+   "n_expected": 255,
+   "missing": [
+    5356
+   ],
+   "extra": 0,
+   "byte_diff": 0,
+   "order_ok": true,
+   "inv": 24501,
+   "wr_delta": 15885,
+   "rd_delta": 255,
+   "dup_nodata": false,
+   "seq_base": 5256,
+   "rd0": 1060
+  },
+  "B": {
+   "type": "B",
+   "ok": true,
+   "errors": [],
+   "warnings": [],
+   "wr0": 1317,
+   "n_expected": 256,
+   "missing": [],
+   "extra": 0,
+   "byte_diff": 0,
+   "order_ok": true,
+   "inv": 24537,
+   "wr_delta": 15628,
+   "rd_delta": 256,
+   "dup_nodata": false,
+   "seq_base": 5512,
+   "rd0": 1317
+  }
+ }
+}
