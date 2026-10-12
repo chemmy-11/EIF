@@ -270,6 +270,16 @@ wire [31:0] mem_u_hold_cycles;
 wire [8:0]  mem_outstanding_sync;                     // user 域灰码镜像(合法跨域读)
 wire [15:0] mem_lat_w, mem_lat_r;                     // B3-0: MIG 延迟镜像(ui->user 2FF, 桥①)
 
+// ★ B3-1a: AXI DMA MM2S (mb_ctrl BD 引出, ui_clk 300MHz 域; MM2S 只读 -> 仅 AR/R)
+wire [31:0]  dma_araddr;   wire [7:0]  dma_arlen;   wire [2:0] dma_arsize;
+wire [1:0]   dma_arburst;  wire [2:0]  dma_arprot;  wire [3:0] dma_arcache;
+wire         dma_arvalid, dma_arready;
+wire [511:0] dma_rdata;    wire [1:0]  dma_rresp;
+wire         dma_rlast, dma_rvalid, dma_rready;
+wire [511:0] dma_tdata;    wire [63:0] dma_tkeep;
+wire         dma_tlast, dma_tvalid, dma_tready;
+wire [31:0]  dma_q0, dma_q1, dma_q2;                  // dma_sink 捕获结果 -> Lite 回读
+
 // 读命令生成: 槽中有未读帧 且 桥空闲 且 上一拍没发过 → 单拍
 // (ro_outstanding_sync 由桥内 gray+2FF 镜像, 单调语义; false-positive 空读
 //  会被桥内 noframe 计数+定长应答兜住, false-negative 只延迟一拍重判)
@@ -653,15 +663,39 @@ mb_ctrl u_mb_ctrl (
     .u_wr_frame      (mem_u_wr_frame      ),
     .u_rd_frame      (mem_u_rd_frame      ),
     .u_buf_drop      (mem_u_buf_drop      ),
-    // B3-0: lat_w/lat_r 需先在 mb_ctrl BD 上加输入端口才能接入其内部 axi_lite_regs
-    //       —— 该 BD 改动与 B3-1（加 AXI DMA）合并做，B3-0 板上测量走 UDP 0x05 路。
     .ctl_owner       (ctl_owner           ),
+    // B3-1a: BD 新增端口 (ui_clk = DMA 存储映射口时钟; lat/dma_q = 观测回读)
+    .ui_clk          (ui_clk              ),
+    .lat_w           (mem_lat_w           ),
+    .lat_r           (mem_lat_r           ),
+    .dma_q0          (dma_q0              ),
+    .dma_q1          (dma_q1              ),
+    .dma_q2          (dma_q2              ),
     .cfg_mode        (lite_cfg_mode       ),
     .cfg_rd_slot     (lite_cfg_rd_slot    ),
     .rd_req_pulse    (lite_rd_req_pulse   ),
     .cfg_wr_pulse    (lite_cfg_wr_pulse   ),
     .lite_exec_cnt   (lite_exec_cnt       ),
-    .lite_rd_trig_cnt(lite_rd_trig_cnt    )
+    .lite_rd_trig_cnt(lite_rd_trig_cnt    ),
+    // B3-1a: DMA 存储映射主口 (只读: AR/R) 与流输出 (512b, ui_clk 域)
+    .M_AXI_MM2S_0_araddr  (dma_araddr  ),
+    .M_AXI_MM2S_0_arburst (dma_arburst ),
+    .M_AXI_MM2S_0_arcache (dma_arcache ),
+    .M_AXI_MM2S_0_arlen   (dma_arlen   ),
+    .M_AXI_MM2S_0_arprot  (dma_arprot  ),
+    .M_AXI_MM2S_0_arready (dma_arready ),
+    .M_AXI_MM2S_0_arsize  (dma_arsize  ),
+    .M_AXI_MM2S_0_arvalid (dma_arvalid ),
+    .M_AXI_MM2S_0_rdata   (dma_rdata   ),
+    .M_AXI_MM2S_0_rlast   (dma_rlast   ),
+    .M_AXI_MM2S_0_rready  (dma_rready  ),
+    .M_AXI_MM2S_0_rresp   (dma_rresp   ),
+    .M_AXI_MM2S_0_rvalid  (dma_rvalid  ),
+    .M_AXIS_MM2S_0_tdata  (dma_tdata   ),
+    .M_AXIS_MM2S_0_tkeep  (dma_tkeep   ),
+    .M_AXIS_MM2S_0_tlast  (dma_tlast   ),
+    .M_AXIS_MM2S_0_tready (dma_tready  ),
+    .M_AXIS_MM2S_0_tvalid (dma_tvalid  )
 );
 
 // prj11 B1: ILA0(@user_clk) 观测 —— J_B1 ③ 寄存器回读一致性
@@ -989,7 +1023,7 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
         .m_axi_rid(sc_s_rid),
         .clk(ui_clk),
         .rst_n(ui_rst_n),
-        // ---- S02: 预留给 AXI DMA MM2S（B3-1 接入前悬空；接 0 即永久不授权）----
+        // ---- S02: AXI DMA MM2S（B3-1a 真连; MM2S 只读 -> 写通道恒不授权, ID 侧带口无引脚悬空）----
         .s02_axi_awid(4'h0), .s02_axi_awaddr(32'h0), .s02_axi_awlen(8'h0),
         .s02_axi_awsize(3'h0), .s02_axi_awburst(2'h0), .s02_axi_awlock(1'b0),
         .s02_axi_awcache(4'h0), .s02_axi_awprot(3'h0), .s02_axi_awqos(4'h0),
@@ -997,12 +1031,21 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
         .s02_axi_wdata(512'h0), .s02_axi_wstrb(64'h0), .s02_axi_wlast(1'b0),
         .s02_axi_wvalid(1'b0), .s02_axi_wready(),
         .s02_axi_bresp(), .s02_axi_bvalid(), .s02_axi_bready(1'b1), .s02_axi_bid(),
-        .s02_axi_arid(4'h0), .s02_axi_araddr(32'h0), .s02_axi_arlen(8'h0),
-        .s02_axi_arsize(3'h0), .s02_axi_arburst(2'h0), .s02_axi_arlock(1'b0),
-        .s02_axi_arcache(4'h0), .s02_axi_arprot(3'h0), .s02_axi_arqos(4'h0),
-        .s02_axi_arvalid(1'b0), .s02_axi_arready(),
-        .s02_axi_rdata(), .s02_axi_rresp(), .s02_axi_rlast(),
-        .s02_axi_rvalid(), .s02_axi_rready(1'b1), .s02_axi_rid()
+        .s02_axi_arid(4'h0), .s02_axi_araddr(dma_araddr), .s02_axi_arlen(dma_arlen),
+        .s02_axi_arsize(dma_arsize), .s02_axi_arburst(dma_arburst), .s02_axi_arlock(1'b0),
+        .s02_axi_arcache(dma_arcache), .s02_axi_arprot(dma_arprot), .s02_axi_arqos(4'h0),
+        .s02_axi_arvalid(dma_arvalid), .s02_axi_arready(dma_arready),
+        .s02_axi_rdata(dma_rdata), .s02_axi_rresp(dma_rresp), .s02_axi_rlast(dma_rlast),
+        .s02_axi_rvalid(dma_rvalid), .s02_axi_rready(dma_rready), .s02_axi_rid()
+    );
+
+    // ★ B3-1a: DMA 流捕获器 —— 冒烟判据数据源 (512b 流 -> beats/bytes/首拍)
+    dma_sink u_dma_sink (
+        .clk(ui_clk), .rst_n(ui_rst_n),
+        .clk_user(user_clk), .rst_user_n(~aurora_rst),
+        .s_tdata(dma_tdata), .s_tkeep(dma_tkeep), .s_tlast(dma_tlast),
+        .s_tvalid(dma_tvalid), .s_tready(dma_tready),
+        .q0(dma_q0), .q1(dma_q1), .q2(dma_q2)
     );
 
 

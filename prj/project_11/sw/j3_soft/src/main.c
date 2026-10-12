@@ -90,6 +90,28 @@ static void busy_ms(unsigned ms)
         n--;
 }
 
+/* ---- B3-1a: AXI DMA MM2S (Lite @0x44A10000, 直通模式) ---- */
+#define DMA_BASE 0x44A10000u
+#define DMA_DMACR   (*(volatile unsigned *)(DMA_BASE + 0x00u))
+#define DMA_DMASR   (*(volatile unsigned *)(DMA_BASE + 0x04u))
+#define DMA_SA      (*(volatile unsigned *)(DMA_BASE + 0x18u))
+#define DMA_LENGTH  (*(volatile unsigned *)(DMA_BASE + 0x28u))
+
+static void uputh(unsigned v)          /* 8 位十六进制 */
+{
+    static const char hx[] = "0123456789abcdef";
+    int i;
+    for (i = 28; i >= 0; i -= 4)
+        uputc(hx[(v >> i) & 0xfu]);
+}
+
+/* 坑 #39: 互联 Lite 读首笔可能陈旧 —— 读两次取第二值 */
+static unsigned dread(volatile unsigned *r)
+{
+    (void)*r;
+    return *r;
+}
+
 /* 坑 #39 读冲刷: 哑写被忽略偏移(OKAY 零副作用, 不进计数)再读 */
 static unsigned rd_reg(volatile unsigned *r)
 {
@@ -325,6 +347,35 @@ int main(void)
             v_lr = rd_reg((volatile unsigned *)(REGS_BASE + 0x24u)) & 0xffffu;
             uputs("[B2] LAT w="); uputd(v_lw);
             uputs(" r=");        uputd(v_lr);
+            uputs("\r\n");
+        } else if (c == 'D') {
+            /* B3-1a DMA 冒烟: MM2S 读"最后一帧所在槽" 64B -> dma_sink 回读 */
+            unsigned wm, sa, sr, guard;
+            unsigned v_q0, v_q1, v_q2;
+            wm = rd_reg(&R_WM_WR) & 0xffffu;               /* 最后帧槽 = (wm-1)%256 */
+            sa = 0x00100000u + ((wm - 1u) & 0xffu) * 4096u;
+            DMA_DMACR = 0x4u;                              /* 复位 */
+            guard = 0;
+            while ((((sr = dread(&DMA_DMASR))) & 0x1u) == 0u)
+                if (++guard > 4000000u) break;
+            DMA_DMACR = 0x1u;                              /* RS=运行 */
+            guard = 0;
+            while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
+                if (++guard > 4000000u) break;
+            DMA_SA     = sa;
+            DMA_LENGTH = 64u;                              /* 写长度即启动 */
+            guard = 0;
+            do { sr = dread(&DMA_DMASR); }                 /* 等 Idle=1 */
+            while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
+            busy_ms(2);                                    /* sink 镜像稳定 */
+            v_q0 = rd_reg((volatile unsigned *)(REGS_BASE + 0x28u));
+            v_q1 = rd_reg((volatile unsigned *)(REGS_BASE + 0x2Cu));
+            v_q2 = rd_reg((volatile unsigned *)(REGS_BASE + 0x30u));
+            uputs("[B2] DMA sa=");  uputh(sa);
+            uputs(" sr=");         uputh(sr & 0xffffu);
+            uputs(" q0=");         uputh(v_q0);
+            uputs(" q1=");         uputh(v_q1);
+            uputs(" q2=");         uputh(v_q2);
             uputs("\r\n");
         } else if (c == 'I') {
             /* 板上实证 (2026-10-12): 打印中途穿插 AXI 读 (rd_reg) 会使 TX 行

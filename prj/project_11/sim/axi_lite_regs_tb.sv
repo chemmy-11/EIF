@@ -51,6 +51,8 @@ module axi_lite_regs_tb;
         .s_axi_rready(rready),
         .clk_user(clk_user), .rst_user_n(rst_user_n),
         .u_wr_frame(u_wr_frame), .u_rd_frame(u_rd_frame), .u_buf_drop(u_buf_drop),
+        .lat_w(16'h00C0), .lat_r(16'h0017),   // B3-0 观测口(常量, P8 读回校验)
+        .dma_q0(32'h0001_0040), .dma_q1(32'h5A5A_A5A5), .dma_q2(32'h0180_0000),  // B3-1a
         .ctl_owner(ctl_owner),
         .cfg_mode(cfg_mode), .cfg_rd_slot(cfg_rd_slot),
         .rd_req_pulse(rd_req_pulse), .cfg_wr_pulse(cfg_wr_pulse),
@@ -209,6 +211,13 @@ module axi_lite_regs_tb;
         lite_rd(32'h08, rd); chk(rd[15:0] === 16'hBEEF, "P5 fresh snapshot");
         lite_rd(32'h0C, rd); chk(rd[15:0] === 16'hCAFE, "P5 fresh snapshot 2");
         $display("[P5] all reads done");
+
+        // ---- P8 B3-0/B3-1a 观测寄存器读回 (常量直通)
+        lite_rd(32'h20, rd); $display("[P8] rd@20=%08x", rd); chk(rd === 32'h0000_00C0, "P8 LAT_W");
+        lite_rd(32'h24, rd); $display("[P8] rd@24=%08x", rd); chk(rd === 32'h0000_0017, "P8 LAT_R");
+        lite_rd(32'h28, rd); $display("[P8] rd@28=%08x", rd); chk(rd === 32'h0001_0040, "P8 DMA_Q0");
+        lite_rd(32'h2C, rd); $display("[P8] rd@2C=%08x", rd); chk(rd === 32'h5A5A_A5A5, "P8 DMA_Q1");
+        lite_rd(32'h30, rd); $display("[P8] rd@30=%08x", rd); chk(rd === 32'h0180_0000, "P8 DMA_Q2");
 
         // ---- P6 write to RO offset
         pulse_cnt = 0;

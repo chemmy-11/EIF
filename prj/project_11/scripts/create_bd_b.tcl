@@ -96,16 +96,28 @@ set xl [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_1]
 # ---- fabric + peripherals ----
 # 2026-10-11 板上换 axi_interconnect(M1 本板验证过): SmartConnect 的 M01 AXI4-Lite 写转换与本从机在真硬件上交互楔死 —— 未映射写/UART 写/读全通、TB 三种 AW/W 次序全过仍不复现, 唯写此从机挂
 create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0
-set_property -dict [list CONFIG.NUM_MI {2} CONFIG.NUM_SI {1}] [get_bd_cells axi_interconnect_0]
+set_property -dict [list CONFIG.NUM_MI {3} CONFIG.NUM_SI {1}] [get_bd_cells axi_interconnect_0]
 set u [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_uartlite:2.0 axi_uartlite_0]
 set_property -dict [list CONFIG.C_BAUDRATE {9600}] $u
 create_bd_cell -type module -reference axi_lite_regs axi_lite_regs_0
+
+# ---- B3-1a: axi_dma (MM2S only, 512b, direct mode) ----
+#   控制口 S_AXI_LITE @ clk_100m; 存储映射口 m_axi_mm2s_aclk = ui_clk(300M,
+#   与 MIG 同域 -> 顶层接仲裁器 S02, 无需 AXI 时钟转换); 流输出同 ui_clk 域。
+set dma [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_dma:7.1 axi_dma_0]
+set_property -dict [list CONFIG.C_INCLUDE_MM2S {1} CONFIG.C_INCLUDE_S2MM {0} CONFIG.C_INCLUDE_SG {0} CONFIG.C_M_AXI_MM2S_DATA_WIDTH {512} CONFIG.C_M_AXIS_MM2S_TDATA_WIDTH {512} CONFIG.C_SG_LENGTH_WIDTH {16}] $dma
+set ui_clk_port [create_bd_port -dir I -type clk ui_clk]
+set_property CONFIG.FREQ_HZ 300000000 $ui_clk_port
 puts "BD_STEP: cells created"
 
 # ---- interface connections ----
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/M_AXI_DP] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
 connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M00_AXI] [get_bd_intf_pins axi_uartlite_0/S_AXI]
 connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M01_AXI] [get_bd_intf_pins axi_lite_regs_0/S_AXI]
+connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M02_AXI] [get_bd_intf_pins axi_dma_0/S_AXI_LITE]
+# DMA 存储映射主口 / 流输出 -> 引到顶层 (S02=仲裁器, sink=dma_sink)
+make_bd_intf_pins_external [get_bd_intf_pins axi_dma_0/M_AXI_MM2S]
+make_bd_intf_pins_external [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S]
 connect_bd_intf_net [get_bd_intf_pins mdm_1/MBDEBUG_0] [get_bd_intf_pins microblaze_0/DEBUG]
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/DLMB] [get_bd_intf_pins microblaze_0_local_memory/DLMB]
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/ILMB] [get_bd_intf_pins microblaze_0_local_memory/ILMB]
@@ -129,20 +141,25 @@ connect_bd_net [get_bd_ports clk_100m] \
     [get_bd_pins axi_interconnect_0/M00_ACLK] \
     [get_bd_pins axi_interconnect_0/M01_ACLK] \
     [get_bd_pins axi_uartlite_0/s_axi_aclk] \
-    [get_bd_pins axi_lite_regs_0/aclk]
+    [get_bd_pins axi_lite_regs_0/aclk] \
+    [get_bd_pins axi_interconnect_0/M02_ACLK] \
+    [get_bd_pins axi_dma_0/s_axi_lite_aclk]
+connect_bd_net [get_bd_ports ui_clk] [get_bd_pins axi_dma_0/m_axi_mm2s_aclk]
 connect_bd_net [get_bd_pins rst_100m/peripheral_aresetn] \
     [get_bd_pins axi_interconnect_0/ARESETN] \
     [get_bd_pins axi_interconnect_0/S00_ARESETN] \
     [get_bd_pins axi_interconnect_0/M00_ARESETN] \
     [get_bd_pins axi_interconnect_0/M01_ARESETN] \
     [get_bd_pins axi_uartlite_0/s_axi_aresetn] \
-    [get_bd_pins axi_lite_regs_0/aresetn]
+    [get_bd_pins axi_lite_regs_0/aresetn] \
+    [get_bd_pins axi_interconnect_0/M02_ARESETN] \
+    [get_bd_pins axi_dma_0/axi_resetn]
 puts "BD_STEP: nets connected"
 
 # ---- user_clk-domain side of lite_regs: all pins external ----
 foreach pin {clk_user rst_user_n u_wr_frame u_rd_frame u_buf_drop ctl_owner \
              cfg_mode cfg_rd_slot rd_req_pulse cfg_wr_pulse \
-             lite_exec_cnt lite_rd_trig_cnt} {
+             lite_exec_cnt lite_rd_trig_cnt lat_w lat_r dma_q0 dma_q1 dma_q2} {
     make_bd_pins_external [get_bd_pins axi_lite_regs_0/$pin]
     set_property name $pin [get_bd_ports ${pin}_0]
 }
@@ -160,6 +177,7 @@ if {[llength $lite_segs] == 0} {
 }
 if {[llength $lite_segs] == 0} { error "BD: no address segment found on axi_lite_regs_0" }
 assign_bd_address -offset 0x44A00000 -range 0x00001000 -target_address_space [get_bd_addr_spaces microblaze_0/Data] $lite_segs -force
+assign_bd_address -offset 0x44A10000 -range 0x00001000 -target_address_space [get_bd_addr_spaces microblaze_0/Data] [get_bd_addr_segs axi_dma_0/S_AXI_LITE/Reg] -force
 puts "BD_STEP: addresses assigned"
 
 validate_bd_design
