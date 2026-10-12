@@ -41,6 +41,7 @@
 - **桥内计数器**（`axi4_master_bridge.v`，独立 always 块）：`lat_w` = AW 握手（仅队列空时武装，保证同帧配对）→ B 出队；`lat_r` = AR 握手 → 首个 R 拍；16 bit 饱和计，**不进任何 FSM 判决路径**；
 - **双回读路**：UDP `GET_LATENCY(0x05)`（`cmd_channel.v`，v16=Lw / v16b=Lr / v16c=采样序号）+ 软核 **Lite `+0x20 LAT_W` / `+0x24 LAT_R`**（`axi_lite_regs.v`，B 版正式形态）；`frame_mem_if` 用 **gray+2FF** 把 ui 域值镜像到 user 域；
 - **离线验证**：`sim/run_lat_sweep.bat` 四参数点扫描 **PASS**（活性非零 / 同配置 3 次读数完全一致 / 写侧 W_DLY+5 → 精确 +5 / 读侧 AR_LAT 8→200 → 9→249 单调 / bresp=0 不死锁）；**W2 回归 STAT 行与基线逐字一致**（`STALL_EN_T` 参数区分基线与测量态）；lite / cmd / W4-joint 回归全绿；
+- **J_B3-0 板上实测（2026-10-12）**：位流 `bf371b5d`（WNS +0.010 / 0 WHS +0.004 / 0 CW）+ `scripts/lat_measure.py` 128 帧采样 —— **Lw 中位 97 拍(0.32µs)/max 246(0.82µs)、Lr 中位 23 拍(0.08µs)/max 160(0.53µs)**，`LAT_BOARD: PASS`（同时满足粗上界 11300 与条件上界 2100 拍 ⇒ 条件上界前提成立）；**Lw/Lr 设计输入缺口闭合**（此前 B3 的硬阻断）；
 - **判据口径**：计数器量的是"桥观测延迟"（含桥内流水/队列），与 MIG 模型参数非逐拍 1:1；**绝对值只在板上取**，板上用 min/中位/max 分布。详见毕设 `调试记录/阶段三_prj11_B3-0延迟可观测离线记录_2026-10-12`。
 
 ## 用法

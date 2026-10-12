@@ -653,8 +653,8 @@ mb_ctrl u_mb_ctrl (
     .u_wr_frame      (mem_u_wr_frame      ),
     .u_rd_frame      (mem_u_rd_frame      ),
     .u_buf_drop      (mem_u_buf_drop      ),
-    .lat_w           (mem_lat_w           ),
-    .lat_r           (mem_lat_r           ),
+    // B3-0: lat_w/lat_r 需先在 mb_ctrl BD 上加输入端口才能接入其内部 axi_lite_regs
+    //       —— 该 BD 改动与 B3-1（加 AXI DMA）合并做，B3-0 板上测量走 UDP 0x05 路。
     .ctl_owner       (ctl_owner           ),
     .cfg_mode        (lite_cfg_mode       ),
     .cfg_rd_slot     (lite_cfg_rd_slot    ),

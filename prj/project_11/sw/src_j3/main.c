@@ -290,7 +290,7 @@ int main(void)
         for (;;) { }
     }
 
-    uputs("[B2-SOFT] WAITCMD (M/A/B/S/I)\r\n");
+    uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L)\r\n");
     for (;;) {
         char c, d;
         while (!urx_poll()) { }
@@ -318,6 +318,14 @@ int main(void)
         else if (c == 'S') {
             R_MODE = MODE_SEQ;
             uputs("[B2] SEQRESTORED (cmd S)\r\n");
+        } else if (c == 'L') {
+            /* B3-0 Lite 路: 回读 MIG 读写延迟观测寄存器 (先读后打, 坑 #44) */
+            unsigned v_lw, v_lr;
+            v_lw = rd_reg((volatile unsigned *)(REGS_BASE + 0x20u)) & 0xffffu;
+            v_lr = rd_reg((volatile unsigned *)(REGS_BASE + 0x24u)) & 0xffffu;
+            uputs("[B2] LAT w="); uputd(v_lw);
+            uputs(" r=");        uputd(v_lr);
+            uputs("\r\n");
         } else if (c == 'I') {
             /* 板上实证 (2026-10-12): 打印中途穿插 AXI 读 (rd_reg) 会使 TX 行
              * 中后段字节损坏 (PDRC-203 引脚组; READY/DONE 等纯打印行完好,
