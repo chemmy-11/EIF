@@ -268,6 +268,7 @@ wire [31:0] mem_dbg_wr_cycles, mem_dbg_rd_cycles, mem_dbg_wr_beats, mem_dbg_rd_b
 wire [15:0] mem_u_wr_frame, mem_u_rd_frame, mem_u_buf_drop;
 wire [31:0] mem_u_hold_cycles;
 wire [8:0]  mem_outstanding_sync;                     // user 域灰码镜像(合法跨域读)
+wire [15:0] mem_lat_w, mem_lat_r;                     // B3-0: MIG 延迟镜像(ui->user 2FF, 桥①)
 
 // 读命令生成: 槽中有未读帧 且 桥空闲 且 上一拍没发过 → 单拍
 // (ro_outstanding_sync 由桥内 gray+2FF 镜像, 单调语义; false-positive 空读
@@ -614,6 +615,8 @@ cmd_channel u_cmd (
     .u_wr_frame     (mem_u_wr_frame   ),
     .u_rd_frame     (mem_u_rd_frame   ),
     .u_buf_drop     (mem_u_buf_drop   ),
+    .lat_w          (mem_lat_w        ),
+    .lat_r          (mem_lat_r        ),
     .cfg_mode       (cmd_cfg_mode     ),
     .cfg_rd_slot    (cmd_cfg_rd_slot  ),
     .rd_req_pulse   (cmd_rd_req_pulse ),
@@ -650,6 +653,8 @@ mb_ctrl u_mb_ctrl (
     .u_wr_frame      (mem_u_wr_frame      ),
     .u_rd_frame      (mem_u_rd_frame      ),
     .u_buf_drop      (mem_u_buf_drop      ),
+    .lat_w           (mem_lat_w           ),
+    .lat_r           (mem_lat_r           ),
     .ctl_owner       (ctl_owner           ),
     .cfg_mode        (lite_cfg_mode       ),
     .cfg_rd_slot     (lite_cfg_rd_slot    ),
@@ -701,6 +706,7 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .cfg_mode(cfg_mode_eff), .cfg_rd_slot(cfg_rd_slot_eff),  // prj11 B1: owner 仲裁(复位后默认 UDP/SEQ)
     .ro_u_wr_frame(mem_u_wr_frame), .ro_u_rd_frame(mem_u_rd_frame),
     .ro_u_buf_drop(mem_u_buf_drop), .ro_u_hold_cycles(mem_u_hold_cycles),
+    .ro_lat_w(mem_lat_w), .ro_lat_r(mem_lat_r),
     .ro_outstanding_sync(mem_outstanding_sync),
     // DDR 侧 (ui_clk)
     .ui_clk(ui_clk), .ui_rst_n(ui_rst_n), .calib_ok(calib),

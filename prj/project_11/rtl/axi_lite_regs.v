@@ -70,6 +70,8 @@ module axi_lite_regs (
     input  wire [15:0] u_wr_frame,       // frame_mem_if.ro_u_wr_frame
     input  wire [15:0] u_rd_frame,       // frame_mem_if.ro_u_rd_frame
     input  wire [15:0] u_buf_drop,       // frame_mem_if.ro_u_buf_drop
+    input  wire [15:0] lat_w,            // B3-0: MIG write latency (ui cycles)
+    input  wire [15:0] lat_r,            // B3-0: MIG read latency (ui cycles)
     input  wire        ctl_owner,        // top-level owner flag (status read)
     output reg         cfg_mode,         // 0 = SEQ, 1 = RND   -> owner mux
     output reg  [7:0]  cfg_rd_slot,      //                    -> owner mux
@@ -398,6 +400,9 @@ module axi_lite_regs (
                         6'h05: d_data <= {8'd1, u_wr_frame[7:0], 16'd0};
                         6'h06: d_data <= {ctl_owner, 1'b0, lite_rd_trig_cnt};
                         6'h07: d_data <= REG_ID;
+                        // B3-0: +0x20 LAT_W / +0x24 LAT_R (r_addr = awaddr[7:2])
+                        6'h08: d_data <= {16'd0, lat_w};
+                        6'h09: d_data <= {16'd0, lat_r};
                         default: d_data <= 32'd0;
                     endcase
                     d_req <= 1'b1;                      // data held stable

@@ -90,6 +90,8 @@ module cmd_channel #(
     input  wire [15:0] u_wr_frame,     // frame_mem_if.ro_u_wr_frame
     input  wire [15:0] u_rd_frame,     // frame_mem_if.ro_u_rd_frame
     input  wire [15:0] u_buf_drop,     // frame_mem_if.ro_u_buf_drop
+    input  wire [15:0] lat_w,          // B3-0: MIG write latency (AW->B, ui cycles)
+    input  wire [15:0] lat_r,          // B3-0: MIG read latency (AR->first R)
     output reg         cfg_mode,       // 0 = SEQ, 1 = RND  -> u_mem.cfg_mode
     output reg  [7:0]  cfg_rd_slot,    //                  -> u_mem.cfg_rd_slot
     output reg         rd_req_pulse,   // single user_clk pulse: trigger one read
@@ -108,6 +110,7 @@ localparam [7:0]  OP_SET_MODE   = 8'h01;
 localparam [7:0]  OP_READ_SLOT  = 8'h02;
 localparam [7:0]  OP_GET_WM     = 8'h03;
 localparam [7:0]  OP_GET_MAP    = 8'h04;
+localparam [7:0]  OP_GET_LAT    = 8'h05;   // B3-0: GET_LATENCY (0x05 idle)
 
 localparam [7:0]  ST_OK         = 8'd0;    // status: OK
 localparam [7:0]  ST_BADARG     = 8'd1;    // status: illegal parameter
@@ -884,7 +887,13 @@ always @(posedge clk_user or negedge rst_user_n) begin
                 OP_GET_MAP: begin
                     u_v16  <= u_wr_frame;
                     u_v16b <= {8'd0, u_wr_frame[7:0]};  // write slot = frame%256
-                    u_v16c <= 16'd1;                    // mapping rule id = 1
+                    u_v16c <= 16'd1;                     // mapping rule id = 1
+                    ust    <= U_RESP;
+                end
+                OP_GET_LAT: begin                       // B3-0: Lw/Lr probe
+                    u_v16  <= lat_w;                     // v16 = Lw (ui cycles)
+                    u_v16b <= lat_r;                     // v16b = Lr
+                    u_v16c <= {8'd0, cmd_exec_cnt[7:0]}; // sample seq tag
                     ust    <= U_RESP;
                 end
                 default: begin

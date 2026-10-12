@@ -57,6 +57,11 @@ module frame_mem_if #(
     output wire [15:0]  ro_u_buf_drop,
     output wire [31:0]  ro_u_hold_cycles,
     output wire [8:0]   ro_outstanding_sync,
+    // ---- B3-0 (2026-10-12): MIG latency, ui->user 2FF gray mirror ----
+    // Latest AW->B / AR->first-R cycle counts from the bridge (ui_clk domain),
+    // mirrored into user_clk for both readback paths (UDP cmd channel + Lite).
+    output wire [15:0]  ro_lat_w,
+    output wire [15:0]  ro_lat_r,
 
     // ================= DDR side (ui_clk domain) =================
     input  wire         ui_clk,
@@ -147,6 +152,10 @@ module frame_mem_if #(
     wire [24:0] rd_dout;  wire rd_empty, rd_full;
     wire        rdesc_wr_en;  wire [24:0] rdesc_din;
 
+    // B3-0: bridge latency outputs (ui_clk domain) -- declared here so the
+    // ui->user 2FF mirror block below can reference them.
+    wire [15:0] lat_w_i, lat_r_i;
+
     async_fifo #(.DW(8), .AW(BF_AW)) u_wr_bytes (
         .wr_clk(user_clk), .wr_rst_n(user_rst_n), .wr_data(wr_data), .wr_en(ub_wr_en),
         .wr_full(ub_full), .wr_level(ub_wl),
@@ -202,6 +211,42 @@ module frame_mem_if #(
     end
     wire [8:0] outstanding_sync = gray2bin9(out_g_s2);
     assign ro_outstanding_sync = outstanding_sync;
+
+    //=========================================================================
+    // 2b. B3-0: MIG latency counters mirrored ui->user (same gray + 2FF
+    //     recipe; slow-changing sampled values, 2FF is sufficient).
+    //=========================================================================
+    function [15:0] bin2gray16(input [15:0] b); bin2gray16 = (b >> 1) ^ b; endfunction
+    function [15:0] gray2bin16(input [15:0] g);
+        integer j;
+        begin
+            gray2bin16[15] = g[15];
+            for (j = 14; j >= 0; j = j - 1) gray2bin16[j] = g[j+1] ^ g[j];
+        end
+    endfunction
+
+    reg  [15:0] latw_g_ui, latr_g_ui;
+    reg  [15:0] latw_g_s1, latw_g_s2, latr_g_s1, latr_g_s2;
+
+    always @(posedge ui_clk or negedge ui_rst_n) begin
+        if (!ui_rst_n) begin
+            latw_g_ui <= 16'd0; latr_g_ui <= 16'd0;
+        end else begin
+            latw_g_ui <= bin2gray16(lat_w_i);
+            latr_g_ui <= bin2gray16(lat_r_i);
+        end
+    end
+    always @(posedge user_clk or negedge user_rst_n) begin
+        if (!user_rst_n) begin
+            latw_g_s1 <= 16'd0; latw_g_s2 <= 16'd0;
+            latr_g_s1 <= 16'd0; latr_g_s2 <= 16'd0;
+        end else begin
+            latw_g_s1 <= latw_g_ui; latw_g_s2 <= latw_g_s1;
+            latr_g_s1 <= latr_g_ui; latr_g_s2 <= latr_g_s1;
+        end
+    end
+    assign ro_lat_w = gray2bin16(latw_g_s2);
+    assign ro_lat_r = gray2bin16(latr_g_s2);
 
     //=========================================================================
     // 3. write side: frame gather, acceptance policy, byte + descriptor push
@@ -375,6 +420,7 @@ module frame_mem_if #(
         .dbg_wr_slot(ro_dbg_wr_slot), .dbg_rd_slot(ro_dbg_rd_slot),
         .dbg_wr_cycles(dbg_wr_cycles), .dbg_rd_cycles(dbg_rd_cycles),
         .dbg_wr_beats(dbg_wr_beats), .dbg_rd_beats(dbg_rd_beats),
+        .lat_w(lat_w_i), .lat_r(lat_r_i),
         .m_axi_awaddr(m_axi_awaddr), .m_axi_awlen(m_axi_awlen), .m_axi_awsize(m_axi_awsize),
         .m_axi_awburst(m_axi_awburst), .m_axi_awvalid(m_axi_awvalid), .m_axi_awready(m_axi_awready),
         .m_axi_wdata(m_axi_wdata), .m_axi_wstrb(m_axi_wstrb), .m_axi_wlast(m_axi_wlast),

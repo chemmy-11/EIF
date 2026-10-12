@@ -21,8 +21,11 @@
 //     xelab -generic_top "AR_LAT_T=200" -generic_top "W_DLY_T=198"
 //     (defaults reproduce the W2 baseline exactly).
 module mem_bridge_tb #(
-    parameter integer AR_LAT_T = 8,   // read first-beat latency (ui cycles)
-    parameter integer W_DLY_T  = 0    // EXTRA write-response delay (ui cycles)
+    parameter integer AR_LAT_T  = 8,   // read first-beat latency (ui cycles)
+    parameter integer W_DLY_T   = 0,   // EXTRA write-response delay (ui cycles)
+    parameter integer STALL_EN_T = 1   // model random stalls: 1 = W2 baseline
+                                       // (STAT byte-identical), 0 = clean
+                                       // latency measurement (B3-0 sweep)
 )();
 
     // ---------------- clocks ----------------
@@ -52,6 +55,7 @@ module mem_bridge_tb #(
     wire [15:0] ro_u_wr_frame, ro_u_rd_frame, ro_u_buf_drop;
     wire [31:0] ro_u_hold_cycles;
     wire [8:0]  ro_outstanding_sync;
+    wire [15:0] tb_lat_w, tb_lat_r;   // B3-0: latency mirror (user domain)
 
     // ---------------- ui side ----------------
     wire [15:0] ro_wm, ro_wr_frame, ro_wr_stall, ro_rd_frame, ro_ill_rd, ro_noframe, ro_bresp_err;
@@ -105,6 +109,7 @@ module mem_bridge_tb #(
         .ro_u_wr_frame(ro_u_wr_frame), .ro_u_rd_frame(ro_u_rd_frame),
         .ro_u_buf_drop(ro_u_buf_drop), .ro_u_hold_cycles(ro_u_hold_cycles),
         .ro_outstanding_sync(ro_outstanding_sync),
+        .ro_lat_w(tb_lat_w), .ro_lat_r(tb_lat_r),   // B3-0 latency mirror
         .ui_clk(ui_clk), .ui_rst_n(ui_rst_n), .calib_ok(calib_ok),
         .ro_wm(ro_wm), .ro_wr_frame(ro_wr_frame), .ro_wr_stall(ro_wr_stall),
         .ro_rd_frame(ro_rd_frame), .ro_ill_rd(ro_ill_rd), .ro_noframe(ro_noframe),
@@ -127,7 +132,7 @@ module mem_bridge_tb #(
         .m_axi_arprot(m_arprot), .m_axi_arqos(m_arqos), .m_axi_rid(m_rid));
 
     axi4_ram_model #(.MEM_BYTES(1<<20), .AR_LAT(AR_LAT_T), .W_RESP_DLY(W_DLY_T),
-                     .STALL_EN(1)) u_ram (
+                     .STALL_EN(STALL_EN_T)) u_ram (
         .clk(ui_clk), .rst_n(ui_rst_n),
         .s_awaddr(m_awaddr), .s_awlen(m_awlen), .s_awsize(m_awsize), .s_awburst(m_awburst),
         .s_awvalid(m_awvalid), .s_awready(m_awready),
@@ -294,6 +299,7 @@ module mem_bridge_tb #(
         fid     = 1;   // frame 0 is now committed: keep fid, wm and slot index in step
         $display("T6: calib_ok=0 -> %0d AXI beats, gate holds, no hang", mon_wb);
         result("T6 (MIG hard gate)", e0);
+
 
         // ================= T1: J2 byte-exactness =================
         e0 = errs;
@@ -478,12 +484,56 @@ module mem_bridge_tb #(
 
         $display("STAT wstrb: full=%0d partial_tail=%0d illegal=%0d", strb_full, strb_partial, strb_bad);
 
+
         if (mon_4k != 0) fail("AXI 4KB boundary crossed");
         if (mon_err != 0) fail("AXI protocol/length error");
         if (strb_bad != 0) fail("A3: WSTRB mask illegal (non-contiguous or partial on non-tail beat)");
 
         if (errs == 0) $display("=== prj10 W2 SIM: PASS (0 errors) ===");
         else           $display("=== prj10 W2 SIM: FAIL (%0d errors) ===", errs);
+
+        // ================= B3-0: MIG latency measurement (post-verdict) =====
+        // Runs AFTER the W2 verdict so no existing judgment is perturbed.
+        // Resets the DUT to a clean state (all slots free) so the isolated
+        // frame is accepted and the counters sample a true isolated latency.
+        user_rst_n = 1'b0; ui_rst_n = 1'b0;
+        repeat (40) @(posedge user_clk);
+        ui_rst_n = 1'b1; repeat (20) @(posedge ui_clk);
+        user_rst_n = 1'b1; calib_ok = 1'b1;
+        repeat (60) @(posedge user_clk);
+        begin
+            int lm_guard;
+            send_frame(0, 64, 1'b1, sentb);           // one frame -> slot 0
+            lm_guard = 0;
+            while ((ro_wr_frame == 0) && (lm_guard < 400000)) begin
+                @(posedge user_clk); lm_guard = lm_guard + 1;
+            end
+            do_read(1'b1, 0);                         // read it back (slot 0)
+            lm_guard = 0;
+            while ((ro_rd_frame == 0) && (lm_guard < 400000)) begin
+                @(posedge user_clk); lm_guard = lm_guard + 1;
+            end
+            repeat (400) @(posedge user_clk);         // 2FF mirror settle
+        end
+        // three isolated write+read pairs -> repeatability of each counter
+        begin
+            int rp, lg;
+            for (rp = 0; rp < 3; rp = rp + 1) begin
+                send_frame(0, 64, 1'b1, sentb);
+                lg = 0;
+                while ((ro_wr_frame < (rp + 2)) && (lg < 400000)) begin
+                    @(posedge user_clk); lg = lg + 1;
+                end
+                do_read(1'b1, rp % 2);
+                lg = 0;
+                while ((ro_rd_frame < (rp + 2)) && (lg < 400000)) begin
+                    @(posedge user_clk); lg = lg + 1;
+                end
+                repeat (300) @(posedge user_clk);
+                $display("LAT_MEAS stall=%0d ar=%0d wd=%0d rep=%0d lat_w=%0d lat_r=%0d bresp=%0d",
+                         STALL_EN_T, AR_LAT_T, W_DLY_T, rp, tb_lat_w, tb_lat_r, ro_bresp_err);
+            end
+        end
         $finish;
     end
 

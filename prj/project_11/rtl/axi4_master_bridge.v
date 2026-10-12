@@ -103,6 +103,14 @@ module axi4_master_bridge #(
     output reg  [31:0]  dbg_rd_cycles,  // ui cycles spent servicing a read frame
     output reg  [31:0]  dbg_wr_beats,
     output reg  [31:0]  dbg_rd_beats,
+    // ---- B3-0 (2026-10-12): MIG read/write latency observability ----
+    // lat_w = cycles from AW handshake (this frame enters the commit queue)
+    //         to that frame's B dequeue; lat_r = AR handshake to first R beat.
+    // "Latest value" only -- min/max/distribution are computed on the READ
+    // side (user domain) so the ui_clk critical cone gains nothing beyond two
+    // 16b registers + an adder (96b of counters here once cost WNS -1.142).
+    output reg  [15:0]  lat_w,
+    output reg  [15:0]  lat_r,
 
     // ---------------- AXI4 master (512-bit data) ----------------
     output wire [31:0]  m_axi_awaddr,
@@ -660,6 +668,65 @@ module axi4_master_bridge #(
             end
             default: rstate <= R_IDLE;
             endcase
+        end
+    end
+
+    //=========================================================================
+    // 10. B3-0: MIG latency observability (own always block -- RAM/FSM
+    //     partition discipline, Correction #33/#34). Latest-value only.
+    //
+    //  lat_w: AW handshake (frame enters the 4-deep commit queue) -> the SAME
+    //         frame's B dequeue. Same-ID FIFO order guarantees the dequeued
+    //         entry (cqs0) is the oldest un-committed one; the queue position
+    //         is tracked in a 2-bit counter to pair the right enqueue.
+    //  lat_r: AR handshake -> first R beat of that burst (the MIG's data
+    //         return delay -- the number the Lw/Lr study needs).
+    //  Saturating: if a response never comes the counter freezes at its max
+    //  and the EXISTING timeout paths (stat_bresp_err / W_DRAIN / R_ARB
+    //  sticky) handle recovery -- no new FSM states, no cone cost.
+    //=========================================================================
+    reg [15:0] lat_w_cnt;
+    reg        lat_w_arm;      // counting: armed at AW accept, closed at B dequeue
+    reg [15:0] lat_r_cnt;
+    reg        lat_r_arm;      // counting: armed at AR accept, closed at first R
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            lat_w     <= 16'd0;
+            lat_r     <= 16'd0;
+            lat_w_cnt <= 16'd0;
+            lat_r_cnt <= 16'd0;
+            lat_w_arm <= 1'b0;
+            lat_r_arm <= 1'b0;
+        end else begin
+            // ---- write path: arm only when the commit queue is EMPTY, so the
+            //      next B dequeue provably pairs with THIS frame's AW (same-ID
+            //      FIFO). Back-to-back frames with a busy queue are simply not
+            //      sampled -- keeps every recorded lat_w an isolated-frame true
+            //      latency instead of a queue-depth artifact. ----
+            if (m_axi_awvalid && m_axi_awready && !lat_w_arm && (cq_cnt == 3'd0)) begin
+                lat_w_cnt <= 16'd1;
+                lat_w_arm <= 1'b1;
+            end else if (lat_w_arm) begin
+                if (m_axi_bvalid && m_axi_bready) begin
+                    lat_w     <= lat_w_cnt;    // snapshot on dequeue
+                    lat_w_arm <= 1'b0;
+                end else if (lat_w_cnt != 16'hFFFF) begin
+                    lat_w_cnt <= lat_w_cnt + 16'd1;
+                end
+            end
+            // ---- read path: arm on AR accept ----
+            if (m_axi_arvalid && m_axi_arready && !lat_r_arm) begin
+                lat_r_cnt <= 16'd1;
+                lat_r_arm <= 1'b1;
+            end else if (lat_r_arm) begin
+                if (m_axi_rvalid && m_axi_rready) begin
+                    lat_r     <= lat_r_cnt;    // snapshot on first data beat
+                    lat_r_arm <= 1'b0;
+                end else if (lat_r_cnt != 16'hFFFF) begin
+                    lat_r_cnt <= lat_r_cnt + 16'd1;
+                end
+            end
         end
     end
 
