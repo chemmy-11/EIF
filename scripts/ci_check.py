@@ -25,10 +25,18 @@ SKIPS: list[str] = []
 
 
 def tracked_files() -> list[Path]:
-    """仓库已跟踪文件（CI 与本地一致；git 不可用时退回全盘扫描）。"""
+    """仓库已跟踪文件（CI 与本地一致；git 不可用时退回全盘扫描）。
+
+    -c core.quotepath=false 必须带：默认 git 会把非 ASCII 文件名输出成八进制转义串
+    （docs/\\350\\247\\204...），Path 解析不到 ⇒ 全部中文名文件会被静默跳过检查（坑账本 #46）。
+    """
     try:
         out = subprocess.run(
-            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+            ["git", "-c", "core.quotepath=false", "ls-files"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout
         return [ROOT / p for p in out.splitlines() if p.strip()]
     except Exception:
@@ -38,9 +46,9 @@ def tracked_files() -> list[Path]:
 # ---------- 1. 文档命名规范 ----------
 ALLOWED_HEAD = {
     "阶段一", "阶段二", "阶段二前置", "阶段三", "阶段四", "阶段五",
-    "前置", "参考", "里程碑", "汇报", "规划", "追踪", "结论", "架构", "导览",
+    "前置", "参考", "里程碑", "汇报", "规划", "追踪", "结论", "架构", "导览", "复现",
 }
-SEG_HEAD = re.compile(r"^阶段[一二三四五](之[一二三四五六七八九十]+)?$")
+SEG_HEAD = re.compile(r"^阶段[一二三四五](前置)?(之[一二三四五六七八九十]+)?$")
 
 
 def check_doc_names(files: list[Path]) -> None:

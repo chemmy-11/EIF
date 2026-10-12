@@ -1,0 +1,15 @@
+docs: 中文文档全量纳检修复 + 3 文件改名 + AI-Infra 运行时口径订正（坑 #45/#46）
+
+ci_check.py 修复 git ls-files 转义盲区（core.quotepath=false，坑 #46）——修复后立即
+暴露并处置 4 处命名违规；SEG_HEAD 扩展「阶段X前置之N」，类别头新增「复现」。
+
+改名 3 文件（vault + docs 镜像同步，frontmatter alias 保旧链接）：
+- 复现/prj9_复现指南.md → 复现_prj9_指南_2026-10-09.md
+- 复现/prj10_复现指南.md → 复现_prj10_指南_2026-10-09.md
+- 汇报/导师原话验证报告_prj10内存进环路_2026-10-08.md → 汇报_导师原话验证报告_prj10内存进环路_2026-10-08.md
+引用同步：vault 15 处、镜像 17 处；另修 repo 根 README 1 处、AGENTS.md 2 处、w6_archive.py 1 处
+（归档清单文件名跟随改名）。镜像特有 2 处：追踪文件 AI-Infra 报告改指镜像扁平名、开题报告降为 code span。
+
+坑账本新增 #45（Git Bash `python` 是别名坏壳，静默退 49；须全路径解释器）。
+AI-Infra 口径订正（llama.cpp 实际落地）：设计报告 §3.0.6 订正注 + §8.2 引用修正，
+镜像同步；架构修订报告 §6 订正注（vault-only，未镜像）。
