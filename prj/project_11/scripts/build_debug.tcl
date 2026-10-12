@@ -12,6 +12,12 @@ set proj  D:/FPGA/prj/project_11
 file mkdir $proj/out
 
 open_project $proj/vivado/prj11.xpr
+# ---- B3-1: 新增 RTL 幂等纳入工程（create_project 只在首建加文件）----
+if {[llength [get_files -quiet axi_arb_3to1.v]] == 0} {
+    add_files -fileset sources_1 $proj/rtl/axi_arb_3to1.v
+    puts "ADD_FILES: axi_arb_3to1.v"
+    update_compile_order -fileset sources_1
+}
 # ---- ddr4_0 配置已改(System_Clock=No_Buffer): 强制重建其产物与 OOC run ----
 # reset_run synth_1 不级联 IP run; 不重建则顶层读到旧差分 stub -> [Synth 8-11365]
 reset_target  all [get_ips ddr4_0]

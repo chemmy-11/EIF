@@ -874,7 +874,8 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
 
     // ---- 自研 AXI 仲裁器(2026-10-06): S00=桥① S01=桥② M=MIG, 事务级轮转 ----
     //   (SmartConnect/AXI Interconnect 2023.1 均锁 IP Integrator, 实测独立生成产物为空壳)
-    axi_arb_2to1 u_arb (
+    // B3-1: 2 主 -> 3 主（S02 预留 AXI DMA MM2S；MIG 只有一个从机口）
+    axi_arb_3to1 u_arb (
         .s00_axi_awid(m_awid),
         .s00_axi_awaddr(m_awaddr),
         .s00_axi_awlen(m_awlen),
@@ -987,7 +988,21 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
         .m_axi_rready(sc_s_rready),
         .m_axi_rid(sc_s_rid),
         .clk(ui_clk),
-        .rst_n(ui_rst_n)
+        .rst_n(ui_rst_n),
+        // ---- S02: 预留给 AXI DMA MM2S（B3-1 接入前悬空；接 0 即永久不授权）----
+        .s02_axi_awid(4'h0), .s02_axi_awaddr(32'h0), .s02_axi_awlen(8'h0),
+        .s02_axi_awsize(3'h0), .s02_axi_awburst(2'h0), .s02_axi_awlock(1'b0),
+        .s02_axi_awcache(4'h0), .s02_axi_awprot(3'h0), .s02_axi_awqos(4'h0),
+        .s02_axi_awvalid(1'b0), .s02_axi_awready(),
+        .s02_axi_wdata(512'h0), .s02_axi_wstrb(64'h0), .s02_axi_wlast(1'b0),
+        .s02_axi_wvalid(1'b0), .s02_axi_wready(),
+        .s02_axi_bresp(), .s02_axi_bvalid(), .s02_axi_bready(1'b1), .s02_axi_bid(),
+        .s02_axi_arid(4'h0), .s02_axi_araddr(32'h0), .s02_axi_arlen(8'h0),
+        .s02_axi_arsize(3'h0), .s02_axi_arburst(2'h0), .s02_axi_arlock(1'b0),
+        .s02_axi_arcache(4'h0), .s02_axi_arprot(3'h0), .s02_axi_arqos(4'h0),
+        .s02_axi_arvalid(1'b0), .s02_axi_arready(),
+        .s02_axi_rdata(), .s02_axi_rresp(), .s02_axi_rlast(),
+        .s02_axi_rvalid(), .s02_axi_rready(1'b1), .s02_axi_rid()
     );
 
 
