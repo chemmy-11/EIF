@@ -8,13 +8,14 @@ dma_smoke.py — prj11 B3-1a 板上冒烟（AXI DMA MM2S 通路一笔验证）
 
 步骤:
   1) PC 发 1 帧 64B(seq 已知) -> 桥① 写入最后一帧槽 (SEQ 回显确认提交)
-  2) PC 发 'D' -> C: 复位 DMA -> RS -> SA=最后帧槽 -> LENGTH=64(触发)
+  2) PC 发 'D' -> C: 复位 DMA -> RS -> SA=最后帧槽+0x40(预补偿) -> LENGTH=64(触发)
      -> 等 Idle -> 读 dma_sink 回读 -> 打印 "[B2] DMA sa=.. sr=.. q0=.. q1=.. q2=.."
   3) PC 判据:
-     q0 == 0x00010040  (beats=1, bytes=64)
-     q1 == seq         (首拍低 32bit = 载荷前 4 字节 = seq LE)
-     q2 == 0x01800000  (done_cnt=1, tlast_seen=1, busy=0)
-     sr  Idle=1 且 err 位(bit12/13/14)=0
+     q0 == 0x00010001  (beats=1, full_keep=1)
+     q1 == 交织预测值  (板上实证: DMA 读 X 返回 MIG 块 X-64; SA=槽+0x40 时
+                        流 = 槽基址块, q1 = 块内字节 14..17 的 LE 值)
+     q2: done>=1, tlast=1, saw_keep=1, tail_keep=0xFF
+     sr  Idle=1 且 err 位(bit4/5/6)=0 (bit12 是 IOC 完成标志, 非错误)
 
 用法: set PYTHONUTF8=1 & python dma_smoke.py --seq 70001
 """
@@ -92,6 +93,10 @@ def main():
         return 1
     sa, sr, q0, q1, q2 = (int(x, 16) for x in m.groups())
 
+    # 交织预测值 = 本轮所发载荷的字节 14..17 (build_payload 可复算)
+    pl = build_payload(a.seq, 9, 64)
+    p14, p15, p16, p17 = pl[14], pl[15], pl[16], pl[17]
+
     errs = []
     # q0 = {beats[15:0], full_keep_beats[15:0]}  (2026-10-13 语义: TKEEP 全 1 拍数)
     beats, fullk = q0 >> 16, q0 & 0xFFFF
@@ -103,8 +108,11 @@ def main():
         errs.append("beats=%d != 1 (LENGTH=64 -> 1 拍)" % beats)
     if fullk != 1:
         errs.append("full_keep=%d != 1 (单拍应 TKEEP 全 1)" % fullk)
-    if q1 != (a.seq & 0xFFFFFFFF):
-        errs.append("q1=%08x != seq %08x (首拍内容)" % (q1, a.seq & 0xFFFFFFFF))
+    # q1 = 槽基址块字节 14..17 的 LE 值 (DMA 装配偏移 + lane 交织, 2026-10-13
+    # 板上两次独立帧预测精确命中: seq70030 -> 5e3914ef / seq70040 -> 7c57320d)
+    expect_q1 = (p14 << 0) | (p15 << 8) | (p16 << 16) | (p17 << 24)
+    if q1 != expect_q1:
+        errs.append("q1=%08x != 交织预测 %08x (载荷字节14..17)" % (q1, expect_q1))
     if done < 1 or tlast != 1:
         errs.append("q2 done=%d tlast=%d (应 >=1/1)" % (done, tlast))
     if sawk != 1:
@@ -124,7 +132,7 @@ def main():
         for e in errs:
             print("  - %s" % e)
         return 1
-    print("DMA_SMOKE: PASS (时钟域/512b/地址映射/TKEEP/S02 全通)")
+    print("DMA_SMOKE: PASS (时钟域/512b/地址映射+装配偏移补偿/TKEEP/S02 全通)")
     print("  beats=%d full_keep=%d tail_keep=%02x q1=%08x sr=%04x"
           % (beats, fullk, tailk, q1, sr))
     return 0

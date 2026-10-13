@@ -112,11 +112,17 @@ static unsigned dread(volatile unsigned *r)
     return *r;
 }
 
-/* 坑 #39 读冲刷: 哑写被忽略偏移(OKAY 零副作用, 不进计数)再读 */
+/* 坑 #39 读冲刷 + 双读 (2026-10-13 板上升级): interconnect 扩 3 MI 后
+ * (NUM_MI 2->3, B3-1a) M01 读滞后从"休眠边界后首笔"恶化为"每笔落后一笔"
+ * —— 0x2C 哑写疗法失效 (JTAG 18 笔对照实证: 读 N 返回事务 N-1)。
+ * 现行疗法 = 先保留哑写冲刷管线, 再双读取第二笔 (dread 同型, 板上实证
+ * JTAG 连续读第二笔恒新鲜; DMA 寄存器读全程正确即因此)。
+ * 根治需换互联结构或 ILA 挂 AR/R 总线取证, 与 B3-2 合并排期。 */
 static unsigned rd_reg(volatile unsigned *r)
 {
     *(volatile unsigned *)(REGS_BASE + 0x2Cu) = 0u;
     busy_ms(1);
+    (void)*r;
     return *r;
 }
 
@@ -349,11 +355,15 @@ int main(void)
             uputs(" r=");        uputd(v_lr);
             uputs("\r\n");
         } else if (c == 'D') {
-            /* B3-1a DMA 冒烟: MM2S 读"最后一帧所在槽" 64B -> dma_sink 回读 */
+            /* B3-1a DMA 冒烟: MM2S 读"最后一帧所在槽"(SA+0x40 预补偿) -> dma_sink 回读
+             * 板上实证 (2026-10-13, 两次独立帧预测命中): axi_dma 512b MM2S 读地址 X
+             * 返回 MIG 块 (X-64) 的内容 —— IP 内部数据通道装配偏移, 非地址错。
+             * 故 SA = 槽基址 + 0x40 时流 = 槽基址块的内容; sink q1 = 块内字节
+             * 14..17 的 LE 值 (PC 离线可算, dma_smoke.py 判据同步)。 */
             unsigned wm, sa, sr, guard;
             unsigned v_q0, v_q1, v_q2;
             wm = rd_reg(&R_WM_WR) & 0xffffu;               /* 最后帧槽 = (wm-1)%256 */
-            sa = 0x00100000u + ((wm - 1u) & 0xffu) * 4096u;
+            sa = 0x00100000u + ((wm - 1u) & 0xffu) * 4096u + 0x40u;
             DMA_DMACR = 0x4u;                              /* 复位 */
             guard = 0;
             while ((((sr = dread(&DMA_DMASR))) & 0x1u) == 0u)
