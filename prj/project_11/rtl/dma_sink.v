@@ -3,15 +3,18 @@
 //-----------------------------------------------------------------------------
 // 用途: axi_dma MM2S 从 DDR 槽区读出的 512 bit 流, 在换层(B3-1b 接 shim)之前
 //   先由本件捕获, 一次验完「时钟域(300M) + 512b + 地址映射 + TKEEP 语义」:
-//     q0 = {beats[15:0], bytes[15:0]}   拍数 / 字节数(按 TKEEP 计)
-//     q1 = 首拍低 32 bit                 (PC 知道槽内容 -> 直接比对)
-//     q2 = {done_cnt[7:0], tlast_seen, busy, 21'd0}
+//     q0 = {beats[15:0], full_beats[15:0]}  总拍数 / "TKEEP 全 1"的拍数
+//     q1 = 首拍低 32 bit                    (PC 知道槽内容 -> 直接比对)
+//     q2 = {done_cnt, tlast_seen, busy, saw_keep, tail_keep[7:0], 13'd0}
+//          saw_keep = 任一拍 TKEEP≠0 (粘滞); tail_keep = TLAST 拍 keep 低 8 位
 //
-// ★时序结构(2026-10-12 首建 WNS -0.134 的修复): 整个流(tdata/tkeep/tlast)
-//   先打一拍进 skid 式寄存组 {data_q, keep_q, last_q}(popcount 的 64 位锥
-//   终结在 keep_q 上), FSM 消费这组延迟流 —— TLAST 结算拍只剩 16b+7b 浅加法。
-//   打一拍对流协议无损(tready 恒 1, 无反压), 只是判决整体后移一拍。
-// 输出经 2FF 镜像到 user 域(axi_lite_regs 采样侧)。
+// ★★ 2026-10-13 重写(板上实证): 原版用 64 位 popcount(function+for) 计字节,
+//   Vivado 2023.1 综合在该锥上发生 netlist 名冲突([Synth 8-6858/6859] x14,
+//   "multi-driven net Q"), **keep_n 寄存器被常量驱动顶掉** -> bytes 恒 0,
+//   整条 tkeep 链被删(netlist 里 dma_tkeep 无网络) -> 板上冒烟 q0 恒
+//   {1,0}/{64,0}、q1 恒等、DMA 状态却全部正常。教训: 宽 popcount/归约锥
+//   在"事件结算拍"路径上不仅有时序风险(#44 同族), 还可能触发工具级
+//   静默误优化 —— 改为"全有效拍计数 + 尾拍采样 + 粘滞位", 全部合成友好。
 //=============================================================================
 `timescale 1ns / 1ps
 
@@ -34,66 +37,66 @@ module dma_sink (
 
     assign s_tready = 1'b1;
 
-    function [6:0] popcnt64(input [63:0] v);
-        integer i;
-        begin
-            popcnt64 = 7'd0;
-            for (i = 0; i < 64; i = i + 1)
-                if (v[i]) popcnt64 = popcnt64 + 7'd1;
-        end
-    endfunction
-
-    // ---- 输入打一拍(时序修复): FSM 消费 d_* (延迟一拍的流) ----
-    reg [511:0] data_q;
-    reg [63:0]  keep_q;
-    reg [6:0]   keep_n;     // keep_q 的 popcount(锥终结点)
+    // ---- 输入打一拍(时序纪律): FSM 消费延迟一拍的流 ----
+    reg [31:0]  data_q;        // 只用低 32 位 -> 只寄存 32
+    reg [7:0]   tail_keep_q;   // keep 低字节 (尾拍长度证据)
+    reg         keep_any_q;    // 本拍 keep != 0
+    reg         keep_full_q;   // 本拍 keep == 全 1
     reg         last_q, valid_q;
+
+    wire keep_full_c = (s_tkeep == 64'hFFFF_FFFF_FFFF_FFFF);
+    wire keep_any_c  = |s_tkeep;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            data_q <= 512'd0; keep_q <= 64'd0; last_q <= 1'b0; valid_q <= 1'b0;
-            keep_n <= 7'd0;
+            data_q <= 32'd0; tail_keep_q <= 8'd0;
+            keep_any_q <= 1'b0; keep_full_q <= 1'b0;
+            last_q <= 1'b0; valid_q <= 1'b0;
         end else begin
             valid_q <= s_tvalid;
             if (s_tvalid) begin
-                data_q <= s_tdata;
-                keep_q <= s_tkeep;
-                last_q <= s_tlast;
+                data_q      <= s_tdata[31:0];
+                tail_keep_q <= s_tkeep[7:0];
+                keep_any_q  <= keep_any_c;
+                keep_full_q <= keep_full_c;
+                last_q      <= s_tlast;
             end
         end
-    end
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) keep_n <= 7'd0;
-        else if (s_tvalid) keep_n <= popcnt64(s_tkeep);   // 与 keep_q 同拍
     end
 
     localparam ST_IDLE = 1'b0, ST_RUN = 1'b1;
     reg         st;
     reg [31:0]  q0i, q1i, q2i;
-    reg [15:0]  beats, bytes;
+    reg [15:0]  beats, full_beats;
     reg [31:0]  first_beat;
     reg [7:0]   done_cnt;
-    reg         tlast_seen, busy;
+    reg         tlast_seen, busy, saw_keep;
+    reg [7:0]   tail_keep_r;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            st <= ST_IDLE; beats <= 16'd0; bytes <= 16'd0; first_beat <= 32'd0;
+            st <= ST_IDLE; beats <= 16'd0; full_beats <= 16'd0; first_beat <= 32'd0;
             done_cnt <= 8'd0; tlast_seen <= 1'b0; busy <= 1'b0;
+            saw_keep <= 1'b0; tail_keep_r <= 1'b0;
             q0i <= 32'd0; q1i <= 32'd0; q2i <= 32'd0;
         end else begin
             busy <= (st == ST_RUN);
+            if (valid_q && keep_any_q) saw_keep <= 1'b1;
             case (st)
             ST_IDLE: begin
                 if (valid_q) begin
-                    first_beat <= data_q[31:0];
+                    first_beat <= data_q;
                     if (last_q) begin              // 单拍帧
-                        q0i <= {16'd1, {9'd0, keep_n}};
-                        q1i <= data_q[31:0];
+                        beats      <= 16'd1;
+                        full_beats <= {15'd0, keep_full_q};
+                        tail_keep_r <= tail_keep_q;
+                        q0i <= {16'd1, {15'd0, keep_full_q}};
+                        q1i <= data_q;
                         done_cnt   <= done_cnt + 8'd1;
                         tlast_seen <= 1'b1;
                     end else begin
                         beats      <= 16'd1;
-                        bytes      <= {9'd0, keep_n};
+                        full_beats <= {15'd0, keep_full_q};
                         tlast_seen <= 1'b0;
                         st         <= ST_RUN;
                     end
@@ -102,20 +105,22 @@ module dma_sink (
             ST_RUN: begin
                 if (valid_q) begin
                     if (last_q) begin
-                        q0i <= {beats + 16'd1, bytes + {9'd0, keep_n}};
+                        q0i <= {beats + 16'd1, full_beats + {15'd0, keep_full_q}};
                         q1i <= first_beat;
+                        tail_keep_r <= tail_keep_q;
                         done_cnt   <= done_cnt + 8'd1;
                         tlast_seen <= 1'b1;
                         st         <= ST_IDLE;
                     end else begin
-                        beats <= beats + 16'd1;
-                        bytes <= bytes + {9'd0, keep_n};
+                        beats      <= beats + 16'd1;
+                        full_beats <= full_beats + {15'd0, keep_full_q};
                     end
                 end
             end
             default: st <= ST_IDLE;
             endcase
-            q2i <= {done_cnt, tlast_seen, busy, 22'd0};   // 8+1+1+22=32
+            // q2 = {done[7:0], tlast_seen, busy, saw_keep, tail_keep[7:0], 13'd0}
+            q2i <= {done_cnt, tlast_seen, busy, saw_keep, tail_keep_r, 13'd0};
         end
     end
 

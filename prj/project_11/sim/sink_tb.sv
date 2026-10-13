@@ -60,7 +60,7 @@ module sink_tb;
         beat(64, 32'h1122_3344, 1'b1);
         settle();
         $display("[K1] q0=%08x q1=%08x q2=%08x", q0, q1, q2);
-        if (q0 !== 32'h0001_0040) begin $display("[FAIL] K1 q0"); errs++; end
+        if (q0 !== 32'h0001_0001) begin $display("[FAIL] K1 q0 (want 0001_0001)"); errs++; end
         if (q1 !== 32'h1122_3344) begin $display("[FAIL] K1 q1"); errs++; end
         if (q2[31:24] !== 8'd1 || q2[23] !== 1'b1) begin $display("[FAIL] K1 q2 (done/tlast)"); errs++; end
 
@@ -69,19 +69,35 @@ module sink_tb;
         beat(20, 32'hA000_0040, 1'b1);
         settle();
         $display("[K2] q0=%08x q1=%08x q2=%08x", q0, q1, q2);
-        if (q0 !== 32'h0002_0054) begin $display("[FAIL] K2 q0 (want 0002_0054)"); errs++; end
+        if (q0 !== 32'h0002_0001) begin $display("[FAIL] K2 q0 (want 0002_0001)"); errs++; end
+        if (q2[21] !== 1'b1) begin $display("[FAIL] K2 saw_keep"); errs++; end
+        if (q2[20:13] !== 8'hFF) begin $display("[FAIL] K2 tail_keep=%02x (want FF)", q2[20:13]); errs++; end
         if (q1 !== 32'hA000_0000) begin $display("[FAIL] K2 q1"); errs++; end
         if (q2[31:24] !== 8'd2) begin $display("[FAIL] K2 done_cnt"); errs++; end
+
+        // ---- K5: 64 拍 × 64B 全 keep (复刻 LENGTH=4096 硬件激励) ----
+        begin
+            int k5;
+            for (k5 = 0; k5 < 63; k5 = k5 + 1)
+                beat(64, 32'h4000_0000 + k5, 1'b0);
+            beat(64, 32'h4000_00FF, 1'b1);    // 第 64 拍带 tlast
+        end
+        settle();
+        $display("[K5] q0=%08x q1=%08x q2=%08x", q0, q1, q2);
+        if (q0 !== 32'h0040_0040) begin
+            $display("[FAIL] K5 q0 (want 0040_0040: 64 拍全有效)"); errs++;
+        end
+        if (q2[23] !== 1'b1) begin $display("[FAIL] K5 tlast"); errs++; end
 
         // ---- K4: 无 TLAST 半帧 -> busy 恒 1; 恢复帧 ----
         beat(64, 32'hDEAD_0000, 1'b0);
         repeat (100) @(posedge clk);
-        if (q2[31:24] !== 8'd2) begin $display("[FAIL] K4 半帧 done 递增"); errs++; end
+        if (q2[31:24] !== 8'd3) begin $display("[FAIL] K4 半帧 done 递增 (want 3)"); errs++; end
         // 恢复: 补一拍带 TLAST (与半帧合计算一轮, done+1)
         beat(64, 32'hDEAD_0040, 1'b1);
         settle();
-        if (q2[31:24] !== 8'd3) begin
-            $display("[FAIL] K4 恢复 done=%d (want 3)", q2[31:24]); errs++;
+        if (q2[31:24] !== 8'd4) begin
+            $display("[FAIL] K4 恢复 done=%d (want 4)", q2[31:24]); errs++;
         end
         $display("[K4] 恢复后 q0=%08x q2=%08x", q0, q2);
 

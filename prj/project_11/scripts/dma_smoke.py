@@ -93,16 +93,30 @@ def main():
     sa, sr, q0, q1, q2 = (int(x, 16) for x in m.groups())
 
     errs = []
-    if q0 != 0x00010040:
-        errs.append("q0=%08x != 00010040 (beats/bytes)" % q0)
+    # q0 = {beats[15:0], full_keep_beats[15:0]}  (2026-10-13 语义: TKEEP 全 1 拍数)
+    beats, fullk = q0 >> 16, q0 & 0xFFFF
+    done   = q2 >> 24
+    tlast  = (q2 >> 23) & 1
+    sawk   = (q2 >> 21) & 1
+    tailk  = (q2 >> 13) & 0xFF
+    if beats != 1:
+        errs.append("beats=%d != 1 (LENGTH=64 -> 1 拍)" % beats)
+    if fullk != 1:
+        errs.append("full_keep=%d != 1 (单拍应 TKEEP 全 1)" % fullk)
     if q1 != (a.seq & 0xFFFFFFFF):
         errs.append("q1=%08x != seq %08x (首拍内容)" % (q1, a.seq & 0xFFFFFFFF))
-    if q2 != 0x01800000:
-        errs.append("q2=%08x != 01800000 (done/tlast)" % q2)
+    if done < 1 or tlast != 1:
+        errs.append("q2 done=%d tlast=%d (应 >=1/1)" % (done, tlast))
+    if sawk != 1:
+        errs.append("saw_keep=0 (整帧未见 TKEEP!=0)")
+    if tailk != 0xFF:
+        errs.append("tail_keep=%02x != FF" % tailk)
     if not (sr & 0x2):
         errs.append("sr=%04x Idle 未置位" % sr)
-    if sr & 0x7000:
-        errs.append("sr=%04x err 位置位" % sr)
+    # DMA 错位 = bit4 DMAIntErr | bit5 DMASlvErr | bit6 DMADecErr
+    # 注: bit12 是 IOC(完成标志), 不是错误 (2026-10-13 板上实证订正)
+    if sr & 0x70:
+        errs.append("sr=%04x 错误位置位 (0x70 掩码)" % sr)
 
     print("-" * 60)
     if errs:
@@ -111,6 +125,8 @@ def main():
             print("  - %s" % e)
         return 1
     print("DMA_SMOKE: PASS (时钟域/512b/地址映射/TKEEP/S02 全通)")
+    print("  beats=%d full_keep=%d tail_keep=%02x q1=%08x sr=%04x"
+          % (beats, fullk, tailk, q1, sr))
     return 0
 
 
