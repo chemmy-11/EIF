@@ -129,7 +129,11 @@ module mem_bridge_tb #(
         .m_axi_awid(m_awid), .m_axi_awlock(m_awlock), .m_axi_awcache(m_awcache),
         .m_axi_awprot(m_awprot), .m_axi_awqos(m_awqos), .m_axi_bid(m_bid),
         .m_axi_arid(m_arid), .m_axi_arlock(m_arlock), .m_axi_arcache(m_arcache),
-        .m_axi_arprot(m_arprot), .m_axi_arqos(m_arqos), .m_axi_rid(m_rid));
+        .m_axi_arprot(m_arprot), .m_axi_arqos(m_arqos), .m_axi_rid(m_rid),
+        // B3-1b: DMA engine ports tied off (bridge-engine regression path)
+        .dma_engine(1'b0), .dma_s_tdata(512'd0), .dma_s_tkeep(64'd0),
+        .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0), .dma_s_tready(),
+        .ro_dma_req());
 
     axi4_ram_model #(.MEM_BYTES(1<<20), .AR_LAT(AR_LAT_T), .W_RESP_DLY(W_DLY_T),
                      .STALL_EN(STALL_EN_T)) u_ram (

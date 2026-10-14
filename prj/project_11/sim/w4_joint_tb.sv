@@ -170,7 +170,11 @@ module w4_joint_tb #(
         .m_axi_arlock(a_arlock), .m_axi_arcache(a_arcache), .m_axi_arprot(a_arprot),
         .m_axi_arqos(a_arqos), .m_axi_arvalid(a_arvalid), .m_axi_arready(a_arready),
         .m_axi_rdata(a_rdata), .m_axi_rresp(a_rresp), .m_axi_rlast(a_rlast),
-        .m_axi_rvalid(a_rvalid), .m_axi_rready(a_rready), .m_axi_rid(a_rid));
+        .m_axi_rvalid(a_rvalid), .m_axi_rready(a_rready), .m_axi_rid(a_rid),
+        // B3-1b: DMA engine ports tied off (bridge-engine regression path)
+        .dma_engine(1'b0), .dma_s_tdata(512'd0), .dma_s_tkeep(64'd0),
+        .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0), .dma_s_tready(),
+        .ro_dma_req());
 
     frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_memB (
         .user_clk(user_clk), .user_rst_n(user_rst_n),
@@ -200,7 +204,11 @@ module w4_joint_tb #(
         .m_axi_arlock(b_arlock), .m_axi_arcache(b_arcache), .m_axi_arprot(b_arprot),
         .m_axi_arqos(b_arqos), .m_axi_arvalid(b_arvalid), .m_axi_arready(b_arready),
         .m_axi_rdata(b_rdata), .m_axi_rresp(b_rresp), .m_axi_rlast(b_rlast),
-        .m_axi_rvalid(b_rvalid), .m_axi_rready(b_rready), .m_axi_rid(b_rid));
+        .m_axi_rvalid(b_rvalid), .m_axi_rready(b_rready), .m_axi_rid(b_rid),
+        // B3-1b: DMA engine ports tied off (bridge-engine regression path)
+        .dma_engine(1'b0), .dma_s_tdata(512'd0), .dma_s_tkeep(64'd0),
+        .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0), .dma_s_tready(),
+        .ro_dma_req());
 
     generate
         if (DEFECT_ROUTING) begin : g_defect

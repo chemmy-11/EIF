@@ -159,7 +159,8 @@ puts "BD_STEP: nets connected"
 # ---- user_clk-domain side of lite_regs: all pins external ----
 foreach pin {clk_user rst_user_n u_wr_frame u_rd_frame u_buf_drop ctl_owner \
              cfg_mode cfg_rd_slot rd_req_pulse cfg_wr_pulse \
-             lite_exec_cnt lite_rd_trig_cnt lat_w lat_r dma_q0 dma_q1 dma_q2} {
+             lite_exec_cnt lite_rd_trig_cnt lat_w lat_r dma_q0 dma_q1 dma_q2 \
+             cfg_rd_engine dma_req dma_arl lite_engine_cnt} {
     make_bd_pins_external [get_bd_pins axi_lite_regs_0/$pin]
     set_property name $pin [get_bd_ports ${pin}_0]
 }

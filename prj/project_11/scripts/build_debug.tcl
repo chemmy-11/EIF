@@ -23,6 +23,12 @@ if {[llength [get_files -quiet dma_sink.v]] == 0} {
     puts "ADD_FILES: dma_sink.v"
     update_compile_order -fileset sources_1
 }
+# ---- B3-1b: shim 首次真正进位流 (桥内实例化) ----
+if {[llength [get_files -quiet dma_rd_shim.v]] == 0} {
+    add_files -fileset sources_1 $proj/rtl/dma_rd_shim.v
+    puts "ADD_FILES: dma_rd_shim.v"
+    update_compile_order -fileset sources_1
+}
 # ---- ddr4_0 配置已改(System_Clock=No_Buffer): 强制重建其产物与 OOC run ----
 # reset_run synth_1 不级联 IP run; 不重建则顶层读到旧差分 stub -> [Synth 8-11365]
 reset_target  all [get_ips ddr4_0]

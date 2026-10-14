@@ -41,6 +41,7 @@ module axi_lite_regs_tb;
     wire [7:0]  cfg_rd_slot;
     wire [15:0] lite_exec_cnt, lite_rd_trig_cnt;
 
+    wire cfg_rd_engine;   // B3-1b
     axi_lite_regs dut (
         .aclk(aclk), .aresetn(aresetn),
         .s_axi_awaddr(awaddr), .s_axi_awvalid(awvalid), .s_axi_awready(awready),
@@ -54,6 +55,9 @@ module axi_lite_regs_tb;
         .lat_w(16'h00C0), .lat_r(16'h0017),   // B3-0 观测口(常量, P8 读回校验)
         .dma_q0(32'h0001_0040), .dma_q1(32'h5A5A_A5A5), .dma_q2(32'h0180_0000),  // B3-1a
         .ctl_owner(ctl_owner),
+        .dma_req(32'h8001_0514),              // B3-1b: {sticky,eng=1,slot=05,len=0x114}
+        .cfg_rd_engine(cfg_rd_engine),        // B3-1b
+        .lite_engine_cnt(),                   // (计数口不校验)
         .cfg_mode(cfg_mode), .cfg_rd_slot(cfg_rd_slot),
         .rd_req_pulse(rd_req_pulse), .cfg_wr_pulse(cfg_wr_pulse),
         .lite_exec_cnt(lite_exec_cnt), .lite_rd_trig_cnt(lite_rd_trig_cnt)
@@ -218,6 +222,14 @@ module axi_lite_regs_tb;
         lite_rd(32'h28, rd); $display("[P8] rd@28=%08x", rd); chk(rd === 32'h0001_0040, "P8 DMA_Q0");
         lite_rd(32'h2C, rd); $display("[P8] rd@2C=%08x", rd); chk(rd === 32'h5A5A_A5A5, "P8 DMA_Q1");
         lite_rd(32'h30, rd); $display("[P8] rd@30=%08x", rd); chk(rd === 32'h0180_0000, "P8 DMA_Q2");
+        // ---- P9 B3-1b: SET_ENGINE 写 + DMA_REQ 读回 ----
+        chk(cfg_rd_engine === 1'b0, "P9 engine reset default 0");
+        lite_wr(32'h0C, 32'h1);               // SET_ENGINE=1
+        chk(cfg_rd_engine === 1'b1, "P9 engine set to 1");
+        lite_rd(32'h34, rd); $display("[P9] rd@34=%08x", rd);
+        chk(rd === 32'h8001_0514, "P9 DMA_REQ snapshot");
+        lite_wr(32'h0C, 32'h0);
+        chk(cfg_rd_engine === 1'b0, "P9 engine back to 0");
 
         // ---- P6 write to RO offset
         pulse_cnt = 0;
@@ -225,7 +237,7 @@ module axi_lite_regs_tb;
         repeat (12) @(negedge aclk);
         chk(pulse_cnt == 0, "P6 no pulse on RO write");
         chk(cfg_rd_slot === 8'h5A, "P6 slot unchanged");
-        chk(lite_exec_cnt === 16'd5, "P6 ignored write not counted");  // P2+P3+P4x2+P4b = 5
+        chk(lite_exec_cnt === 16'd7, "P6 ignored write not counted");  // P2+P3+P4x2+P4b+P9x2 = 7
         $display("[P6] RO write ignored (exec=%0d)", lite_exec_cnt);
 
         // ---- P7 response held until ready

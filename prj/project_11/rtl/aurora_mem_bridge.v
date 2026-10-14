@@ -277,8 +277,42 @@ wire         dma_arvalid, dma_arready;
 wire [511:0] dma_rdata;    wire [1:0]  dma_rresp;
 wire         dma_rlast, dma_rvalid, dma_rready;
 wire [511:0] dma_tdata;    wire [63:0] dma_tkeep;
-wire         dma_tlast, dma_tvalid, dma_tready;
+wire         dma_tlast, dma_tvalid;
+wire         dma_tready_sink, dma_tready_shim;        // B3-1b: 引擎 mux 后见 dma_tready
 wire [31:0]  dma_q0, dma_q1, dma_q2;                  // dma_sink 捕获结果 -> Lite 回读
+// B3-1b: DMA 读引擎 —— engine(user 域 lite 寄存器) -> ui 域 2FF; 请求镜像回读
+wire        lite_cfg_rd_engine;
+wire [31:0] mem_dma_req;
+wire [15:0] lite_engine_cnt;
+reg         dma_engine_ui_s1, dma_engine_ui;
+wire        dma_engine = lite_cfg_rd_engine;          // frame_mem_if 在 user 侧直接用
+wire        dma_tready = dma_engine_ui ? dma_tready_shim : dma_tready_sink;
+
+// B3-1b: DMA AR 地址锁存 (取证: 线上 AR 是否=SA, 定位 -50 侧别)
+reg [31:0] dma_ar_latch_ui;
+always @(posedge ui_clk or negedge ui_rst_n) begin
+    if (!ui_rst_n)                            dma_ar_latch_ui <= 32'd0;
+    else if (dma_arvalid && dma_arready)      dma_ar_latch_ui <= dma_araddr;
+end
+reg [31:0] dma_ar_latch_s1, dma_ar_latch;
+always @(posedge user_clk) begin
+    if (aurora_rst) begin
+        dma_ar_latch_s1 <= 32'd0; dma_ar_latch <= 32'd0;
+    end else begin
+        dma_ar_latch_s1 <= dma_ar_latch_ui; dma_ar_latch <= dma_ar_latch_s1;
+    end
+end
+
+// B3-1b: 读引擎选择 user->ui 2FF (准静态配置位)
+always @(posedge ui_clk or negedge ui_rst_n) begin
+    if (!ui_rst_n) begin
+        dma_engine_ui_s1 <= 1'b0;
+        dma_engine_ui    <= 1'b0;
+    end else begin
+        dma_engine_ui_s1 <= lite_cfg_rd_engine;
+        dma_engine_ui    <= dma_engine_ui_s1;
+    end
+end
 
 // 读命令生成: 槽中有未读帧 且 桥空闲 且 上一拍没发过 → 单拍
 // (ro_outstanding_sync 由桥内 gray+2FF 镜像, 单调语义; false-positive 空读
@@ -677,6 +711,10 @@ mb_ctrl u_mb_ctrl (
     .cfg_wr_pulse    (lite_cfg_wr_pulse   ),
     .lite_exec_cnt   (lite_exec_cnt       ),
     .lite_rd_trig_cnt(lite_rd_trig_cnt    ),
+    .cfg_rd_engine   (lite_cfg_rd_engine  ),
+    .dma_req         (mem_dma_req         ),
+    .dma_arl         (dma_ar_latch        ),
+    .lite_engine_cnt (lite_engine_cnt     ),
     // B3-1a: DMA 存储映射主口 (只读: AR/R) 与流输出 (512b, ui_clk 域)
     .M_AXI_MM2S_0_araddr  (dma_araddr  ),
     .M_AXI_MM2S_0_arburst (dma_arburst ),
@@ -766,7 +804,13 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .m_axi_awqos(m_awqos), .m_axi_bid(m_bid),
     .m_axi_arid(m_arid), .m_axi_arlock(m_arlock),
     .m_axi_arcache(m_arcache), .m_axi_arprot(m_arprot),
-    .m_axi_arqos(m_arqos), .m_axi_rid(m_rid)
+    .m_axi_arqos(m_arqos), .m_axi_rid(m_rid),
+    // B3-1b: DMA read engine pass-through (user-domain bit; fmi 2FFs to ui)
+    .dma_engine (dma_engine),
+    .dma_s_tdata(dma_tdata), .dma_s_tkeep(dma_tkeep),
+    .dma_s_tlast(dma_tlast), .dma_s_tvalid(dma_tvalid),
+    .dma_s_tready(dma_tready_shim),
+    .ro_dma_req(mem_dma_req)
 );
 
 //*******************************************************************
@@ -903,7 +947,13 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
     .m_axi_awqos(m2_axi_awqos), .m_axi_bid(m2_axi_bid),
     .m_axi_arid(m2_axi_arid), .m_axi_arlock(m2_axi_arlock),
     .m_axi_arcache(m2_axi_arcache), .m_axi_arprot(m2_axi_arprot),
-    .m_axi_arqos(m2_axi_arqos), .m_axi_rid(m2_axi_rid)
+    .m_axi_arqos(m2_axi_arqos), .m_axi_rid(m2_axi_rid),
+    // B3-1b: 桥② 不接 DMA 读引擎 (保持硬件读; 端口悬空)
+    .dma_engine (1'b0),
+    .dma_s_tdata(512'd0), .dma_s_tkeep(64'd0),
+    .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0),
+    .dma_s_tready(),
+    .ro_dma_req()
 );
 
     // ---- 自研 AXI 仲裁器(2026-10-06): S00=桥① S01=桥② M=MIG, 事务级轮转 ----
@@ -1044,7 +1094,7 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
         .clk(ui_clk), .rst_n(ui_rst_n),
         .clk_user(user_clk), .rst_user_n(~aurora_rst),
         .s_tdata(dma_tdata), .s_tkeep(dma_tkeep), .s_tlast(dma_tlast),
-        .s_tvalid(dma_tvalid), .s_tready(dma_tready),
+        .s_tvalid(~dma_engine_ui & dma_tvalid), .s_tready(dma_tready_sink),
         .q0(dma_q0), .q1(dma_q1), .q2(dma_q2)
     );
 

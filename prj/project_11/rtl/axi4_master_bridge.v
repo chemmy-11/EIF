@@ -76,15 +76,18 @@ module axi4_master_bridge #(
     output wire         wd_rd_en,
 
     // ---------------- read byte stream (ui side of ui->user FIFO) ----------------
-    output reg          rf_wr_en,
-    output reg  [7:0]   rf_wr_data,
+    // B3-1b: 端口改 wire —— 桥硬件读 FSM 与 DMA shim 两引擎在端口处合并
+    // (互斥: engine=1 时读 FSM 自 R_PRE 起泊在 R_DRET, 不再驱动这两个口)。
+    output wire         rf_wr_en,
+    output wire [7:0]   rf_wr_data,
     // ---------------- read command (ui side of user->ui cmd FIFO) ----------------
     input  wire         rc_empty,
     input  wire [8:0]   rc_data,        // {rnd, slot[7:0]}
     output wire         rc_rd_en,
     // ---------------- read descriptor (ui side of ui->user desc FIFO) ----------------
-    output reg          rd_wr_en,
-    output reg  [24:0]  rd_wr_data,     // {none, len[15:0], slot[7:0]}
+    // B3-1b: wire 合并双引擎 (硬件读 FSM 与 shim 互斥, 永不同拍)
+    output wire         rd_wr_en,
+    output wire [24:0]  rd_wr_data,     // {none, len[15:0], slot[7:0]}
 
     // ---------------- status / counters (ui_clk domain, ILA-friendly) ----------------
     output reg  [15:0]  stat_wm,        // write watermark = frames committed
@@ -155,7 +158,22 @@ module axi4_master_bridge #(
     output wire [3:0]   m_axi_arcache,
     output wire [2:0]   m_axi_arprot,
     output wire [3:0]   m_axi_arqos,
-    input  wire [3:0]   m_axi_rid
+    input  wire [3:0]   m_axi_rid,
+
+    // ---------------- B3-1b (2026-10-14): DMA 读引擎 ----------------
+    // engine=1 时读请求不再由桥硬件读出, 而是锁进 dma_req_* 交给软件
+    // (MicroBlaze 逐帧编程 axi_dma MM2S); shim 把 DMA 流拆包回灌本桥的
+    // 读字节流/描述符输出, 退休与桥读 FSM 走同一套槽表/计数 (双引擎互斥,
+    // 输出在端口处合并)。engine 与 AXI4-Stream 全部同步于本桥 clk (ui_clk)。
+    input  wire         dma_engine,      // 0 = 桥硬件读, 1 = DMA+软件读
+    input  wire [511:0] dma_s_tdata,     // ← axi_dma M_AXIS_MM2S (ui_clk 域)
+    input  wire [63:0]  dma_s_tkeep,
+    input  wire         dma_s_tlast,
+    input  wire         dma_s_tvalid,
+    output wire         dma_s_tready,
+    output reg          dma_req_new,     // 单拍脉冲: {slot,len} 请求待软件服务
+    output reg  [7:0]   dma_req_slot,
+    output reg  [15:0]  dma_req_len
 );
 
     //=========================================================================
@@ -488,7 +506,8 @@ module axi4_master_bridge #(
     // 4. read FSM
     //=========================================================================
     localparam R_IDLE=3'd0, R_AR=3'd1, R_R=3'd2, R_UNPACK=3'd3, R_FIN=3'd4,
-               R_PRE=3'd5;   // R_PRE2 removed: triggered a Vivado 2023.1 synth crash (3x reproducible)
+               R_PRE=3'd5,   // R_PRE2 removed: triggered a Vivado 2023.1 synth crash (3x reproducible)
+               R_DRET=3'd6;  // B3-1b: DMA 引擎 —— 等 shim rdesc, 统一退休
 
     reg [2:0]   rstate;
     reg [7:0]   r_slot, r_beat, r_bi, r_beats;
@@ -496,6 +515,46 @@ module axi4_master_bridge #(
     reg [6:0]   r_nbytes;        // meaningful bytes in the current beat (<=64)
     reg [511:0] r_beat_data;
     reg         r_rnd;
+
+    //=========================================================================
+    // ★B3-1b (2026-10-14): DMA 读引擎 shim + 双引擎输出合并
+    //-------------------------------------------------------------------------
+    // 桥硬件读 FSM 的 rf/rdesc 输出改用内部名 brf_*/brd_*, 与 shim 输出在
+    // 端口处 OR 合并 —— 两引擎由 dma_engine 互斥 (engine=1 时读 FSM 自 R_PRE
+    // 泊在 R_DRET, brf/brd 恒 0), 单驱动纪律不破(各归各的 always 块)。
+    // shim 输入 tvalid 用 engine 门控: engine=0 时 dma_sink 占用 M_AXIS
+    // ('D' 冒烟), shim 不偷拍。DROP_BYTES=50 = 板上实证的 DMA 读窗口前移量
+    // (载荷族+特征帧族两路独立复算, 见 dma_rd_shim.v 头部证据)。
+    //=========================================================================
+    reg         brf_wr_en;
+    reg  [7:0]  brf_wr_data;
+    reg         brd_wr_en;
+    reg  [24:0] brd_wr_data;
+
+    wire        shim_rf_wr_en;
+    wire [7:0]  shim_rf_wr_data;
+    wire        shim_rdesc_wr_en;
+    wire [24:0] shim_rdesc_wr_data;
+    wire [7:0]  shim_rdesc_slot = shim_rdesc_wr_data[7:0];
+
+    dma_rd_shim #(.DROP_BYTES(50)) u_rd_shim (
+        .clk(clk), .rst_n(rst_n),
+        .s_tdata (dma_s_tdata),
+        .s_tkeep (dma_s_tkeep),
+        .s_tlast (dma_s_tlast),
+        .s_tvalid(dma_engine & dma_s_tvalid),   // engine=0 时让路给 dma_sink
+        .s_tready(dma_s_tready),
+        .rf_wr_en (shim_rf_wr_en),  .rf_wr_data (shim_rf_wr_data),
+        .rdesc_wr_en(shim_rdesc_wr_en), .rdesc_wr_data(shim_rdesc_wr_data),
+        .tag_slot (dma_req_slot),             // 在飞请求恰一笔: tag 即当前 slot
+        .tag_valid(1'b0),                     // (tag FIFO 未用: direct 模式单笔在飞)
+        .tag_pop  ()
+    );
+
+    assign rf_wr_en   = brf_wr_en    | shim_rf_wr_en;
+    assign rf_wr_data = shim_rf_wr_en ? shim_rf_wr_data : brf_wr_data;
+    assign rd_wr_en   = brd_wr_en    | shim_rdesc_wr_en;
+    assign rd_wr_data = shim_rdesc_wr_en ? shim_rdesc_wr_data : brd_wr_data;
 
     // ---- W5 timing fix (2026-10-07): command prefetch registers ----
     // Old single-cycle cone: rc_data (FWFT comb RAM read of u_rd_cmd!) -> compare
@@ -558,7 +617,7 @@ module axi4_master_bridge #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             rstate <= R_IDLE; m_axi_arvalid <= 0; m_axi_rready <= 0;
-            rf_wr_en <= 0; rf_wr_data <= 0; rd_wr_en <= 0; rd_wr_data <= 0;
+            brf_wr_en <= 0; brf_wr_data <= 0; brd_wr_en <= 0; brd_wr_data <= 0;
             r_slot <= 0; r_beat <= 0; r_bi <= 0; r_beats <= 0; r_len <= 0;
             r_beat_data <= 0; r_rnd <= 0;
             pre_rnd <= 1'b0; pre_slot <= 8'd0;
@@ -566,11 +625,13 @@ module axi4_master_bridge #(
             rd_retire <= 0; rd_retire_slot <= 0; rd_seq_slot <= 0;
             stat_rd_frame <= 0; stat_ill_rd <= 0; stat_noframe <= 0; dbg_rd_slot <= 0;
             dbg_rd_cycles <= 0; dbg_rd_beats <= 0; out_dec <= 1'b0;
+            dma_req_new <= 1'b0; dma_req_slot <= 8'd0; dma_req_len <= 16'd0;
         end else begin
             rd_retire <= 1'b0;
             out_dec   <= 1'b0;     // D1 FIX: this block is the ONLY driver of out_dec
-            rf_wr_en  <= 1'b0;
-            rd_wr_en  <= 1'b0;
+            brf_wr_en <= 1'b0;
+            brd_wr_en <= 1'b0;
+            dma_req_new <= 1'b0;
             if (rstate != R_IDLE) dbg_rd_cycles <= dbg_rd_cycles + 32'd1;
 
             case (rstate)
@@ -606,10 +667,20 @@ module axi4_master_bridge #(
                 if (!p_target_ok) begin
                     if (!pre_rnd)            stat_noframe <= stat_noframe + 16'd1;
                     else if (p_in_rng)       stat_ill_rd  <= stat_ill_rd  + 16'd1;
-                    rd_wr_en    <= 1'b1;
-                    rd_wr_data  <= {1'b1, 16'd0, 8'hFF};
+                    brd_wr_en   <= 1'b1;
+                    brd_wr_data <= {1'b1, 16'd0, 8'hFF};
                     dbg_rd_slot <= 8'hFF;
                     rstate      <= R_IDLE;
+                end else if (dma_engine) begin
+                    // ★B3-1b: DMA 读引擎 —— 请求锁存交给软件 (MicroBlaze 编程
+                    // MM2S: SA=SLOT_BASE+slot*4096, LEN=len+DROP_BYTES), 数据流
+                    // 由 shim 拆包回灌, 退休由 shim 的 rdesc 脉冲触发 (R_DRET)。
+                    // 槽表/计数/指针不动: 全部在 shim rdesc 到达时统一结算。
+                    dma_req_new  <= 1'b1;
+                    dma_req_slot <= p_eff;
+                    dma_req_len  <= len_tab[p_eff];
+                    dbg_rd_slot  <= p_eff;
+                    rstate       <= R_DRET;     // 等 shim rdesc (或空答直接回)
                 end else begin
                     r_slot  <= p_eff;
                     r_len   <= len_tab[p_eff];
@@ -645,8 +716,8 @@ module axi4_master_bridge #(
             end
             //-----------------------------------------------------------------
             R_UNPACK: begin   // 1 byte / ui cycle into the ui->user byte FIFO
-                rf_wr_en   <= 1'b1;
-                rf_wr_data <= r_beat_data[r_bi*8 +: 8];
+                brf_wr_en   <= 1'b1;
+                brf_wr_data <= r_beat_data[r_bi*8 +: 8];
                 if (r_bi == (r_nbytes - 7'd1)) begin
                     r_bi <= 8'd0;
                     if (r_beat == (r_beats - 8'd1)) rstate <= R_FIN;
@@ -662,9 +733,27 @@ module axi4_master_bridge #(
                 out_dec        <= 1'b1;
                 stat_rd_frame  <= stat_rd_frame + 16'd1;
                 if (!r_rnd) rd_seq_slot <= rd_seq_slot + 8'd1;
-                rd_wr_en   <= 1'b1;
-                rd_wr_data <= {1'b0, r_len, r_slot};
+                brd_wr_en   <= 1'b1;
+                brd_wr_data <= {1'b0, r_len, r_slot};
                 rstate     <= R_IDLE;
+            end
+            //-----------------------------------------------------------------
+            // ★B3-1b: DMA 引擎退休等待。shim 在 TLAST 结算时发 rdesc 脉冲
+            // {len,slot}; 同拍在此统一退休 (与 R_FIN 同一套槽表/计数/指针
+            // 语义 —— 单驱动纪律: 都在本 always 块)。若软件读失败/超时,
+            // 软件可经 Lite 引擎位清零让 DMA 让路, rc 命令照常被硬件读出。
+            R_DRET: begin
+                m_axi_arvalid <= 1'b0;
+                m_axi_rready  <= 1'b0;
+                if (shim_rdesc_wr_en) begin
+                    rd_retire      <= 1'b1;
+                    rd_retire_slot <= shim_rdesc_slot;
+                    out_dec        <= 1'b1;
+                    stat_rd_frame  <= stat_rd_frame + 16'd1;
+                    if (!r_rnd) rd_seq_slot <= shim_rdesc_slot + 8'd1;
+                    dbg_rd_beats   <= dbg_rd_beats + 32'd1;
+                    rstate         <= R_IDLE;   // rdesc 已由 shim 发给下游
+                end
             end
             default: rstate <= R_IDLE;
             endcase

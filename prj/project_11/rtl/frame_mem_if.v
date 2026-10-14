@@ -63,6 +63,17 @@ module frame_mem_if #(
     output wire [15:0]  ro_lat_w,
     output wire [15:0]  ro_lat_r,
 
+    // ---- B3-1b (2026-10-14): DMA 读引擎 (engine = user 域; 流/请求 = ui 域) ----
+    // engine=1 时读请求交软件; 内部 2FF 到 ui 域喂 u_bridge; {slot,len} 经
+    // 2FF+sticky 展宽镜像到 user 域给 Lite 回读 (准静态事件, 2FF 足够)。
+    input  wire         dma_engine,      // user 域 (顶层直连 Lite 寄存器位)
+    input  wire [511:0] dma_s_tdata,
+    input  wire [63:0]  dma_s_tkeep,
+    input  wire         dma_s_tlast,
+    input  wire         dma_s_tvalid,
+    output wire         dma_s_tready,
+    output wire [31:0]  ro_dma_req,      // user 域: {sticky_new, engine, slot[7:0], len[15:0]}
+
     // ================= DDR side (ui_clk domain) =================
     input  wire         ui_clk,
     input  wire         ui_rst_n,
@@ -406,6 +417,22 @@ module frame_mem_if #(
     //=========================================================================
     // 5. the AXI4 master + slot table (pure ui_clk)
     //=========================================================================
+    // B3-1b: DMA 读请求镜像声明 (须在 u_bridge 实例前)
+    wire        dma_req_new_i;
+    wire [7:0]  dma_req_slot_i;
+    wire [15:0] dma_req_len_i;
+    // engine: user -> ui 2FF (准静态; 顶层 tready mux 用各自的 2FF, 不复用)
+    reg         dma_engine_q_s1, dma_engine_q;
+    always @(posedge ui_clk or negedge ui_rst_n) begin
+        if (!ui_rst_n) begin
+            dma_engine_q_s1 <= 1'b0;
+            dma_engine_q    <= 1'b0;
+        end else begin
+            dma_engine_q_s1 <= dma_engine;
+            dma_engine_q    <= dma_engine_q_s1;
+        end
+    end
+
     axi4_master_bridge #(.SLOT_BASE(SLOT_BASE), .MAX_LEN(MAX_LEN)) u_bridge (
         .clk(ui_clk), .rst_n(ui_rst_n), .calib_ok(calib_ok),
         .wf_empty(ub_empty), .wf_data(ub_dout), .wf_level(ub_rl), .wf_rd_en(ub_rd_en),
@@ -436,6 +463,39 @@ module frame_mem_if #(
         .m_axi_awqos(m_axi_awqos), .m_axi_bid(m_axi_bid),
         .m_axi_arid(m_axi_arid), .m_axi_arlock(m_axi_arlock),
         .m_axi_arcache(m_axi_arcache), .m_axi_arprot(m_axi_arprot),
-        .m_axi_arqos(m_axi_arqos), .m_axi_rid(m_axi_rid));
+        .m_axi_arqos(m_axi_arqos), .m_axi_rid(m_axi_rid),
+        // B3-1b: DMA 读引擎 (ui_clk 域, 2FF 后)
+        .dma_engine(dma_engine_q),
+        .dma_s_tdata(dma_s_tdata), .dma_s_tkeep(dma_s_tkeep),
+        .dma_s_tlast(dma_s_tlast), .dma_s_tvalid(dma_s_tvalid),
+        .dma_s_tready(dma_s_tready),
+        .dma_req_new(dma_req_new_i), .dma_req_slot(dma_req_slot_i),
+        .dma_req_len(dma_req_len_i));
+
+    //=========================================================================
+    // 2c. B3-1b: DMA 读请求 ui->user 镜像 (准静态事件, 2FF + sticky 展宽)
+    //     软核轮询 ro_dma_req 的 sticky 位 (bit31), 服务后由 engine 切换
+    //     (1->0->1) 或下一请求覆盖。ui 侧 {slot,len} 稳定期 = R_DRET 全程,
+    //     远大于 2 拍, 无亚稳态窗口问题。
+    //=========================================================================
+    reg  [7:0]  dreq_slot_s1, dreq_slot_s2;
+    reg  [15:0] dreq_len_s1,  dreq_len_s2;
+    reg         dreq_new_s1,  dreq_new_s2;
+    reg         dreq_sticky;
+
+    always @(posedge user_clk or negedge user_rst_n) begin
+        if (!user_rst_n) begin
+            dreq_slot_s1 <= 8'd0;  dreq_slot_s2 <= 8'd0;
+            dreq_len_s1  <= 16'd0; dreq_len_s2  <= 16'd0;
+            dreq_new_s1  <= 1'b0;  dreq_new_s2  <= 1'b0;
+            dreq_sticky  <= 1'b0;
+        end else begin
+            dreq_slot_s1 <= dma_req_slot_i;  dreq_slot_s2 <= dreq_slot_s1;
+            dreq_len_s1  <= dma_req_len_i;   dreq_len_s2  <= dreq_len_s1;
+            dreq_new_s1  <= dma_req_new_i;   dreq_new_s2  <= dreq_new_s1;
+            if (dreq_new_s2) dreq_sticky <= 1'b1;
+        end
+    end
+    assign ro_dma_req = {dreq_sticky, dma_engine, dreq_slot_s2, dreq_len_s2};
 
 endmodule

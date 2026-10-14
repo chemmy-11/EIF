@@ -76,6 +76,11 @@ module axi_lite_regs (
     input  wire [31:0] dma_q1,           // B3-1a: 首拍低 32 bit
     input  wire [31:0] dma_q2,           // B3-1a: {done_cnt[7:0], busy, err, tlast_seen, ...}
     input  wire        ctl_owner,        // top-level owner flag (status read)
+    // B3-1b: DMA 读引擎 (user 域) —— engine 选择位 + 请求 {sticky,slot,len}
+    output reg         cfg_rd_engine,    // 0 = 桥硬件读, 1 = DMA+软件读
+    input  wire [31:0] dma_req,          // {sticky_new, engine, slot[7:0], len[15:0]}
+    input  wire [31:0] dma_arl,          // B3-1b: 最近一笔 DMA AR 地址 (user 域镜像)
+    output reg  [15:0] lite_engine_cnt,  // SET_ENGINE 执行计数 (user dom)
     output reg         cfg_mode,         // 0 = SEQ, 1 = RND   -> owner mux
     output reg  [7:0]  cfg_rd_slot,      //                    -> owner mux
     output reg         rd_req_pulse,     // single user_clk pulse
@@ -86,6 +91,7 @@ module axi_lite_regs (
 
     localparam [7:0] OP_SET_MODE   = 8'h01;   // same codes as cmd_channel
     localparam [7:0] OP_READ_SLOT  = 8'h02;
+    localparam [7:0] OP_SET_ENGINE = 8'h03;   // B3-1b: 读引擎选择 0=桥 1=DMA
 
     localparam [31:0] REG_ID = 32'h5031_4231;  // "P1B1"
 
@@ -182,6 +188,8 @@ module axi_lite_regs (
                         a_data <= {OP_SET_MODE,  wd_byte};
                     else if (aw_word == 6'h01)
                         a_data <= {OP_READ_SLOT, wd_byte};
+                    else if (aw_word == 6'h03)         // B3-1b: +0x0C SET_ENGINE
+                        a_data <= {OP_SET_ENGINE, wd_byte};
                     else
                         a_data <= 16'd0;              // ignored offset, OKAY
                     a_req      <= 1'b1;
@@ -293,6 +301,8 @@ module axi_lite_regs (
             a_ack            <= 1'b0;
             cfg_mode         <= 1'b0;                  // SEQ after reset
             cfg_rd_slot      <= 8'd0;
+            cfg_rd_engine    <= 1'b0;                  // B3-1b: 桥硬件读
+            lite_engine_cnt  <= 16'd0;
             rd_req_pulse     <= 1'b0;
             cfg_wr_pulse     <= 1'b0;
             lite_exec_cnt    <= 16'd0;
@@ -311,6 +321,12 @@ module axi_lite_regs (
                     a_ack <= 1'b1;
                     if (a_data[15:8] == OP_SET_MODE) begin
                         cfg_mode       <= a_data[0];
+                        cfg_wr_pulse   <= 1'b1;
+                        lite_exec_cnt  <= lite_exec_cnt + 16'd1;
+                        ust            <= U_CLOSE;
+                    end
+                    else if (a_data[15:8] == OP_SET_ENGINE) begin  // B3-1b
+                        cfg_rd_engine  <= a_data[0];   // (缺陷路径语义同正路)
                         cfg_wr_pulse   <= 1'b1;
                         lite_exec_cnt  <= lite_exec_cnt + 16'd1;
                         ust            <= U_CLOSE;
@@ -334,6 +350,13 @@ module axi_lite_regs (
                         cfg_wr_pulse  <= 1'b1;
                         lite_exec_cnt <= lite_exec_cnt + 16'd1;
                         ust           <= U_CLOSE;
+                    end
+                    else if (a_data[15:8] == OP_SET_ENGINE) begin  // B3-1b
+                        cfg_rd_engine  <= a_data[0];    // 0=桥 1=DMA
+                        cfg_wr_pulse   <= 1'b1;
+                        lite_exec_cnt  <= lite_exec_cnt + 16'd1;
+                        lite_engine_cnt<= lite_engine_cnt + 16'd1;
+                        ust            <= U_CLOSE;
                     end
                     else if (a_data[15:8] == OP_READ_SLOT) begin
                         cfg_mode      <= 1'b1;          // reads imply RND
@@ -410,6 +433,9 @@ module axi_lite_regs (
                         6'h0A: d_data <= dma_q0;
                         6'h0B: d_data <= dma_q1;
                         6'h0C: d_data <= dma_q2;
+                        // B3-1b: +0x34 DMA_REQ / +0x38 DMA_ARL
+                        6'h0D: d_data <= dma_req;
+                        6'h0E: d_data <= dma_arl;
                         default: d_data <= 32'd0;
                     endcase
                     d_req <= 1'b1;                      // data held stable

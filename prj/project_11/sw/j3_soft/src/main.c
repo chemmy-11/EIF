@@ -18,6 +18,12 @@
  *   'A' 同上两段, 负向 A: 跳过 1 槽 sA=(wr0+100)%256 (帧#100 的槽)
  *   'B' 同上两段, 负向 B: 256 槽读完后重读 sB=(wr0+50)%256 (预期无数据)
  *   'S' 任何时候: 恢复 SET_MODE(SEQ) -> "[B2] SEQRESTORED"
+ *   'E' B3-1b: 读引擎切 DMA(引擎位=1) -> RND 逐帧服务 {slot,len} 请求
+ *       (SA=槽基址对齐读, LEN=len+50 前导补, shim 丢 50 前导) -> 引擎位=0
+ *       -> "[B2] E-DONE rd=N stall=N"
+ *   'E' B3-1b: read engine -> DMA round; serves {slot,len} requests via
+ *       MM2S aligned reads (LEN=len+50, shim drops the 50B prefix)
+ *       -> "[B2] E-DONE served=N rd+=N stall=0"
  *   'I' ID/计数快照
  *
  * 判据对应 (契约 §4.1/§4.2, 由 PC 侧 j3_soft_verify.py 判):
@@ -49,6 +55,9 @@
 #define R_SMAP    (*(volatile unsigned *)(REGS_BASE + 0x14))
 #define R_STAT    (*(volatile unsigned *)(REGS_BASE + 0x18))
 #define R_ID      (*(volatile unsigned *)(REGS_BASE + 0x1C))
+/* B3-1b: 读引擎选择 (+0x0C 写 engine 位) / DMA 请求 (+0x34 读) */
+#define R_ENGINE  (*(volatile unsigned *)(REGS_BASE + 0x0Cu))
+#define R_DMAREQ  (*(volatile unsigned *)(REGS_BASE + 0x34u))
 
 #define MODE_SEQ 0u
 #define MODE_RND 1u
@@ -318,7 +327,7 @@ int main(void)
         for (;;) { }
     }
 
-    uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L)\r\n");
+    uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L/D/E)\r\n");
     for (;;) {
         char c, d;
         while (!urx_poll()) { }
@@ -353,6 +362,75 @@ int main(void)
             v_lr = rd_reg((volatile unsigned *)(REGS_BASE + 0x24u)) & 0xffffu;
             uputs("[B2] LAT w="); uputd(v_lw);
             uputs(" r=");        uputd(v_lr);
+            uputs("\r\n");
+        } else if (c == 'E') {
+            /* B3-1b: DMA read-engine round - the soft core drives MM2S per
+             * frame; the stream goes through dma_rd_shim (which drops the
+             * provenance 50-byte prefix, board-measured) back into
+             * frame_mem_if's read path. engine=1 -> RND -> serve {slot,len}
+             * requests read from +0x34 -> SA = slot base (ALIGNED read),
+             * LEN = len+50 -> wait DMASR idle -> close out -> engine=0. */
+            unsigned rd0, rd, v_req, slot, len, sa, sr, guard;
+            unsigned served = 0, stall = 0;
+
+            R_ENGINE = 1u;                          /* read engine = DMA */
+            R_MODE   = MODE_RND;                    /* RND: per-frame trigger */
+            uputs("[B2] E-START (engine=DMA)\r\n");
+
+            rd0 = rd_reg(&R_WM_RD);
+            for (guard = 0; guard < 8000u; guard++) {
+                rd = rd_reg(&R_WM_WR);
+                if (d16(rd, 0) >= 1u) break;        /* wait first frame in */
+                busy_ms(1);
+            }
+            {
+                unsigned wr_last = 0, same = 0;
+                for (;;) {
+                    v_req = rd_reg((volatile unsigned *)(REGS_BASE + 0x34u));
+                    if (v_req & 0x80000000u) {      /* sticky: pending request */
+                        slot = (v_req >> 8) & 0xffu;
+                        len  = v_req & 0xffffu;
+                        sa = 0x00100000u + slot * 4096u;
+                        DMA_DMACR = 0x4u;           /* reset */
+                        guard = 0;
+                        while ((((sr = dread(&DMA_DMASR))) & 0x1u) == 0u)
+                            if (++guard > 4000000u) break;
+                        DMA_DMACR = 0x1u;           /* RS=run */
+                        guard = 0;
+                        while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
+                            if (++guard > 4000000u) break;
+                        DMA_SA     = sa;            /* aligned slot base */
+                        DMA_LENGTH = len + 50u;     /* +50 prefix, shim drops */
+                        guard = 0;
+                        do { sr = dread(&DMA_DMASR); }
+                        while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
+                        served++;
+                    } else {
+                        busy_ms(1);
+                    }
+                    rd = rd_reg(&R_WM_RD);
+                    {
+                        unsigned wr = rd_reg(&R_WM_WR);
+                        if (wr == wr_last) same++; else same = 0;
+                        wr_last = wr;
+                        if ((same >= 12u) && (d16(rd, rd0) == d16(wr, rd0)))
+                            break;                  /* drained & stable */
+                        if (same >= 4000u) {        /* ~4s no request: stall */
+                            stall = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+            R_ENGINE = 0u;                          /* read engine = bridge */
+            R_MODE   = MODE_SEQ;
+            rd = rd_reg(&R_WM_RD);
+            /* 取证: 最近一笔 DMA 线上 AR 地址 (定位 -50 侧别; 与 SA 对照) */
+            uputs("[B2] E-ARL arl="); uputh(rd_reg((volatile unsigned *)(REGS_BASE + 0x38u)));
+            uputs("\r\n");
+            uputs("[B2] E-DONE served="); uputd(served);
+            uputs(" rd+");      uputd(d16(rd, rd0));
+            uputs(" stall=");   uputd(stall);
             uputs("\r\n");
         } else if (c == 'D') {
             /* B3-1a DMA 冒烟: MM2S 读"最后一帧所在槽"(SA+0x40 预补偿) -> dma_sink 回读
