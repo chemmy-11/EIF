@@ -283,6 +283,7 @@ wire [31:0]  dma_q0, dma_q1, dma_q2;                  // dma_sink 捕获结果 -
 // B3-1b: DMA 读引擎 —— engine(user 域 lite 寄存器) -> ui 域 2FF; 请求镜像回读
 wire        lite_cfg_rd_engine;
 wire [31:0] mem_dma_req;
+wire [31:0] mem_dbg_emit;                   // B3-1b 取证: 发射帧 len/slot/首字节
 wire [15:0] lite_engine_cnt;
 reg         dma_engine_ui_s1, dma_engine_ui;
 wire        dma_engine = lite_cfg_rd_engine;          // frame_mem_if 在 user 侧直接用
@@ -714,6 +715,7 @@ mb_ctrl u_mb_ctrl (
     .cfg_rd_engine   (lite_cfg_rd_engine  ),
     .dma_req         (mem_dma_req         ),
     .dma_arl         (dma_ar_latch        ),
+    .dbg_emit        (mem_dbg_emit        ),
     .lite_engine_cnt (lite_engine_cnt     ),
     // B3-1a: DMA 存储映射主口 (只读: AR/R) 与流输出 (512b, ui_clk 域)
     .M_AXI_MM2S_0_araddr  (dma_araddr  ),
@@ -810,7 +812,8 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .dma_s_tdata(dma_tdata), .dma_s_tkeep(dma_tkeep),
     .dma_s_tlast(dma_tlast), .dma_s_tvalid(dma_tvalid),
     .dma_s_tready(dma_tready_shim),
-    .ro_dma_req(mem_dma_req)
+    .ro_dma_req(mem_dma_req),
+    .ro_dbg_emit(mem_dbg_emit)
 );
 
 //*******************************************************************
@@ -910,7 +913,7 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
         else            mem2_rd_req <= (mem2_outstanding_sync != 9'd0) && !mem2_rd_busy && !mem2_rd_req;
     end
 
-frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
+frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_mem2 (
     // 帧侧 (user_clk)
     .user_clk(user_clk), .user_rst_n(~aurora_rst),
     .wr_data (unpack_data  ), .wr_en (unpack_en   ),   // ← W4 回程拦截点: 解包输出

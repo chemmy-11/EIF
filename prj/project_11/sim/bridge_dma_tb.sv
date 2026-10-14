@@ -250,15 +250,15 @@ module bridge_dma_tb;
                 return;
             end
             slot = dma_req_slot; len = dma_req_len;
-            // 生成 [50 前导 + 帧] 流, 对齐读 SA=槽基址
+            // 生成 [8 前导 + 帧] 流, 对齐读 SA=槽基址 (板上定案: 窗口前移 8B)
             // 帧内容 = ddr[slot 基址 .. +len) (写路径真实写入)
-            total = len + 50;
+            total = len + 8;
             for (k = 0; k * 64 < total; k = k + 1) begin
                 @(negedge clk);
                 dma_s_tdata = 0; dma_s_tkeep = 0;
                 for (i = 0; i < 64; i++) begin
                     if (k*64 + i < total) begin
-                        int addr = (k*64 + i < 50) ? -1 : (SLOT_BASE + slot*4096 + (k*64+i-50));
+                        int addr = (k*64 + i < 8) ? -1 : (SLOT_BASE + slot*4096 + (k*64+i-8));
                         dma_s_tdata[i*8 +: 8] = (addr < 0) ? 8'hEE : ddr[addr[17:0]];
                         dma_s_tkeep[i] = 1'b1;
                     end

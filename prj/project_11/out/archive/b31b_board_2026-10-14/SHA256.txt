@@ -1,0 +1,2 @@
+55d3171d091cc383907892a336f1f1b5ca19c92379c669b979a24da951965993 *out/aurora_mem_bridge.bit
+0f4f0bd344fca25866d4187468cc3f9453673e38fdcac3de35de0d616cb13be8 *sw/j3_soft/Debug/j3_soft.elf

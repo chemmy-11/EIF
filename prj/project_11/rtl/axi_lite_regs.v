@@ -80,6 +80,7 @@ module axi_lite_regs (
     output reg         cfg_rd_engine,    // 0 = 桥硬件读, 1 = DMA+软件读
     input  wire [31:0] dma_req,          // {sticky_new, engine, slot[7:0], len[15:0]}
     input  wire [31:0] dma_arl,          // B3-1b: 最近一笔 DMA AR 地址 (user 域镜像)
+    input  wire [31:0] dbg_emit,         // B3-1b 取证: 发射帧 {len,slot,首字节}(user 域)
     output reg  [15:0] lite_engine_cnt,  // SET_ENGINE 执行计数 (user dom)
     output reg         cfg_mode,         // 0 = SEQ, 1 = RND   -> owner mux
     output reg  [7:0]  cfg_rd_slot,      //                    -> owner mux
@@ -436,6 +437,7 @@ module axi_lite_regs (
                         // B3-1b: +0x34 DMA_REQ / +0x38 DMA_ARL
                         6'h0D: d_data <= dma_req;
                         6'h0E: d_data <= dma_arl;
+                        6'h0F: d_data <= dbg_emit;   // B3-1b: {len,slot,byte0}
                         default: d_data <= 32'd0;
                     endcase
                     d_req <= 1'b1;                      // data held stable

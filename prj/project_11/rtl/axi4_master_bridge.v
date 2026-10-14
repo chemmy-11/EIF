@@ -58,7 +58,11 @@
 
 module axi4_master_bridge #(
     parameter [31:0] SLOT_BASE = 32'h0010_0000,   // 4KB-aligned slot region
-    parameter [15:0] MAX_LEN   = 16'd1538         // prj9 frame contract (chunk=1466)
+    parameter [15:0] MAX_LEN   = 16'd1538,        // prj9 frame contract (chunk=1466)
+    // B3-1b: 0 = 不例化 DMA shim (桥② 等纯硬件读实例)。板上取证(10-15): 死 shim
+    // (tvalid 恒 0 被全折叠) 在 DROP=8 常量下触发 2023.1 "Mimic Skeleton" 综合
+    // 崩溃 3/3 复现 —— 与 W5 R_PRE2 同病; 消灭死实例即绕开。
+    parameter        HAS_DMA   = 1
 )(
     // ---------------- ui_clk / reset / MIG gate ----------------
     input  wire         clk,            // ui_clk  (~300 MHz per MIG report)
@@ -171,7 +175,7 @@ module axi4_master_bridge #(
     input  wire         dma_s_tlast,
     input  wire         dma_s_tvalid,
     output wire         dma_s_tready,
-    output reg          dma_req_new,     // 单拍脉冲: {slot,len} 请求待软件服务
+    output reg          dma_req_new,     // 电平: R_DRET 泊住期间=1 (请求待服务), 退休清 0
     output reg  [7:0]   dma_req_slot,
     output reg  [15:0]  dma_req_len
 );
@@ -523,8 +527,14 @@ module axi4_master_bridge #(
     // 端口处 OR 合并 —— 两引擎由 dma_engine 互斥 (engine=1 时读 FSM 自 R_PRE
     // 泊在 R_DRET, brf/brd 恒 0), 单驱动纪律不破(各归各的 always 块)。
     // shim 输入 tvalid 用 engine 门控: engine=0 时 dma_sink 占用 M_AXIS
-    // ('D' 冒烟), shim 不偷拍。DROP_BYTES=50 = 板上实证的 DMA 读窗口前移量
-    // (载荷族+特征帧族两路独立复算, 见 dma_rd_shim.v 头部证据)。
+    // ('D' 冒烟), shim 不偷拍。
+    // ★DROP_BYTES=8 (板上 10-14 深夜定案): 槽内存的是【完整 ETH/IP/UDP 帧】
+    //   (42B 头+载荷, len_tab=全长); DMA 读窗口 = mem[SA-8..] (AR 精确=SA,
+    //   ARL 取证两轮证实; 窗口前移 8B 属 MIG 数据侧行为)。
+    //   原 DROP=50 是把"相对载荷 -50"误当独立偏移 —— 它 = 42(头)+8。
+    //   DROP=50 时发出的是【无头纯载荷】-> 泵B 直打 RGMII -> PC 网卡静默
+    //   丢弃 (板上 45+ 帧零到达 + ILA 全链路+1 佐证)。DROP=8 + LEN=len+8
+    //   发出完整帧, 与桥硬件引擎逐字节同构。
     //=========================================================================
     reg         brf_wr_en;
     reg  [7:0]  brf_wr_data;
@@ -537,24 +547,32 @@ module axi4_master_bridge #(
     wire [24:0] shim_rdesc_wr_data;
     wire [7:0]  shim_rdesc_slot = shim_rdesc_wr_data[7:0];
 
-    dma_rd_shim #(.DROP_BYTES(50)) u_rd_shim (
-        .clk(clk), .rst_n(rst_n),
-        .s_tdata (dma_s_tdata),
-        .s_tkeep (dma_s_tkeep),
-        .s_tlast (dma_s_tlast),
-        .s_tvalid(dma_engine & dma_s_tvalid),   // engine=0 时让路给 dma_sink
-        .s_tready(dma_s_tready),
-        .rf_wr_en (shim_rf_wr_en),  .rf_wr_data (shim_rf_wr_data),
-        .rdesc_wr_en(shim_rdesc_wr_en), .rdesc_wr_data(shim_rdesc_wr_data),
-        .tag_slot (dma_req_slot),             // 在飞请求恰一笔: tag 即当前 slot
-        .tag_valid(1'b0),                     // (tag FIFO 未用: direct 模式单笔在飞)
-        .tag_pop  ()
-    );
+    generate if (HAS_DMA) begin : gen_dma_engine
+        dma_rd_shim #(.DROP_BYTES(8)) u_rd_shim (
+            .clk(clk), .rst_n(rst_n),
+            .s_tdata (dma_s_tdata),
+            .s_tkeep (dma_s_tkeep),
+            .s_tlast (dma_s_tlast),
+            .s_tvalid(dma_engine & dma_s_tvalid),   // engine=0 时让路给 dma_sink
+            .s_tready(dma_s_tready),
+            .rf_wr_en (shim_rf_wr_en),  .rf_wr_data (shim_rf_wr_data),
+            .rdesc_wr_en(shim_rdesc_wr_en), .rdesc_wr_data(shim_rdesc_wr_data),
+            .tag_slot (dma_req_slot),             // 在飞请求恰一笔: tag 即当前 slot
+            .tag_valid(1'b0),                     // (tag FIFO 未用: direct 单笔在飞)
+            .tag_pop  ()
+        );
 
-    assign rf_wr_en   = brf_wr_en    | shim_rf_wr_en;
-    assign rf_wr_data = shim_rf_wr_en ? shim_rf_wr_data : brf_wr_data;
-    assign rd_wr_en   = brd_wr_en    | shim_rdesc_wr_en;
-    assign rd_wr_data = shim_rdesc_wr_en ? shim_rdesc_wr_data : brd_wr_data;
+        assign rf_wr_en   = brf_wr_en    | shim_rf_wr_en;
+        assign rf_wr_data = shim_rf_wr_en ? shim_rf_wr_data : brf_wr_data;
+        assign rd_wr_en   = brd_wr_en    | shim_rdesc_wr_en;
+        assign rd_wr_data = shim_rdesc_wr_en ? shim_rdesc_wr_data : brd_wr_data;
+    end else begin : gen_no_dma
+        assign rf_wr_en   = brf_wr_en;
+        assign rf_wr_data = brf_wr_data;
+        assign rd_wr_en   = brd_wr_en;
+        assign rd_wr_data = brd_wr_data;
+        assign dma_s_tready = 1'b0;
+    end endgenerate
 
     // ---- W5 timing fix (2026-10-07): command prefetch registers ----
     // Old single-cycle cone: rc_data (FWFT comb RAM read of u_rd_cmd!) -> compare
@@ -631,7 +649,9 @@ module axi4_master_bridge #(
             out_dec   <= 1'b0;     // D1 FIX: this block is the ONLY driver of out_dec
             brf_wr_en <= 1'b0;
             brd_wr_en <= 1'b0;
-            dma_req_new <= 1'b0;
+            // dma_req_new 不在此清零: 电平语义 (板上实证 10-14: 1 拍 ui 脉冲
+            // 3.3ns 过 2FF 到 151.5MHz 采样域会被随机漏采, 请求待服务状态
+            // 对软核不可见 -> 服务循环停摆。电平 = R_DRET 全程保持。)
             if (rstate != R_IDLE) dbg_rd_cycles <= dbg_rd_cycles + 32'd1;
 
             case (rstate)
@@ -752,6 +772,8 @@ module axi4_master_bridge #(
                     stat_rd_frame  <= stat_rd_frame + 16'd1;
                     if (!r_rnd) rd_seq_slot <= shim_rdesc_slot + 8'd1;
                     dbg_rd_beats   <= dbg_rd_beats + 32'd1;
+                    dma_req_new    <= 1'b0;     // 电平随退休清零 (板上实证:
+                                                // 1 拍脉冲跨域漏采, 见镜像注释)
                     rstate         <= R_IDLE;   // rdesc 已由 shim 发给下游
                 end
             end

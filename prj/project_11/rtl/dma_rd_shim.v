@@ -71,6 +71,10 @@ module dma_rd_shim #(
     reg [5:0]   bi;              // 当前拍内字节下标 0..63
     reg [15:0]  len_cnt;         // 本帧累计字节数(已扣前导)
     reg [15:0]  drop_left;       // 本帧尚需丢弃的前导字节数
+    reg         drop_busy;       // 丢弃进行中(寄存器标志 —— 2026-10-15 板场次:
+                                 // 16 位比较直连字节路径在 DROP=8 常量下触发
+                                 // Vivado 2023.1 "Mimic Skeleton" 综合崩溃,
+                                 // 2/2 复现; W5 R_PRE2 同位置同病, 结构扰动绕开)
     reg         in_frame;        // 帧内标志: 从首拍置位到 TLAST 结算清零
 
     assign s_tready = (st == ST_IDLE);
@@ -85,7 +89,8 @@ module dma_rd_shim #(
         if (!rst_n) begin
             st <= ST_IDLE; rf_wr_en <= 1'b0; rdesc_wr_en <= 1'b0; tag_pop <= 1'b0;
             beat_data <= 512'd0; beat_keep <= 64'd0; beat_last <= 1'b0;
-            bi <= 6'd0; len_cnt <= 16'd0; drop_left <= 16'd0; in_frame <= 1'b0;
+            bi <= 6'd0; len_cnt <= 16'd0; drop_left <= 16'd0;
+            drop_busy <= 1'b0; in_frame <= 1'b0;
             rf_wr_data <= 8'd0; rdesc_wr_data <= 25'd0;
         end else begin
             rf_wr_en   <= 1'b0;
@@ -100,6 +105,7 @@ module dma_rd_shim #(
                     if (!in_frame) begin
                         len_cnt   <= 16'd0;
                         drop_left <= DROP_N;    // 帧首: 重置前导丢弃预算
+                        drop_busy <= (DROP_N != 16'd0);
                     end
                     beat_data <= s_tdata;
                     beat_keep <= s_tkeep;
@@ -112,8 +118,10 @@ module dma_rd_shim #(
             //-------------------------------------------------------- unpack
             ST_UNPK: begin
                 if (beat_keep[bi]) begin
-                    if (drop_left != 16'd0) begin
+                    if (drop_busy) begin
                         drop_left <= drop_left - 16'd1;   // 前导: 丢弃不发射
+                        if (drop_left == 16'd1)           // 这是最后一拍丢弃
+                            drop_busy <= 1'b0;
                     end else begin
                         rf_wr_en   <= 1'b1;
                         rf_wr_data <= beat_data[bi*8 +: 8];

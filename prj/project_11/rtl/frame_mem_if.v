@@ -31,7 +31,8 @@ module frame_mem_if #(
     parameter [31:0] SLOT_BASE = 32'h0010_0000,
     parameter [15:0] MAX_LEN   = 16'd1538,
     parameter        BF_AW     = 12,          // byte FIFO depth = 4096 (>=2 frames)
-    parameter        DF_AW     = 3            // descriptor FIFO depth = 8
+    parameter        DF_AW     = 3,           // descriptor FIFO depth = 8
+    parameter        HAS_DMA   = 1            // B3-1b: 桥内是否例化 DMA shim
 )(
     // ================= frame side (user_clk domain) =================
     input  wire         user_clk,
@@ -67,12 +68,14 @@ module frame_mem_if #(
     // engine=1 时读请求交软件; 内部 2FF 到 ui 域喂 u_bridge; {slot,len} 经
     // 2FF+sticky 展宽镜像到 user 域给 Lite 回读 (准静态事件, 2FF 足够)。
     input  wire         dma_engine,      // user 域 (顶层直连 Lite 寄存器位)
+    // B3-1b 取证: 最近一笔发射帧 {len[31:16], slot[23:16], 首字节[7:0]}(user 域)
+    output wire [31:0]  ro_dbg_emit,
     input  wire [511:0] dma_s_tdata,
     input  wire [63:0]  dma_s_tkeep,
     input  wire         dma_s_tlast,
     input  wire         dma_s_tvalid,
     output wire         dma_s_tready,
-    output wire [31:0]  ro_dma_req,      // user 域: {sticky_new, engine, slot[7:0], len[15:0]}
+    output wire [31:0]  ro_dma_req,      // user 域 26 位拼接: sticky[25] engine[24] slot[23:16] len[15:0]
 
     // ================= DDR side (ui_clk domain) =================
     input  wire         ui_clk,
@@ -433,7 +436,7 @@ module frame_mem_if #(
         end
     end
 
-    axi4_master_bridge #(.SLOT_BASE(SLOT_BASE), .MAX_LEN(MAX_LEN)) u_bridge (
+    axi4_master_bridge #(.SLOT_BASE(SLOT_BASE), .MAX_LEN(MAX_LEN), .HAS_DMA(HAS_DMA)) u_bridge (
         .clk(ui_clk), .rst_n(ui_rst_n), .calib_ok(calib_ok),
         .wf_empty(ub_empty), .wf_data(ub_dout), .wf_level(ub_rl), .wf_rd_en(ub_rd_en),
         .wd_empty(ud_empty), .wd_data(ud_dout), .wd_rd_en(ud_rd_en),
@@ -474,28 +477,44 @@ module frame_mem_if #(
 
     //=========================================================================
     // 2c. B3-1b: DMA 读请求 ui->user 镜像 (准静态事件, 2FF + sticky 展宽)
-    //     软核轮询 ro_dma_req 的 sticky 位 (bit31), 服务后由 engine 切换
+    //     软核轮询 ro_dma_req 的 sticky 位 (bit25, 26 位拼接), 服务后由 engine 切换
     //     (1->0->1) 或下一请求覆盖。ui 侧 {slot,len} 稳定期 = R_DRET 全程,
     //     远大于 2 拍, 无亚稳态窗口问题。
     //=========================================================================
     reg  [7:0]  dreq_slot_s1, dreq_slot_s2;
     reg  [15:0] dreq_len_s1,  dreq_len_s2;
     reg         dreq_new_s1,  dreq_new_s2;
-    reg         dreq_sticky;
 
+    // ★板上实证(10-14): 请求脉冲跨域漏采 -> 桥侧改为电平, 此处直接
+    //   2FF 透传电平 (bit25 = "有请求待服务"), 无锁存/清除协议。
+    //   {slot,len} 与电平同源同拍变化, 双 2FF 同步采样, 元组不混。
     always @(posedge user_clk or negedge user_rst_n) begin
         if (!user_rst_n) begin
             dreq_slot_s1 <= 8'd0;  dreq_slot_s2 <= 8'd0;
             dreq_len_s1  <= 16'd0; dreq_len_s2  <= 16'd0;
             dreq_new_s1  <= 1'b0;  dreq_new_s2  <= 1'b0;
-            dreq_sticky  <= 1'b0;
         end else begin
             dreq_slot_s1 <= dma_req_slot_i;  dreq_slot_s2 <= dreq_slot_s1;
             dreq_len_s1  <= dma_req_len_i;   dreq_len_s2  <= dreq_len_s1;
             dreq_new_s1  <= dma_req_new_i;   dreq_new_s2  <= dreq_new_s1;
-            if (dreq_new_s2) dreq_sticky <= 1'b1;
         end
     end
-    assign ro_dma_req = {dreq_sticky, dma_engine, dreq_slot_s2, dreq_len_s2};
+    assign ro_dma_req = {dreq_new_s2, dma_engine, dreq_slot_s2, dreq_len_s2};
+
+    // ---- B3-1b 取证: 发射帧 len/slot/首字节 (user 域, 无跨域) ----
+    reg [31:0] dbg_emit_r;
+    always @(posedge user_clk or negedge user_rst_n) begin
+        if (!user_rst_n) begin
+            dbg_emit_r <= 32'd0;
+        end else begin
+            if ((est == 2'd0) && !rd_empty) begin
+                dbg_emit_r[31:16] <= rd_dout[23:8];   // rdesc 弹出: len
+                dbg_emit_r[23:16] <= rd_dout[7:0];    // slot
+            end
+            if ((est == 2'd1) && !rb_empty && (rd_cnt == 16'd0))
+                dbg_emit_r[7:0]  <= rb_dout;          // 帧首字节发射
+        end
+    end
+    assign ro_dbg_emit = dbg_emit_r;
 
 endmodule

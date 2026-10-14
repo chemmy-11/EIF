@@ -374,7 +374,17 @@ int main(void)
             unsigned served = 0, stall = 0;
 
             R_ENGINE = 1u;                          /* read engine = DMA */
-            R_MODE   = MODE_RND;                    /* RND: per-frame trigger */
+            R_MODE   = MODE_SEQ;                    /* SEQ: 顶层自动触发喂请求
+                                                      * (RND 下无人发读命令, 服务
+                                                      *  循环会等不到 sticky) */
+            {   /* 置位确认门: 镜像 bit24 回读到 1 再继续 (关"引擎晚到"窗口) */
+                unsigned k;
+                for (k = 0; k < 3000u; k++) {
+                    if (rd_reg((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x01000000u)
+                        break;
+                    busy_ms(1);
+                }
+            }
             uputs("[B2] E-START (engine=DMA)\r\n");
 
             rd0 = rd_reg(&R_WM_RD);
@@ -387,8 +397,8 @@ int main(void)
                 unsigned wr_last = 0, same = 0;
                 for (;;) {
                     v_req = rd_reg((volatile unsigned *)(REGS_BASE + 0x34u));
-                    if (v_req & 0x80000000u) {      /* sticky: pending request */
-                        slot = (v_req >> 8) & 0xffu;
+                    if (v_req & 0x02000000u) {      /* sticky=bit25 ({1,1,slot[8],len[16]} 共 26 位拼接) */
+                        slot = (v_req >> 16) & 0xffu;
                         len  = v_req & 0xffffu;
                         sa = 0x00100000u + slot * 4096u;
                         DMA_DMACR = 0x4u;           /* reset */
@@ -400,10 +410,15 @@ int main(void)
                         while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
                             if (++guard > 4000000u) break;
                         DMA_SA     = sa;            /* aligned slot base */
-                        DMA_LENGTH = len + 50u;     /* +50 prefix, shim drops */
+                        DMA_LENGTH = len + 8u;      /* 窗口前移 8B(板上定案), shim 丢 8 */
                         guard = 0;
                         do { sr = dread(&DMA_DMASR); }
                         while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
+                        /* 等请求电平落零 (退休已发生) 再取下一笔, 防重服务 */
+                        guard = 0;
+                        while ((rd_reg((volatile unsigned *)(REGS_BASE + 0x34u))
+                                & 0x02000000u) && (++guard < 100000u))
+                            ;
                         served++;
                     } else {
                         busy_ms(1);
@@ -413,8 +428,12 @@ int main(void)
                         unsigned wr = rd_reg(&R_WM_WR);
                         if (wr == wr_last) same++; else same = 0;
                         wr_last = wr;
-                        if ((same >= 12u) && (d16(rd, rd0) == d16(wr, rd0)))
-                            break;                  /* drained & stable */
+                        if ((same >= 600u) && (d16(rd, rd0) == d16(wr, rd0))
+                            && (served > 0u))
+                            break;                  /* drained & stable & >=1 served:
+                                                     * 板上实证(10-14): 无此门则循环
+                                                     * 在 PC 首帧到达前(~50ms)即收口,
+                                                     * engine 被切回 0, 帧走桥引擎 */
                         if (same >= 4000u) {        /* ~4s no request: stall */
                             stall = 1;
                             break;
@@ -427,6 +446,7 @@ int main(void)
             rd = rd_reg(&R_WM_RD);
             /* 取证: 最近一笔 DMA 线上 AR 地址 (定位 -50 侧别; 与 SA 对照) */
             uputs("[B2] E-ARL arl="); uputh(rd_reg((volatile unsigned *)(REGS_BASE + 0x38u)));
+            uputs("[B2] E-EMIT emit="); uputh(rd_reg((volatile unsigned *)(REGS_BASE + 0x3Cu)));
             uputs("\r\n");
             uputs("[B2] E-DONE served="); uputd(served);
             uputs(" rd+");      uputd(d16(rd, rd0));
