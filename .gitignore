@@ -96,3 +96,5 @@ prj/project_11/.tmpCRC/
 prj/project_11/iter_*.txt
 prj/project_11/sw/.analytics
 *.log.old
+.tmpCRC/
+prj/project_11/scripts/iter_*_CongestedCLBsAndNets.txt
