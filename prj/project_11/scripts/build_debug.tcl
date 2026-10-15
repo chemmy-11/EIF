@@ -23,12 +23,16 @@ if {[llength [get_files -quiet dma_sink.v]] == 0} {
     puts "ADD_FILES: dma_sink.v"
     update_compile_order -fileset sources_1
 }
-# ---- B3-1b: shim 首次真正进位流 (桥内实例化) ----
-if {[llength [get_files -quiet dma_rd_shim.v]] == 0} {
-    add_files -fileset sources_1 $proj/rtl/dma_rd_shim.v
-    puts "ADD_FILES: dma_rd_shim.v"
-    update_compile_order -fileset sources_1
+# ---- B3-1b: shim v2 (更名绕开综合 worker 的文件级陈旧缓存, 见 v2 文件头) ----
+if {[llength [get_files -quiet dma_rd_shim_v2.v]] == 0} {
+    add_files -fileset sources_1 $proj/rtl/dma_rd_shim_v2.v
+    puts "ADD_FILES: dma_rd_shim_v2.v"
 }
+if {[llength [get_files -quiet dma_rd_shim.v]] > 0} {
+    remove_files -fileset sources_1 [get_files -quiet dma_rd_shim.v]
+    puts "REMOVE_FILES: dma_rd_shim.v (v1 退役)"
+}
+update_compile_order -fileset sources_1
 # ---- ddr4_0 配置已改(System_Clock=No_Buffer): 强制重建其产物与 OOC run ----
 # reset_run synth_1 不级联 IP run; 不重建则顶层读到旧差分 stub -> [Synth 8-11365]
 reset_target  all [get_ips ddr4_0]
@@ -263,6 +267,8 @@ place_design       -directive ExtraTimingOpt
 phys_opt_design    -directive AggressiveExplore
 route_design       -directive NoTimingRelaxation
 phys_opt_design    -directive AggressiveExplore
+# build10: MIG->DMA SF-FIFO cross-IP path -0.010 - extra post-route phys_opt
+phys_opt_design    -directive Explore
 
 report_clocks            -file $proj/out/rpt_clocks.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose \

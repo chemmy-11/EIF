@@ -1,16 +1,16 @@
 //=============================================================================
-// shim_drop_tb.sv — dma_rd_shim 前导丢弃判据（prj11 B3-1b）
+// shim_drop_tb.sv — dma_rd_shim_v2 前导丢弃判据（prj11 B3-1b）
 //-----------------------------------------------------------------------------
-// 背景: 板上实证 DMA 读窗口起点比帧首早 50 字节(见 dma_rd_shim.v 头部证据)。
-//   集成配置 = 对齐读 SA=SLOT_BASE, LEN=帧长+DROP_BYTES, shim DROP_BYTES=50。
-//   本 TB 用 DROP_BYTES=50 的实例, 直接验证:
-//     把「50 字节前导 + 帧」的 512b 流喂进去, 输出必须是**纯帧字节**(前导全丢),
-//     且描述符 len = 帧长(不是帧长+50)。
+// 背景: DMA 读窗口起点比帧首早 DROP_BYTES 字节(板上定案=8: 槽存完整 ETH 帧,
+//   "50" 是 42B 帧头 + 8 的早期误读)。本 TB 用 DROP=50 跑参数健壮性 —— 故意
+//   取 >64 的值, 让丢弃跨拍边界; 集成配置 DROP=8 由 bridge_dma_tb P2 覆盖。
+//   把「50 字节前导 + 帧」的 512b 流喂进去, 输出必须是**纯帧字节**(前导全丢),
+//   且每帧恰 1 个 frame_done (v3: 描述符由桥侧发射, 本 TB 只管字节+脉冲)。
 //
 // 判据:
-//   D1 200B 帧 + 50B 前导 (合计 250B = 3 全拍 + 58B 尾拍) -> 字节流 == 帧, len=200
-//   D2 512B 帧 + 50B 前导 (合计 562B = 8 全拍 + 50B 尾拍) -> 字节流 == 帧, len=512
-//   D3   1B 帧 + 50B 前导 (合计  51B = 1 拍, keep=51)     -> 字节流 == 帧, len=1
+//   D1 200B 帧 + 50B 前导 (合计 250B = 3 全拍 + 58B 尾拍) -> 字节流 == 帧, 输出恰 200B
+//   D2 512B 帧 + 50B 前导 (合计 562B = 8 全拍 + 50B 尾拍) -> 字节流 == 帧, 输出恰 512B
+//   D3   1B 帧 + 50B 前导 (合计  51B = 1 拍, keep=51)     -> 字节流 == 帧, 输出恰 1B
 //   D4 64B 帧 + 50B 前导 (合计 114B = 1 全拍 + 50B 尾拍)  -> 边界: 前导恰在首拍内
 //   期望字节流由 TB 独立生成比对; 前导填充 0xEE 且与帧字节内容不同, 漏丢必被抓。
 //=============================================================================
@@ -30,36 +30,33 @@ module shim_drop_tb;
 
     wire        rf_wr_en;
     wire [7:0]  rf_wr_data;
-    wire        rdesc_wr_en;
-    wire [24:0] rdesc_wr_data;
+    wire        frame_done;
     reg  [7:0]  tag_slot = 0;
     reg         tag_valid = 0;
 
-    dma_rd_shim #(.DROP_BYTES(DROP)) dut (
+    reg [15:0] frame_len = 0;      // v3: 桥侧参考输入, shim 不再使用
+    dma_rd_shim_v2 #(.DROP_BYTES(DROP)) dut (
         .clk(clk), .rst_n(rst_n),
         .s_tdata(tdata), .s_tkeep(tkeep), .s_tlast(tlast), .s_tvalid(tvalid),
         .s_tready(tready),
         .rf_wr_en(rf_wr_en), .rf_wr_data(rf_wr_data),
-        .rdesc_wr_en(rdesc_wr_en), .rdesc_wr_data(rdesc_wr_data),
-        .tag_slot(tag_slot), .tag_valid(tag_valid), .tag_pop()
+        .frame_done(frame_done),
+        .frame_len(frame_len), .tag_slot(tag_slot), .tag_valid(tag_valid)
     );
 
     int errs = 0;
     int got_bytes = 0;
 
     reg [7:0]  cap [0:8191];
-    reg [24:0] desc_q [0:15];
-    int        desc_n = 0;
+    int        done_n = 0;
 
     always @(posedge clk) begin
         if (rf_wr_en) begin
             cap[got_bytes] <= rf_wr_data;
             got_bytes <= got_bytes + 1;
         end
-        if (rdesc_wr_en) begin
-            desc_q[desc_n] <= rdesc_wr_data;
-            desc_n <= desc_n + 1;
-        end
+        if (frame_done)
+            done_n <= done_n + 1;
     end
 
     // 连续字节流缓冲: [0,DROP) 前导 0xEE; [DROP,DROP+n) 帧 = base+i
@@ -95,17 +92,18 @@ module shim_drop_tb;
         end
     endtask
 
-    // 一帧: n 字节(帧), 前导 DROP, 校验输出 = 帧, 描述符 len=n
+    // 一帧: n 字节(帧), 前导 DROP, 校验输出 = 帧, frame_done 恰 1 个
     task automatic case_drop(input int n, input byte base, input byte slot, input string tag);
         int b0, dn0, g0;
         begin
             b0 = got_bytes;
             mk_stream(n, base);
             tag_slot = slot; tag_valid = 1;
+            frame_len = n[15:0];
             emit(DROP + n);
             @(negedge clk); tag_valid = 0;
-            dn0 = desc_n; g0 = 0;
-            while ((desc_n == dn0) && (g0 < 8000)) begin
+            dn0 = done_n; g0 = 0;
+            while ((done_n == dn0) && (g0 < 8000)) begin
                 @(posedge clk); g0 = g0 + 1;
             end
             repeat (2) @(posedge clk);
@@ -122,15 +120,8 @@ module shim_drop_tb;
                          tag, got_bytes - b0, n);
                 errs = errs + 1;
             end
-            if (desc_n < 1) begin
-                $display("[FAIL] %s 无描述符", tag); errs = errs + 1;
-            end else begin
-                desc_n = desc_n - 1;
-                if (desc_q[desc_n][23:8] !== n || desc_q[desc_n][7:0] !== slot) begin
-                    $display("[FAIL] %s 描述符 len=%0d slot=%0d (want %0d/%0d)",
-                             tag, desc_q[desc_n][23:8], desc_q[desc_n][7:0], n, slot);
-                    errs = errs + 1;
-                end
+            if (done_n == dn0) begin
+                $display("[FAIL] %s 无 frame_done", tag); errs = errs + 1;
             end
             if (errs == 0) $display("[%s] %0dB 帧 + %0dB 前导 -> 纯帧 %0dB ✓", tag, n, DROP, n);
         end

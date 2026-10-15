@@ -10,6 +10,9 @@ REM ===========================================================================
 setlocal
 set VIV=D:\Xilinx\Vivado\2023.1\bin
 cd /d "%~dp0"
+REM 10-15: shared work lib corrupted by an interrupted xvlog makes the next
+REM        xvlog spin forever -> clear it first each run (seconds to recompile).
+if exist xsim.dir rmdir /s /q xsim.dir
 
 del /q lite_tb.log lite_defect.log 2>nul
 

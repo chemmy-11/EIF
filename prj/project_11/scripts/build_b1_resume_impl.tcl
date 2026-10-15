@@ -13,10 +13,13 @@ implement_debug_core
 write_debug_probes -force $proj/scripts/probes.ltx
 
 opt_design
-place_design       -directive ExtraTimingOpt
+# build16r2(10-15): build15 差 19ps(-0.018, u_mem2/full_bit_q 路由主导) -> 换 place 指令重掷
+# (build16r 教训: 追加 phys_opt 轮次造成寄存器复制, WNS 反而恶化到 -0.120, 已回退)
+place_design       -directive ExtraPostPlacementOpt
 phys_opt_design    -directive AggressiveExplore
 route_design       -directive NoTimingRelaxation
 phys_opt_design    -directive AggressiveExplore
+phys_opt_design    -directive Explore
 
 report_clocks            -file $proj/out/rpt_clocks.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose \

@@ -5,9 +5,10 @@
 //   P1 engine=0 (桥硬件读): 写 3 帧 -> SEQ 读回 -> 比对
 //   P2 engine=1 (DMA 引擎): 写 3 帧 -> 读命令入队 -> 桥发 dma_req{slot,len}
 //       -> TB 充当"软核+DMA+DDR": 用 AXI 从机内存内容生成
-//          [50B 前导 + 帧] 的 512b 流 (SA=槽基址对齐读, LEN=len+50)
-//       -> shim 拆包 -> rf/rdesc -> 比对 + 退休语义 (outstanding 归零,
-//          rd_seq_slot 推进, 下一条 SEQ 请求不被旧槽挡住)
+//          [8B 前导 + 帧] 的 512b 流 (SA=槽基址对齐读, LEN=len+8;
+//          板上定案: 槽存完整 ETH 帧, 窗口前移 8B —— 早期误读为 50)
+//       -> shim 拆包 -> rf; 描述符 (v3) 由桥 R_DRET 自发射 -> 比对 + 退休
+//          语义 (outstanding 归零, rd_seq_slot 推进, 下一条 SEQ 请求不被旧槽挡住)
 //   NEG engine=1 时桥不得发 AR (m_axi_arvalid 恒 0)
 //
 // DDR 模型: 简化版在 TB 内 —— 写路径用 AXI 从机 (写真正进内存), 读路径

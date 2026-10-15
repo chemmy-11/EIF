@@ -16,7 +16,7 @@ del /q w4_joint_run.log 2>nul
 
 echo === prj10 W4 joint sim %DATE% %TIME% === > w4_joint_run.log
 
-call "%VIV%\xvlog.bat" -sv ..\rtl\async_fifo.v ..\rtl\axi4_master_bridge.v ..\rtl\dma_rd_shim.v ..\rtl\frame_mem_if.v ..\rtl\axi_arb_2to1.v axi4_ram_model.v axi_arb_2to1_defect.v w4_joint_tb.sv >> w4_joint_run.log 2>&1
+call "%VIV%\xvlog.bat" -sv ..\rtl\async_fifo.v ..\rtl\axi4_master_bridge.v ..\rtl\dma_rd_shim_v2.v ..\rtl\frame_mem_if.v ..\rtl\axi_arb_2to1.v axi4_ram_model.v axi_arb_2to1_defect.v w4_joint_tb.sv >> w4_joint_run.log 2>&1
 if errorlevel 1 ( echo XVLOG_FAIL & findstr /C:"ERROR" w4_joint_run.log & exit /b 1 )
 
 REM ---- 1) negative control (defect routing): expect FAIL ----

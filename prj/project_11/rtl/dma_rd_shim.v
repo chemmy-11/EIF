@@ -5,8 +5,12 @@
 //   读出的 512b 流, 经本件还原成 frame_mem_if 期望的两路输出:
 //     1) 字节流 rf_wr_en/rf_wr_data (1 字节/拍, 与原桥 R_UNPACK 同速率)
 //     2) 读描述符 rdesc_wr_data = {1'b0, len[15:0], slot[7:0]} (TLAST 时发)
-//   长度语义: **按 TKEEP 计** —— 尾拍有效字节 = popcount(tkeep), 不是整 64,
-//   否则帧长非 64 倍数时会拖尾 (设计决策 3)。
+//   长度语义: ★2026-10-15 网表取证定案 (坑 #47 第四案): 逐字节 len_cnt 的
+//   CE 锥在板上被综合器改写 (真值表与 RTL 语义不符, ST_UNPK 之外也计数,
+//   板上现象 = rdesc.len 每帧 +1 而非帧长)。修法照 dma_sink 先例: **计数锥
+//   彻底退出逐字节路径** —— 帧长由 frame_len 端口直接提供 (软件下发的
+//   dma_req_len, R_DRET 全程稳定, 同 tag_slot 的既有先例), 结算时引用。
+//   TKEEP 仅门控发射(哪些 lane 有效), 不再参与长度计算。
 //
 // ★前导丢弃 DROP_BYTES (2026-10-13 板上实证):
 //   DMA 读窗口起点比帧首字节早 DROP_BYTES 字节。板上两族独立帧逐字节反推,
@@ -52,9 +56,10 @@ module dma_rd_shim #(
     output reg          rdesc_wr_en,
     output reg  [24:0]  rdesc_wr_data,    // {1'b0, len[15:0], slot[7:0]}
 
-    // ---- 槽号 tag in (描述符写入方推送; TLAST 时 pop) ----
+    // ---- 槽号/帧长 in (描述符写入方提供; direct 模式单笔在飞 => 稳定) ----
     input  wire [7:0]   tag_slot,
     input  wire         tag_valid,
+    input  wire [15:0]  frame_len,      // 本帧长度 (软件下发, 帧全程稳定)
     output reg          tag_pop
 );
 
@@ -69,7 +74,6 @@ module dma_rd_shim #(
     reg [63:0]  beat_keep;
     reg         beat_last;
     reg [5:0]   bi;              // 当前拍内字节下标 0..63
-    reg [15:0]  len_cnt;         // 本帧累计字节数(已扣前导)
     reg [15:0]  drop_left;       // 本帧尚需丢弃的前导字节数
     reg         drop_busy;       // 丢弃进行中(寄存器标志 —— 2026-10-15 板场次:
                                  // 16 位比较直连字节路径在 DROP=8 常量下触发
@@ -89,7 +93,7 @@ module dma_rd_shim #(
         if (!rst_n) begin
             st <= ST_IDLE; rf_wr_en <= 1'b0; rdesc_wr_en <= 1'b0; tag_pop <= 1'b0;
             beat_data <= 512'd0; beat_keep <= 64'd0; beat_last <= 1'b0;
-            bi <= 6'd0; len_cnt <= 16'd0; drop_left <= 16'd0;
+            bi <= 6'd0; drop_left <= 16'd0;
             drop_busy <= 1'b0; in_frame <= 1'b0;
             rf_wr_data <= 8'd0; rdesc_wr_data <= 25'd0;
         end else begin
@@ -103,7 +107,6 @@ module dma_rd_shim #(
                 // IDLE 过渡(等下一拍)绝不能清, 否则多拍帧只剩尾拍计数。
                 if (s_tvalid) begin
                     if (!in_frame) begin
-                        len_cnt   <= 16'd0;
                         drop_left <= DROP_N;    // 帧首: 重置前导丢弃预算
                         drop_busy <= (DROP_N != 16'd0);
                     end
@@ -125,7 +128,6 @@ module dma_rd_shim #(
                     end else begin
                         rf_wr_en   <= 1'b1;
                         rf_wr_data <= beat_data[bi*8 +: 8];
-                        len_cnt    <= len_cnt + 16'd1;
                     end
                 end
                 // 本拍 64 个 lane 扫完 -> 拍边界 (TKEEP 只门控发射, 不参与拍边界)
@@ -141,9 +143,9 @@ module dma_rd_shim #(
             end
             //--------------------------------------------------- last settle
             ST_LAST: begin
-                // 描述符在进入本态的下一拍发出 (len 已含尾字节, 已扣前导)
+                // 描述符在进入本态的下一拍发出 (len = 软件下发的帧长)
                 rdesc_wr_en  <= 1'b1;
-                rdesc_wr_data <= {1'b0, len_cnt, tag_slot};
+                rdesc_wr_data <= {1'b0, frame_len, tag_slot};
                 tag_pop      <= 1'b1;
                 in_frame     <= 1'b0;          // 帧边界: 下一帧重新计长
                 st           <= ST_IDLE;

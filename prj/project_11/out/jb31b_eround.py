@@ -2,7 +2,7 @@
 """B3-1b 'E' round v2: tag-matched echo compare (stray LAN frames immune).
 Judge: every B31B payload echoed byte-exact (tag matched); rd delta == wr delta;
 E-DONE served>=1 stall=0; E-ARL vs expected (last served burst)."""
-import socket, time, serial
+import socket, time, serial, re
 
 SRC_IP, SRC_PORT = "192.168.1.102", 1234
 DST_IP, DST_PORT = "192.168.1.10", 1234
@@ -106,18 +106,21 @@ else:
     print("E-DONE: served=%d stall=0" % served)
 
 # judge 4: E-ARL (last burst of last transfer)
+# 修复 (10-15): ARL 与 EMIT 两行 UART 打印无换行粘连 -> 旧 split("arl=") 尾部
+# 带 "[B2] E-EMIT ..." 导致 int() 崩; 改为只抠 hex 前缀。
 arl = ""
 for line in uart.splitlines():
-    if "E-ARL" in line and "arl=" in line:
-        arl = line.split("arl=")[1].strip()
+    m = re.search(r"arl=([0-9a-fA-F]+)", line)
+    if m:
+        arl = m.group(1)
 if arl and wr1 > wr0:
     last_slot = (wr1 - 1) & 0xff
     last_len = LENS[-1] if (wr1 - wr0) == N else None
     sa = 0x100000 + last_slot * 4096
     got = int(arl, 16)
     note = "unknown-len(stray last)" if last_len is None else \
-           ("SA+128 (2nd burst of LEN=%d -> AR exact, -50 = data side)" % (last_len + 50)
-            if got == sa + 128 and last_len + 50 > 128 else
+           ("SA+128 (2nd burst of LEN=%d -> AR exact, 窗口偏移在数据侧)" % (last_len + 8)
+            if got == sa + 128 and last_len + 8 > 128 else
             ("==SA (single-burst, AR exact)" if got == sa else "check"))
     print("E-ARL: got=%08x last-slot-SA=%08x -> %s" % (got, sa, note))
 else:

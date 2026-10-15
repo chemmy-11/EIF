@@ -3,6 +3,9 @@ REM run_sink_tb.bat -- prj11 B3-1a dma_sink unit regression (ASCII only)
 setlocal
 set VIV=D:\Xilinx\Vivado\2023.1\bin
 cd /d "%~dp0"
+REM 10-15: shared work lib corrupted by an interrupted xvlog makes the next
+REM        xvlog spin forever -> clear it first each run (seconds to recompile).
+if exist xsim.dir rmdir /s /q xsim.dir
 if exist xsim_sink.dir rmdir /s /q xsim_sink.dir
 del /q sink_run.log 2>nul
 echo === sink sim %DATE% %TIME% === > sink_run.log

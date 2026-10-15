@@ -501,20 +501,29 @@ module frame_mem_if #(
     end
     assign ro_dma_req = {dreq_new_s2, dma_engine, dreq_slot_s2, dreq_len_s2};
 
-    // ---- B3-1b 取证: 发射帧 len/slot/首字节 (user 域, 无跨域) ----
-    reg [31:0] dbg_emit_r;
-    always @(posedge user_clk or negedge user_rst_n) begin
-        if (!user_rst_n) begin
-            dbg_emit_r <= 32'd0;
-        end else begin
-            if ((est == 2'd0) && !rd_empty) begin
-                dbg_emit_r[31:16] <= rd_dout[23:8];   // rdesc 弹出: len
-                dbg_emit_r[23:16] <= rd_dout[7:0];    // slot
+    // ---- B3-1b 取证: 发射帧 len/slot/首字节 (user 域; 仅 DMA 实例生成) ----
+    // build9 教训: 无条件生成使 u_mem2 平添采样逻辑, 写路径字节 FIFO 拥塞
+    // (route 77%, WNS -0.083); HAS_DMA=0 实例不应存在任何取证锥。
+    generate if (HAS_DMA) begin : gen_dbg_emit
+        reg [31:0] dbg_emit_r;
+        always @(posedge user_clk or negedge user_rst_n) begin
+            if (!user_rst_n) begin
+                dbg_emit_r <= 32'd0;
+            end else begin
+                // 板上实证(10-15): 初版 [31:16]/[23:16] 双赋值位域重叠,
+                // slot 覆盖 len 低 8 位 -> 读数 21/22/23 递增即 slot 泄露。
+                // 修正排布: [31:16]=len, [15:8]=slot, [7:0]=帧首字节。
+                if ((est == 2'd0) && !rd_empty) begin
+                    dbg_emit_r[31:16] <= rd_dout[23:8];   // rdesc 弹出: len
+                    dbg_emit_r[15:8]  <= rd_dout[7:0];    // slot
+                end
+                if ((est == 2'd1) && !rb_empty && (rd_cnt == 16'd0))
+                    dbg_emit_r[7:0]  <= rb_dout;          // 帧首字节发射
             end
-            if ((est == 2'd1) && !rb_empty && (rd_cnt == 16'd0))
-                dbg_emit_r[7:0]  <= rb_dout;          // 帧首字节发射
         end
-    end
-    assign ro_dbg_emit = dbg_emit_r;
+        assign ro_dbg_emit = dbg_emit_r;
+    end else begin : gen_no_dbg_emit
+        assign ro_dbg_emit = 32'd0;
+    end endgenerate
 
 endmodule

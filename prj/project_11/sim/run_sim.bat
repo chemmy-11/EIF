@@ -14,7 +14,7 @@ del /q xsim_run.log 2>nul
 
 echo === prj10 W2 sim %DATE% %TIME% === > xsim_run.log
 
-call "%VIV%\xvlog.bat" -sv ..\rtl\async_fifo.v ..\rtl\axi4_master_bridge.v ..\rtl\dma_rd_shim.v ..\rtl\frame_mem_if.v axi4_ram_model.v mem_bridge_tb.sv >> xsim_run.log 2>&1
+call "%VIV%\xvlog.bat" -sv ..\rtl\async_fifo.v ..\rtl\axi4_master_bridge.v ..\rtl\dma_rd_shim_v2.v ..\rtl\frame_mem_if.v axi4_ram_model.v mem_bridge_tb.sv >> xsim_run.log 2>&1
 if errorlevel 1 ( echo XVLOG_FAIL & findstr /C:"ERROR" xsim_run.log & exit /b 1 )
 
 call "%VIV%\xelab.bat" -debug typical mem_bridge_tb -s mem_bridge_sim >> xsim_run.log 2>&1

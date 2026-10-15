@@ -1,12 +1,15 @@
 //=============================================================================
-// shim_tb.sv — dma_rd_shim 单元仿真（prj11 B3-1b, 2026-10-12）
+// shim_tb.sv — dma_rd_shim_v2 单元仿真（prj11 B3-1b, 2026-10-12；v3 接口 10-15）
 //-----------------------------------------------------------------------------
+// ★v3 (2026-10-15): shim 不再发 rdesc/tag —— 只输出字节流 + frame_done 脉冲。
+//   描述符由桥 R_DRET 用自身 dma_req_* 寄存器发射（见 bridge_dma_tb P2 覆盖）。
+//   本 TB 只管字节流逐字节正确 + frame_done 恰一次/帧。
 // 判据:
-//   S1 全拍帧    : 2 拍 × 64B 全 keep -> 字节流逐字节一致, 描述符 {len=128, slot}
-//   S2 尾拍截断  : 1 全拍 + 1 尾拍 keep=20B -> len=84 (TKEEP 语义, 不拖尾)
-//   S3 单拍帧    : 1 拍 keep=7B -> len=7
-//   S4 连续多帧  : 背靠背 3 帧(不同 slot tag) -> 3 个描述符, 顺序与 tag 一致
-//   NEG 无 TLAST : 流只发 1 拍(无 tlast)后停止 -> 不发描述符, 不死锁,
+//   S1 全拍帧    : 2 拍 × 64B 全 keep -> 字节流逐字节一致 + frame_done×1
+//   S2 尾拍截断  : 1 全拍 + 1 尾拍 keep=20B -> 输出恰 84B (TKEEP 门控, 不拖尾)
+//   S3 单拍帧    : 1 拍 keep=7B -> 输出恰 7B
+//   S4 连续多帧  : 背靠背 3 帧(不同 slot tag) -> 3 个 frame_done, 字节流顺序一致
+//   NEG 无 TLAST : 流只发 1 拍(无 tlast)后停止 -> 不发 frame_done, 不死锁,
 //                  后续新帧(tvalid 重新出现)能重新开始 (IDLE 重入)
 // 激励用可变 keep/last 的任务驱动; 期望字节流由 TB 独立生成比对。
 //=============================================================================
@@ -24,37 +27,35 @@ module shim_tb;
 
     wire        rf_wr_en;
     wire [7:0]  rf_wr_data;
-    wire        rdesc_wr_en;
-    wire [24:0] rdesc_wr_data;
+    wire        frame_done;
+    reg  [15:0] frame_len = 0;             // v3: 桥侧参考输入, shim 不再使用
     reg  [7:0]  tag_slot = 0;
     reg         tag_valid = 0;
 
-    dma_rd_shim dut (
+    dma_rd_shim_v2 #(.DROP_BYTES(0)) dut (
         .clk(clk), .rst_n(rst_n),
         .s_tdata(tdata), .s_tkeep(tkeep), .s_tlast(tlast), .s_tvalid(tvalid),
         .s_tready(tready),
         .rf_wr_en(rf_wr_en), .rf_wr_data(rf_wr_data),
-        .rdesc_wr_en(rdesc_wr_en), .rdesc_wr_data(rdesc_wr_data),
-        .tag_slot(tag_slot), .tag_valid(tag_valid), .tag_pop()
+        .frame_done(frame_done),
+        .frame_len(frame_len), .tag_slot(tag_slot), .tag_valid(tag_valid)
     );
 
     int errs = 0;
     int got_bytes = 0;
+    int neg_b0 = 0;
 
-    // 收集字节流与描述符
+    // 收集字节流与帧完成脉冲数
     reg [7:0]  cap [0:4095];
-    reg [24:0] desc_q [0:15];
-    int        desc_n = 0;
+    int        done_n = 0;
 
     always @(posedge clk) begin
         if (rf_wr_en) begin
             cap[got_bytes] <= rf_wr_data;
             got_bytes <= got_bytes + 1;
         end
-        if (rdesc_wr_en) begin
-            desc_q[desc_n] <= rdesc_wr_data;
-            desc_n <= desc_n + 1;
-        end
+        if (frame_done)
+            done_n <= done_n + 1;
     end
 
     // 构造一拍(64B), 前 n 字节有效(keep), 数据 = base+i
@@ -91,15 +92,15 @@ module shim_tb;
         end
     endtask
 
-    // extra: 错误路径语义 —— 前一帧无 TLAST 弃帧后 in_frame 残留, 恢复帧
-    //        的描述符 len 会包含弃帧字节数(RTL 有意为之: TLAST 是唯一帧边界)
+    // extra: v3 下弃帧字节随流连续发射(不体现在 frame_done 计数), 默认 0
     task automatic frame(input int nbytes, input byte base, input byte slot,
                          input int extra = 0);
         int full, tail;
-        int b0;
+        int b0, dn0, g0;
         begin
             b0 = got_bytes;
             tag_slot = slot; tag_valid = 1;
+            frame_len = nbytes[15:0];
             full = nbytes / 64;
             tail = nbytes % 64;
             for (int k = 0; k < full; k++)
@@ -107,26 +108,20 @@ module shim_tb;
             if (tail != 0)
                 beat(tail, base + full*64, 1'b1);
             @(negedge clk); tag_valid = 0;
-            // 等描述符出现(=整帧拆包完成), 而非固定拍数; 5000 拍超时兜底
-            begin
-                int g0 = 0;
-                int dn0 = desc_n;
-                while ((desc_n == dn0) && (g0 < 5000)) begin
-                    @(posedge clk); g0 = g0 + 1;
-                end
-                repeat (2) @(posedge clk);
+            // 等 frame_done (=整帧拆包完成), 而非固定拍数; 5000 拍超时兜底
+            dn0 = done_n; g0 = 0;
+            while ((done_n == dn0) && (g0 < 5000)) begin
+                @(posedge clk); g0 = g0 + 1;
             end
+            repeat (2) @(posedge clk);
             chk_bytes(b0, nbytes, base, $sformatf("F%0d", nbytes));
-            if (desc_n < 1) begin
-                $display("[FAIL] 无描述符"); errs = errs + 1;
-            end else begin
-                desc_n = desc_n - 1;
-                if ((desc_q[desc_n][23:8] !== nbytes + extra) ||
-                    (desc_q[desc_n][7:0] !== slot)) begin
-                    $display("[FAIL] 描述符 len=%0d slot=%0d (want %0d/%0d)",
-                             desc_q[desc_n][23:8], desc_q[desc_n][7:0], nbytes, slot);
-                    errs = errs + 1;
-                end
+            if ((got_bytes - b0) !== (nbytes + extra)) begin
+                $display("[FAIL] F%0d 输出字节数=%0d (want %0d)",
+                         nbytes, got_bytes - b0, nbytes + extra);
+                errs = errs + 1;
+            end
+            if (done_n == dn0) begin
+                $display("[FAIL] F%0d 无 frame_done", nbytes); errs = errs + 1;
             end
         end
     endtask
@@ -153,16 +148,22 @@ module shim_tb;
         frame(65, 8'hB0, 8'h03);
         $display("[S4] 背靠背 3 帧 done");
 
-        // ---- NEG: 无 TLAST 的"半帧" -> 不发描述符; 再发正常帧可恢复 ----
-        desc_n = 0;
+        // ---- NEG: 无 TLAST 的"半帧" -> 不发 frame_done; 再发正常帧可恢复 ----
+        done_n = 0;
+        neg_b0 = got_bytes;
         beat(64, 8'hC0, 1'b0);                    // 无 tlast
         repeat (80) @(posedge clk);
-        if (desc_n != 0) begin
-            $display("[FAIL] NEG: 半帧发了描述符"); errs = errs + 1;
+        if (done_n != 0) begin
+            $display("[FAIL] NEG: 半帧发了 frame_done"); errs = errs + 1;
         end
         // 静默后重新开始一帧 (shim 应停在 IDLE/UNPK 且能继续)
-        frame(50, 8'hD0, 8'h05, 64);   // 弃帧 64B 并入恢复帧 len (文档化语义)
-        $display("[NEG] 恢复帧 len 含弃帧 64B (TLAST=唯一帧边界, 设计语义)");
+        frame(50, 8'hD0, 8'h05);       // 弃帧 64B 已随流发射, 恢复帧 50B 连续
+        if ((got_bytes - neg_b0) !== (64 + 50)) begin
+            $display("[FAIL] NEG 字节总数=%0d want 114 (弃帧字节应连续发射)",
+                     got_bytes - neg_b0);
+            errs = errs + 1;
+        end
+        $display("[NEG] 弃帧 64B 连同恢复帧 50B 连续发射, frame_done×1 (TLAST=唯一帧边界)");
         $display("[NEG] 无TLAST恢复 done");
 
         $display("==== SHIM_TB: %0d errors ====", errs);

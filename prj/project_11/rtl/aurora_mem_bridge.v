@@ -956,7 +956,8 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_mem
     .dma_s_tdata(512'd0), .dma_s_tkeep(64'd0),
     .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0),
     .dma_s_tready(),
-    .ro_dma_req()
+    .ro_dma_req(),
+    .ro_dbg_emit()
 );
 
     // ---- 自研 AXI 仲裁器(2026-10-06): S00=桥① S01=桥② M=MIG, 事务级轮转 ----

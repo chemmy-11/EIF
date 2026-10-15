@@ -543,12 +543,10 @@ module axi4_master_bridge #(
 
     wire        shim_rf_wr_en;
     wire [7:0]  shim_rf_wr_data;
-    wire        shim_rdesc_wr_en;
-    wire [24:0] shim_rdesc_wr_data;
-    wire [7:0]  shim_rdesc_slot = shim_rdesc_wr_data[7:0];
+    wire        shim_frame_done;
 
     generate if (HAS_DMA) begin : gen_dma_engine
-        dma_rd_shim #(.DROP_BYTES(8)) u_rd_shim (
+        dma_rd_shim_v2 #(.DROP_BYTES(8)) u_rd_shim (
             .clk(clk), .rst_n(rst_n),
             .s_tdata (dma_s_tdata),
             .s_tkeep (dma_s_tkeep),
@@ -556,16 +554,15 @@ module axi4_master_bridge #(
             .s_tvalid(dma_engine & dma_s_tvalid),   // engine=0 时让路给 dma_sink
             .s_tready(dma_s_tready),
             .rf_wr_en (shim_rf_wr_en),  .rf_wr_data (shim_rf_wr_data),
-            .rdesc_wr_en(shim_rdesc_wr_en), .rdesc_wr_data(shim_rdesc_wr_data),
-            .tag_slot (dma_req_slot),             // 在飞请求恰一笔: tag 即当前 slot
-            .tag_valid(1'b0),                     // (tag FIFO 未用: direct 单笔在飞)
-            .tag_pop  ()
+            .frame_done(shim_frame_done),
+            .frame_len(dma_req_len), .tag_slot(dma_req_slot), .tag_valid(1'b0)
         );
 
-        assign rf_wr_en   = brf_wr_en    | shim_rf_wr_en;
+        assign rf_wr_en   = brf_wr_en | shim_rf_wr_en;
         assign rf_wr_data = shim_rf_wr_en ? shim_rf_wr_data : brf_wr_data;
-        assign rd_wr_en   = brd_wr_en    | shim_rdesc_wr_en;
-        assign rd_wr_data = shim_rdesc_wr_en ? shim_rdesc_wr_data : brd_wr_data;
+        // v3: 描述符由读 FSM 在 frame_done 拍自发射 (见 R_DRET, brd_wr_*)
+        assign rd_wr_en   = brd_wr_en;
+        assign rd_wr_data = brd_wr_data;
     end else begin : gen_no_dma
         assign rf_wr_en   = brf_wr_en;
         assign rf_wr_data = brf_wr_data;
@@ -694,13 +691,13 @@ module axi4_master_bridge #(
                 end else if (dma_engine) begin
                     // ★B3-1b: DMA 读引擎 —— 请求锁存交给软件 (MicroBlaze 编程
                     // MM2S: SA=SLOT_BASE+slot*4096, LEN=len+DROP_BYTES), 数据流
-                    // 由 shim 拆包回灌, 退休由 shim 的 rdesc 脉冲触发 (R_DRET)。
-                    // 槽表/计数/指针不动: 全部在 shim rdesc 到达时统一结算。
+                    // 由 shim 拆包回灌, 退休由 shim 的 frame_done 脉冲触发 (R_DRET)。
+                    // 槽表/计数/指针不动: 全部在 frame_done 到达时统一结算。
                     dma_req_new  <= 1'b1;
                     dma_req_slot <= p_eff;
                     dma_req_len  <= len_tab[p_eff];
                     dbg_rd_slot  <= p_eff;
-                    rstate       <= R_DRET;     // 等 shim rdesc (或空答直接回)
+                    rstate       <= R_DRET;     // 等 shim frame_done (或空答直接回)
                 end else begin
                     r_slot  <= p_eff;
                     r_len   <= len_tab[p_eff];
@@ -758,23 +755,27 @@ module axi4_master_bridge #(
                 rstate     <= R_IDLE;
             end
             //-----------------------------------------------------------------
-            // ★B3-1b: DMA 引擎退休等待。shim 在 TLAST 结算时发 rdesc 脉冲
-            // {len,slot}; 同拍在此统一退休 (与 R_FIN 同一套槽表/计数/指针
-            // 语义 —— 单驱动纪律: 都在本 always 块)。若软件读失败/超时,
-            // 软件可经 Lite 引擎位清零让 DMA 让路, rc 命令照常被硬件读出。
+            // ★B3-1b: DMA 引擎退休等待。shim 在 TLAST 结算时发 frame_done
+            // 脉冲 (v3: shim 不再发描述符); 描述符由本 FSM 用锁存
+            // {dma_req_len,dma_req_slot} 自发射, 同拍统一退休 (与 R_FIN 同一
+            // 套槽表/计数/指针语义 —— 单驱动纪律: 都在本 always 块)。若软件
+            // 读失败/超时, 软件可经 Lite 引擎位清零让 DMA 让路。
             R_DRET: begin
                 m_axi_arvalid <= 1'b0;
                 m_axi_rready  <= 1'b0;
-                if (shim_rdesc_wr_en) begin
+                if (shim_frame_done) begin
                     rd_retire      <= 1'b1;
-                    rd_retire_slot <= shim_rdesc_slot;
+                    rd_retire_slot <= dma_req_slot;
                     out_dec        <= 1'b1;
                     stat_rd_frame  <= stat_rd_frame + 16'd1;
-                    if (!r_rnd) rd_seq_slot <= shim_rdesc_slot + 8'd1;
+                    if (!r_rnd) rd_seq_slot <= dma_req_slot + 8'd1;
                     dbg_rd_beats   <= dbg_rd_beats + 32'd1;
                     dma_req_new    <= 1'b0;     // 电平随退休清零 (板上实证:
                                                 // 1 拍脉冲跨域漏采, 见镜像注释)
-                    rstate         <= R_IDLE;   // rdesc 已由 shim 发给下游
+                    // 描述符由桥自发射 (brd_wr_*, frame_done 的下一拍)
+                    brd_wr_en   <= 1'b1;
+                    brd_wr_data <= {1'b0, dma_req_len, dma_req_slot};
+                    rstate      <= R_IDLE;
                 end
             end
             default: rstate <= R_IDLE;

@@ -96,6 +96,13 @@ module axi_lite_regs (
 
     localparam [31:0] REG_ID = 32'h5031_4231;  // "P1B1"
 
+    // B3-1b build9 时序: dbg_emit 输入打一拍再进快照 mux (读路径锥 -1 级)
+    reg [31:0] dbg_emit_q1;
+    always @(posedge clk_user or negedge rst_user_n) begin
+        if (!rst_user_n) dbg_emit_q1 <= 32'd0;
+        else             dbg_emit_q1 <= dbg_emit;
+    end
+
     //=========================================================================
     // mailbox registers
     //=========================================================================
@@ -437,7 +444,7 @@ module axi_lite_regs (
                         // B3-1b: +0x34 DMA_REQ / +0x38 DMA_ARL
                         6'h0D: d_data <= dma_req;
                         6'h0E: d_data <= dma_arl;
-                        6'h0F: d_data <= dbg_emit;   // B3-1b: {len,slot,byte0}
+                        6'h0F: d_data <= dbg_emit_q1;   // B3-1b: {len,slot,byte0}
                         default: d_data <= 32'd0;
                     endcase
                     d_req <= 1'b1;                      // data held stable
