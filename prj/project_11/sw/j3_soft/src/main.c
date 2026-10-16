@@ -24,7 +24,8 @@
  *   'E' B3-1b: read engine -> DMA round; serves {slot,len} requests via
  *       MM2S aligned reads (LEN=len+50, shim drops the 50B prefix)
  *       -> "[B2] E-DONE served=N rd+=N stall=0"
- *   'I' ID/计数快照
+ *   'd' B3-1c: 切换读出引擎 (DMA 描述符 / 桥硬件读) —— 切换后 'M'/'A'/'B' 四条
+ *       链都在所选引擎上跑 -> "[B2] DMAMODE now=DMA|bridge"
  *   'F' B3-1b v4: DMA 流起点取证 —— 槽基址 SA-64/SA/SA+64 三点各做一笔 MM2S(64B),
  *       回读 dma_sink q1(流首拍 4 字节 LE) -> "[B2] F slot=n q1[-64]=.. q1[0]=.. q1[+64]=.."
  *
@@ -195,6 +196,50 @@ static char wait_go(char type)
 }
 
 /* ---------------------------------------------------------------------------
+ * B3-1c: DMA 读出引擎的「逐笔服务」原语 + 开关
+ *
+ * 桥 FSM 把每笔读命令转成 {slot,len} 请求 (sticky 位 25); 由软核编程 MM2S:
+ *   SA/LEN 必须与位流的 shim DROP_BYTES 配对 (见下 macro), 等 DMASR Idle
+ *   且请求电平落零(退休) 再返回。'E' 命令的服务循环与 'N'(RND+DMA) 共用本件。
+ * ------------------------------------------------------------------------ */
+static unsigned g_dma_service;          /* 1 = 本轮每笔读请求由软核服务 */
+static unsigned g_dma_mode;             /* 1 = 读引擎=DMA (命令 'd' 切换; B3-1c) */
+
+static int serve_dma_once(void)
+{
+    unsigned v_req, slot, len, sa, sr, guard;
+
+    v_req = rd_reg((volatile unsigned *)(REGS_BASE + 0x34u));
+    if ((v_req & 0x02000000u) == 0u)
+        return 0;                       /* 无待服务请求 */
+
+    slot = (v_req >> 16) & 0xffu;
+    len  = v_req & 0xffffu;
+    sa   = 0x00100000u + slot * 4096u;
+
+    DMA_DMACR = 0x4u;                   /* reset */
+    guard = 0;
+    while ((((sr = dread(&DMA_DMASR))) & 0x1u) == 0u)
+        if (++guard > 4000000u) break;
+    DMA_DMACR = 0x1u;                   /* RS=run */
+    guard = 0;
+    while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
+        if (++guard > 4000000u) break;
+
+    DMA_SA     = sa;                    /* 配对 A: v5-RTL(DROP_BYTES=0) */
+    DMA_LENGTH = len;
+    guard = 0;
+    do { sr = dread(&DMA_DMASR); }
+    while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
+
+    guard = 0;                          /* 等退休(请求电平落零) 再取下一笔 */
+    while ((rd_reg((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u)
+           && (++guard < 100000u))
+        ;
+    return 1;
+}
+
+/* ---------------------------------------------------------------------------
  * 一轮 J3 (主轮 M / 负向 A / 负向 B)。进入时模式已是 RND、基线已取好。
  * 返回 0 = 正常跑完; 1 = 等写超时; 2 = 读停摆。
  * ------------------------------------------------------------------------ */
@@ -232,6 +277,8 @@ static int run_round(char type, unsigned wr0, unsigned rd0)
         R_SLOT = s;
         issued++;
         for (wr = 0; wr < RD_WAIT_POLLS; wr++) {
+            if (g_dma_service)
+                serve_dma_once();        /* ★B3-1c: RND 也走 DMA 描述符 */
             rd = rd_reg(&R_WM_RD);
             if (d16(rd, rd0) == issued)
                 break;
@@ -287,6 +334,12 @@ static void round_command(char type)
         return;
     }
 
+    if (g_dma_mode) {                    /* ★B3-1c: RND 段起切 DMA 读引擎 */
+        R_ENGINE      = 1u;
+        g_dma_service = 1u;
+        uputs("[B2] DMAMODE engine=DMA (RND via descriptors)\r\n");
+    }
+
     R_MODE = MODE_RND;                   /* 段1: RND + 稳定基线 (契约步0) */
     stable = 0;
     prev = rd_reg(&R_WM_WR);
@@ -303,6 +356,12 @@ static void round_command(char type)
     uputs(" rd0="); uputd(rd0); uputs("\r\n");
 
     run_round(type, wr0, rd0);
+
+    if (g_dma_mode) {                    /* ★B3-1c: 轮末切回桥引擎 (保持口径可比) */
+        g_dma_service = 0u;
+        R_ENGINE      = 0u;
+        uputs("[B2] DMAMODE engine=bridge\r\n");
+    }
     /* 不在此恢复 SEQ: 恢复写会使 u_wr_frame +1 污染轮后 'I' 对账; 且下一轮
      * 段0 本就先切 SEQ (预热窗需要)。脚本收尾显式发 'S' 恢复。 */
 }
@@ -352,7 +411,14 @@ int main(void)
                 uputs("[B2] BADPAIR "); uputc(c); uputs("\r\n");
                 continue;
             }
-            round_command(c);
+            round_command(c);                       /* 引擎由 g_dma_mode 决定 */
+        }
+        else if (c == 'd') {
+            /* ★B3-1c: 切换读出引擎 (DMA 描述符 / 桥硬件读) —— 之后 'M'/'A'/'B'
+             * 四条链都在所选引擎上跑, 供同一判据脚本复跑 (J3/J3′ + 负向 A/B)。 */
+            g_dma_mode = !g_dma_mode;
+            uputs("[B2] DMAMODE now=");
+            uputs(g_dma_mode ? "DMA\r\n" : "bridge\r\n");
         }
         else if (c == 'S') {
             R_MODE = MODE_SEQ;

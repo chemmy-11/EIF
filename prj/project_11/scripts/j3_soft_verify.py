@@ -545,6 +545,8 @@ def main(argv=None):
     p.add_argument("--pace-us", type=int, default=1000)
     p.add_argument("--rounds", default="MAB", help="轮次 (M/A/B 子集)")
     p.add_argument("--no-warmup", action="store_true")
+    p.add_argument("--dma", action="store_true",
+                   help="B3-1c: 先发 'd' 把板端读出引擎切到 DMA 描述符, 再跑轮次")
     p.add_argument("--json-out", default=None)
     args = p.parse_args(argv)
     nslots = args.nslots
@@ -565,6 +567,24 @@ def main(argv=None):
         ctl.send_cmd("I")
         line = ctl.read_line(2.0)
         log("板卡状态行: %s" % line)
+        if args.dma:                         # ★B3-1c: 读出引擎切 DMA (幂等)
+            dl = None
+            for _ in range(4):               # 'd' 是切换命令 -> 最多发 4 次直到读到 DMA
+                ctl.send_cmd("d")
+                t0 = time.time()
+                while time.time() - t0 < 6.0:
+                    ln = ctl.read_line(2.0)
+                    if not ln:
+                        break
+                    if "DMAMODE" in ln:
+                        dl = ln
+                        break
+                if dl and "now=DMA" in dl:
+                    break
+            log("引擎切换行: %s" % dl)
+            if not dl or "now=DMA" not in dl:
+                log("FAIL: 引擎未切到 DMA (--dma) -> %s" % dl)
+                return 2
 
     dp = DataPlane(mock_bridge)
     seq_base = 5000

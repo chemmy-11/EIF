@@ -1,0 +1,5 @@
+﻿4b463f934a884391  j3_soft_b31c.elf
+24da683f0b5de69c  j3_soft_verify.py
+3b4f0cb3a1eef1e1  jb31b_b31c_AB_dma.log
+d15aae565158f0da  jb31b_b31c_M_dma.log
+65346fe2e9827dda  main_b31c.c
