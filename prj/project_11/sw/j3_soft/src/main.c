@@ -411,12 +411,8 @@ int main(void)
                         guard = 0;
                         while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
                             if (++guard > 4000000u) break;
-                        DMA_SA     = sa;            /* 槽基址(对齐) */
-                        DMA_LENGTH = len;           /* 2026-10-16 板上实证: 槽存 = 【8B 前导+SFD
-                                                     * + 完整帧(含 FCS)】, 全长 = len(请求登记长度);
-                                                     * 桥硬件引擎就是原样发射这 len 字节。
-                                                     * 旧口径 len+8 会多读 8B 且配合 shim 丢 8B
-                                                     * 把前导丢掉 -> 上线无前导 -> 网卡静默丢弃。*/
+                        DMA_SA     = sa - 8u;       /* TEMP 机制验证(2026-10-16): 基址前移 8B 补 DROP=8 */
+                        DMA_LENGTH = len + 8u;      /* TEMP: 与 DROP=8 位流配套 */
                         guard = 0;
                         do { sr = dread(&DMA_DMASR); }
                         while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
