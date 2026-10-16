@@ -1,0 +1,7 @@
+﻿3aa600aa2899c361  aurora_mem_bridge_rdclose_3aa600aa.bit
+5c03db6b9784b27f  aurora_mem_bridge_tready_fix.v
+bbf5688fdd52dc83  jb31b_burn_rdclose.tcl
+be6e21b3b86560ac  jb31b_diag2.tcl
+b0de75696c24d9d5  jb31b_diag_rdclose.tcl
+423571e6a437d3a3  jb31b_restore_v5rtl.tcl
+cb373568c6b50de0  main_rdclose_reverted.c
