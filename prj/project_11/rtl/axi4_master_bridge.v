@@ -528,13 +528,14 @@ module axi4_master_bridge #(
     // 泊在 R_DRET, brf/brd 恒 0), 单驱动纪律不破(各归各的 always 块)。
     // shim 输入 tvalid 用 engine 门控: engine=0 时 dma_sink 占用 M_AXIS
     // ('D' 冒烟), shim 不偷拍。
-    // ★DROP_BYTES=8 (板上 10-14 深夜定案): 槽内存的是【完整 ETH/IP/UDP 帧】
-    //   (42B 头+载荷, len_tab=全长); DMA 读窗口 = mem[SA-8..] (AR 精确=SA,
-    //   ARL 取证两轮证实; 窗口前移 8B 属 MIG 数据侧行为)。
-    //   原 DROP=50 是把"相对载荷 -50"误当独立偏移 —— 它 = 42(头)+8。
-    //   DROP=50 时发出的是【无头纯载荷】-> 泵B 直打 RGMII -> PC 网卡静默
-    //   丢弃 (板上 45+ 帧零到达 + ILA 全链路+1 佐证)。DROP=8 + LEN=len+8
-    //   发出完整帧, 与桥硬件引擎逐字节同构。
+    // ★DROP_BYTES=0 + DMA_LENGTH=len_tab (2026-10-16 板上 ILA 发射字节流实证; 修正 10-14 的 DROP=8):
+    //   槽内存的是【8B 以太网前导+SFD (55×7,D5) + 完整 ETH/IP/UDP 帧(含尾 4B FCS)】,
+    //   全长 = len_tab(写路径提交长度)。桥硬件读引擎把这 len_tab 字节【原样】发射给下游
+    //   (前导由数据流携带, 下游直接上线) —— 桥模式回显因此逐字节正确。
+    //   DMA 路径必须与之【逐字节同构】: DMA_SA=槽基址, DMA_LENGTH=len_tab, shim 不丢任何字节。
+    //   旧口径(DROP=8 + LEN=len+8)把前导+SFD 丢掉、并在尾部多读 8B ⇒ 发射流 =
+    //   【帧(无前导) + FCS + 8B 垃圾】⇒ 接收侧 MAC 无法定界 ⇒ 网卡静默丢弃、PC 零到达。
+    //   实证(2026-10-16, 同一 slot 同一帧): 桥=[前导][帧][FCS] 1526B  vs  E=[帧][FCS][8B 垃圾] 1526B。
     //=========================================================================
     reg         brf_wr_en;
     reg  [7:0]  brf_wr_data;
@@ -546,7 +547,7 @@ module axi4_master_bridge #(
     wire        shim_frame_done;
 
     generate if (HAS_DMA) begin : gen_dma_engine
-        dma_rd_shim_v2 #(.DROP_BYTES(8)) u_rd_shim (
+        dma_rd_shim_v2 #(.DROP_BYTES(0)) u_rd_shim (
             .clk(clk), .rst_n(rst_n),
             .s_tdata (dma_s_tdata),
             .s_tkeep (dma_s_tkeep),

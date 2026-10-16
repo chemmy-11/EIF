@@ -136,6 +136,17 @@ foreach n [bus_nets dbg_lite_exec 16] { lappend nets0 $n }
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
+# ---- B3-1b v5(2026-10-16): 发射字节流探针(probe1) ----
+#   目的: 把「frame_mem_if 读侧实际发射的字节」搬上 ILA, 与桥/DMA 两引擎逐字节比对
+#   (该探针是 0 回显根因定案的关键仪器: 桥流=[8B 前导+SFD][帧][FCS], DMA 流旧口径=[帧][FCS][8B 垃圾])。
+set nets_rd {}
+lappend nets_rd [one_net dbg_mem_rden]
+foreach i {0 1 2 3 4 5 6 7} { lappend nets_rd [one_net "mem_rd_data\[$i\]"] }
+create_debug_port u_ila_0 probe
+set_property port_width [llength $nets_rd] [get_debug_ports u_ila_0/probe1]
+connect_debug_port u_ila_0/probe1 $nets_rd
+puts "ILA0_PROBE1_EMIT_BYTES: [llength $nets_rd] nets"
+
 # ============ ILA1 @ eth_rxc (gmii_rx_clk) —— prj9 原样 ============
 create_debug_core u_ila_1 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_1]
@@ -263,7 +274,9 @@ write_debug_probes -force $proj/scripts/probes.ltx
 # ============ 同会话手动实现（调试核已入网表）============
 # W5(2026-10-07): 默认配方在 RND 活化后不收敛(-1.142), 换 W4 实测最优组合
 opt_design
-place_design       -directive ExtraTimingOpt
+# 2026-10-16: 换 place 指令 —— build15 用 ExtraTimingOpt 首建 WNS -0.018 被门限拒;
+# 同网表换 ExtraPostPlacementOpt 重掷即 +0.004 过门限(build16r2/v3 与 rdprobe/v5 两轮实证)。
+place_design       -directive ExtraPostPlacementOpt
 phys_opt_design    -directive AggressiveExplore
 route_design       -directive NoTimingRelaxation
 phys_opt_design    -directive AggressiveExplore
