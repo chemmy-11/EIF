@@ -203,7 +203,8 @@ static char wait_go(char type)
  *   且请求电平落零(退休) 再返回。'E' 命令的服务循环与 'N'(RND+DMA) 共用本件。
  * ------------------------------------------------------------------------ */
 static unsigned g_dma_service;          /* 1 = 本轮每笔读请求由软核服务 */
-static unsigned g_dma_mode;             /* 1 = 读引擎=DMA (命令 'd' 切换; B3-1c) */
+static unsigned g_dma_mode;             /* 0 = 桥读引擎服务(现役 v5-RTL 配对);
+                                         * 1 = DMA 驻留服务(退役后置 1; 由 'd' 切换/默认值在此) */
 
 static int serve_dma_once(void)
 {
