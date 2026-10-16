@@ -287,7 +287,8 @@ wire [31:0] mem_dbg_emit;                   // B3-1b 取证: 发射帧 len/slot/
 wire [15:0] lite_engine_cnt;
 reg         dma_engine_ui_s1, dma_engine_ui;
 wire        dma_engine = lite_cfg_rd_engine;          // frame_mem_if 在 user 侧直接用
-wire        dma_tready = dma_engine_ui ? dma_tready_shim : dma_tready_sink;
+wire        dma_tready = dma_tready_shim;              // ★B3-1c: 退役后 shim 独占流, tready 恒取 shim
+                                                       // (旧 dma_engine_ui mux 会在引擎位=0 时绕过 shim 反压)
 
 // B3-1b: DMA AR 地址锁存 (取证: 线上 AR 是否=SA, 定位 -50 侧别)
 reg [31:0] dma_ar_latch_ui;

@@ -203,8 +203,10 @@ static char wait_go(char type)
  *   且请求电平落零(退休) 再返回。'E' 命令的服务循环与 'N'(RND+DMA) 共用本件。
  * ------------------------------------------------------------------------ */
 static unsigned g_dma_service;          /* 1 = 本轮每笔读请求由软核服务 */
-static unsigned g_dma_mode;             /* 0 = 桥读引擎服务(现役 v5-RTL 配对);
-                                         * 1 = DMA 驻留服务(退役后置 1; 由 'd' 切换/默认值在此) */
+static unsigned g_dma_mode = 1u;        /* ★B3-1c: 1 = 软核【驻留服务】DMA 读请求
+                                         * (退役桥硬件读引擎后必需: 栈自发帧也在环路上);
+                                         * 0 = 交给桥硬件读引擎 (v5-RTL 旧配对)。
+                                         * 'd' 命令可现场切换, 便于两者对照。 */
 
 static int serve_dma_once(void)
 {
@@ -392,7 +394,12 @@ int main(void)
     uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L/D/E)\r\n");
     for (;;) {
         char c, d;
-        while (!urx_poll()) { }
+        /* ★B3-1c 驻留服务: 空闲期即刻服务桥 FSM 的 {slot,len} 读请求。
+         * 退役桥硬件读引擎后, 所有出向帧(数据帧 + 栈自发 ARP/ICMP/命令应答)
+         * 的读回都靠它 —— 无请求时本调用只是一次寄存器读(~1ms), 无副作用。 */
+        while (!urx_poll()) {
+            if (g_dma_mode) serve_dma_once();
+        }
         c = urx_get();
         /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。
          * 策略: 单字节命令 (S/I) 在「命令间」直接执行; 轮命令 M/A/B 要求
