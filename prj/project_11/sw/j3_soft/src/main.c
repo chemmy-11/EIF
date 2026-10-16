@@ -25,6 +25,8 @@
  *       MM2S aligned reads (LEN=len+50, shim drops the 50B prefix)
  *       -> "[B2] E-DONE served=N rd+=N stall=0"
  *   'I' ID/计数快照
+ *   'F' B3-1b v4: DMA 流起点取证 —— 槽基址 SA-64/SA/SA+64 三点各做一笔 MM2S(64B),
+ *       回读 dma_sink q1(流首拍 4 字节 LE) -> "[B2] F slot=n q1[-64]=.. q1[0]=.. q1[+64]=.."
  *
  * 判据对应 (契约 §4.1/§4.2, 由 PC 侧 j3_soft_verify.py 判):
  *   主轮 M: J3 逆序对>0 + 逐帧对应 + J3' 集合相等; wr+=256 rd+=256
@@ -484,6 +486,44 @@ int main(void)
             uputs(" q0=");         uputh(v_q0);
             uputs(" q1=");         uputh(v_q1);
             uputs(" q2=");         uputh(v_q2);
+            uputs("\r\n");
+        } else if (c == 'F') {
+            /* B3-1b v4 取证 (2026-10-16): 直接量「DMA 流起点相对槽基址的字节偏移」。
+             * 现模型「流 = mem[SA-8..], shim 丢 8」只是推断, 从未在 base=SA 逐字节量过。
+             * 做法: 以对齐槽基址 SA 为中心取三个 64B 对齐点各做一笔 MM2S(64B=1 拍),
+             * 回读 dma_sink q1 = 该笔「流首拍低 32 bit」(= 流起点 4 字节, 小端)。
+             * PC 侧用已知帧字节反解流起点 ⇒ (-8 / -50 / -64) 三说一次定案。
+             * 纪律: 先读全部寄存器, 再纯打印 (坑 #44: 打印中穿插 AXI 读会毁 TX 行)。 */
+            unsigned wm, base, sr, guard;
+            unsigned q1b, q1m, q1p;
+            unsigned k;
+            wm = rd_reg(&R_WM_WR) & 0xffffu;
+            base = 0x00100000u + ((wm - 1u) & 0xffu) * 4096u;
+            for (k = 0u; k < 3u; k++) {
+                unsigned a = (k == 0u) ? (base - 0x40u)
+                                        : ((k == 1u) ? base : (base + 0x40u));
+                DMA_DMACR = 0x4u;                          /* 复位 */
+                guard = 0;
+                while ((((sr = dread(&DMA_DMASR))) & 0x1u) == 0u)
+                    if (++guard > 4000000u) break;
+                DMA_DMACR = 0x1u;                          /* RS=运行 */
+                guard = 0;
+                while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
+                    if (++guard > 4000000u) break;
+                DMA_SA     = a;
+                DMA_LENGTH = 64u;                          /* 写长度即启动 */
+                guard = 0;
+                do { sr = dread(&DMA_DMASR); }
+                while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
+                busy_ms(2);                                /* sink 镜像稳定 */
+                if (k == 0u)      q1b = rd_reg((volatile unsigned *)(REGS_BASE + 0x2Cu));
+                else if (k == 1u) q1m = rd_reg((volatile unsigned *)(REGS_BASE + 0x2Cu));
+                else              q1p = rd_reg((volatile unsigned *)(REGS_BASE + 0x2Cu));
+            }
+            uputs("[B2] F slot=");   uputd((wm - 1u) & 0xffu);
+            uputs(" q1[-64]=");      uputh(q1b);
+            uputs(" q1[0]=");        uputh(q1m);
+            uputs(" q1[+64]=");      uputh(q1p);
             uputs("\r\n");
         } else if (c == 'I') {
             /* 板上实证 (2026-10-12): 打印中途穿插 AXI 读 (rd_reg) 会使 TX 行
