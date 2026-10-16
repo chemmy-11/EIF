@@ -421,8 +421,8 @@ int main(void)
                          *   【8B 前导+SFD (55×7,D5)】+【完整 ETH/IP/UDP 帧(含壳 4B FCS)】, 全长 = len;
                          * 旧口径(SA=基址, LEN=len+8, 配 DROP=8)把前导丢掉 ⇒ 上线无前导 ⇒
                          * 接收侧 MAC 无法定界 ⇒ 网卡静默丢弃(0 回显的真根因)。 */
-                        DMA_SA     = sa - 8u;
-                        DMA_LENGTH = len + 8u;
+                        DMA_SA     = sa;            /* 当前生效 = v5-RTL 配对(DROP_BYTES=0 位流) */
+                        DMA_LENGTH = len;
                         guard = 0;
                         do { sr = dread(&DMA_DMASR); }
                         while (((sr & 0x2u) == 0u) && (++guard < 80000000u));

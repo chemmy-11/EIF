@@ -411,8 +411,18 @@ int main(void)
                         guard = 0;
                         while ((((sr = dread(&DMA_DMASR))) & 0x1u) != 0u)
                             if (++guard > 4000000u) break;
-                        DMA_SA     = sa - 8u;       /* TEMP 机制验证(2026-10-16): 基址前移 8B 补 DROP=8 */
-                        DMA_LENGTH = len + 8u;      /* TEMP: 与 DROP=8 位流配套 */
+                        /* DMA 基址/长度口径 —— 必须与位流的 shim DROP_BYTES 配对:
+                         *   · DROP_BYTES=8 位流(v3 a432addd / rdprobe 442ca75a):
+                         *       SA = 槽基址-8, LEN = len+8;
+                         *     前移 8B 让"被丢的 8B"落在前导之前 ⇒ 发射流 =
+                         *     【8B 以太网前导+SFD】+ 完整帧(含 FCS), 与桥硬件引擎逐字节同构。
+                         *   · DROP_BYTES=0 位流(v5 DROP=0): SA = 槽基址, LEN = len。
+                         * 板上实证(2026-10-16 ILA 发射字节流比对): 槽存 =
+                         *   【8B 前导+SFD (55×7,D5)】+【完整 ETH/IP/UDP 帧(含壳 4B FCS)】, 全长 = len;
+                         * 旧口径(SA=基址, LEN=len+8, 配 DROP=8)把前导丢掉 ⇒ 上线无前导 ⇒
+                         * 接收侧 MAC 无法定界 ⇒ 网卡静默丢弃(0 回显的真根因)。 */
+                        DMA_SA     = sa;            /* 当前生效 = v5-RTL 配对(DROP_BYTES=0 位流) */
+                        DMA_LENGTH = len;
                         guard = 0;
                         do { sr = dread(&DMA_DMASR); }
                         while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
