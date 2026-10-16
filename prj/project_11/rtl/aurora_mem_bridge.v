@@ -1098,7 +1098,8 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_mem
         .clk(ui_clk), .rst_n(ui_rst_n),
         .clk_user(user_clk), .rst_user_n(~aurora_rst),
         .s_tdata(dma_tdata), .s_tkeep(dma_tkeep), .s_tlast(dma_tlast),
-        .s_tvalid(~dma_engine_ui & dma_tvalid), .s_tready(dma_tready_sink),
+        .s_tvalid(1'b0), .s_tready(dma_tready_sink),   // ★B3-1c: 硬件读引擎退役 + shim 独占流
+                                                   // -> dma_sink 让路(冒烟路退休; J3 四条链/'E' 轮已覆盖其判据)
         .q0(dma_q0), .q1(dma_q1), .q2(dma_q2)
     );
 

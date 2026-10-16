@@ -10,6 +10,8 @@ set ok 0
 
 foreach d $dirs {
     puts "==================== TRY place -directive $d ===================="
+    # 每条指令独立 catch: MIG PHY 缝合瞬态失败(Opt 31-306 / Mig 66-119)不终止整轮扫描
+    if {[catch {
     open_checkpoint $proj/scripts/pre_impl_debug.dcp
     if {[llength [get_debug_cores -quiet]] == 0} { error "debug cores lost" }
     implement_debug_core
@@ -37,6 +39,10 @@ foreach d $dirs {
         break
     }
     close_design
+    } emsg]} {
+        puts "SWEEP_$d: ABORT/TRANSIENT -> $emsg"
+        catch {close_design}
+    }
 }
 if {!$ok} { puts "V5_SWEEP_ALL_FAIL" }
 exit

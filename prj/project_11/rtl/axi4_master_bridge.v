@@ -552,15 +552,16 @@ module axi4_master_bridge #(
             .s_tdata (dma_s_tdata),
             .s_tkeep (dma_s_tkeep),
             .s_tlast (dma_s_tlast),
-            .s_tvalid(dma_engine & dma_s_tvalid),   // engine=0 时让路给 dma_sink
+            .s_tvalid(dma_s_tvalid),               // ★B3-1c: shim 是唯一消费者
+                                                   // (硬件读引擎退役; 冒烟用 dma_sink 已在顶层让路)
             .s_tready(dma_s_tready),
             .rf_wr_en (shim_rf_wr_en),  .rf_wr_data (shim_rf_wr_data),
             .frame_done(shim_frame_done),
             .frame_len(dma_req_len), .tag_slot(dma_req_slot), .tag_valid(1'b0)
         );
 
-        assign rf_wr_en   = brf_wr_en | shim_rf_wr_en;
-        assign rf_wr_data = shim_rf_wr_en ? shim_rf_wr_data : brf_wr_data;
+        assign rf_wr_en   = shim_rf_wr_en;      // ★B3-1c: 不再与桥硬件读 OR
+        assign rf_wr_data = shim_rf_wr_data;
         // v3: 描述符由读 FSM 在 frame_done 拍自发射 (见 R_DRET, brd_wr_*)
         assign rd_wr_en   = brd_wr_en;
         assign rd_wr_data = brd_wr_data;
@@ -689,71 +690,17 @@ module axi4_master_bridge #(
                     brd_wr_data <= {1'b1, 16'd0, 8'hFF};
                     dbg_rd_slot <= 8'hFF;
                     rstate      <= R_IDLE;
-                end else if (dma_engine) begin
-                    // ★B3-1b: DMA 读引擎 —— 请求锁存交给软件 (MicroBlaze 编程
-                    // MM2S: SA=SLOT_BASE+slot*4096, LEN=len+DROP_BYTES), 数据流
-                    // 由 shim 拆包回灌, 退休由 shim 的 frame_done 脉冲触发 (R_DRET)。
-                    // 槽表/计数/指针不动: 全部在 frame_done 到达时统一结算。
+                end else begin
+                    // ★B3-1c(2026-10-16): 桥硬件读引擎【已退役】—— 唯一读出路径 =
+                    //   DMA 描述符 (软核编程 MM2S, 数据由 shim 拆包回灌, 退休由 shim
+                    //   的 frame_done 脉冲触发)。原 R_AR/R_R/R_UNPACK/R_FIN 分支与其
+                    //   dma_engine 二选一已删除; 读请求一律泊在 R_DRET。
                     dma_req_new  <= 1'b1;
                     dma_req_slot <= p_eff;
                     dma_req_len  <= len_tab[p_eff];
                     dbg_rd_slot  <= p_eff;
                     rstate       <= R_DRET;     // 等 shim frame_done (或空答直接回)
-                end else begin
-                    r_slot  <= p_eff;
-                    r_len   <= len_tab[p_eff];
-                    r_beats <= len_beats_tab[p_eff];
-                    r_beat  <= 8'd0;
-                    dbg_rd_slot <= p_eff;
-                    rstate  <= R_AR;
                 end
-            end
-            //-----------------------------------------------------------------
-            R_AR: begin
-                m_axi_arvalid <= 1'b1;
-                if (m_axi_arvalid && m_axi_arready) begin
-                    m_axi_arvalid <= 1'b0;
-                    rstate <= R_R;
-                end
-            end
-            //-----------------------------------------------------------------
-            R_R: begin
-                // AXI handshake: READY must be high in the SAME cycle that VALID
-                // is sampled. Asserting rready only while rvalid is still low (and
-                // dropping it on the first rvalid) never completes the transfer on
-                // the slave side -> the slave stays mid-burst and the next AR is
-                // never accepted (W2 bring-up bug: bridge stuck in R_AR).
-                m_axi_rready <= 1'b1;
-                if (m_axi_rvalid && m_axi_rready) begin
-                    m_axi_rready <= 1'b0;
-                    r_beat_data  <= m_axi_rdata;
-                    r_bi         <= 8'd0;
-                    dbg_rd_beats <= dbg_rd_beats + 32'd1;
-                    rstate       <= R_UNPACK;
-                end
-            end
-            //-----------------------------------------------------------------
-            R_UNPACK: begin   // 1 byte / ui cycle into the ui->user byte FIFO
-                brf_wr_en   <= 1'b1;
-                brf_wr_data <= r_beat_data[r_bi*8 +: 8];
-                if (r_bi == (r_nbytes - 7'd1)) begin
-                    r_bi <= 8'd0;
-                    if (r_beat == (r_beats - 8'd1)) rstate <= R_FIN;
-                    else begin r_beat <= r_beat + 8'd1; rstate <= R_R; end
-                end else begin
-                    r_bi <= r_bi + 8'd1;
-                end
-            end
-            //-----------------------------------------------------------------
-            R_FIN: begin
-                rd_retire      <= 1'b1;
-                rd_retire_slot <= r_slot;
-                out_dec        <= 1'b1;
-                stat_rd_frame  <= stat_rd_frame + 16'd1;
-                if (!r_rnd) rd_seq_slot <= rd_seq_slot + 8'd1;
-                brd_wr_en   <= 1'b1;
-                brd_wr_data <= {1'b0, r_len, r_slot};
-                rstate     <= R_IDLE;
             end
             //-----------------------------------------------------------------
             // ★B3-1b: DMA 引擎退休等待。shim 在 TLAST 结算时发 frame_done

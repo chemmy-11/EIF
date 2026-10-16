@@ -251,16 +251,17 @@ module bridge_dma_tb;
                 return;
             end
             slot = dma_req_slot; len = dma_req_len;
-            // 生成 [8 前导 + 帧] 流, 对齐读 SA=槽基址 (板上定案: 窗口前移 8B)
-            // 帧内容 = ddr[slot 基址 .. +len) (写路径真实写入)
-            total = len + 8;
+            // ★B3-1c: 桥硬件读引擎退役后, shim 是唯一读出路径; 本件模拟 DMA MM2S:
+            //   按描述符长度 len 从槽基址连续吐出【槽内全内容】(= 原桥读路径的 r_len 字节,
+            //   含写路径写入的帧), DROP_BYTES=0 ⇒ 逐字节等价于原桥引擎的输出。
+            total = len;
             for (k = 0; k * 64 < total; k = k + 1) begin
                 @(negedge clk);
                 dma_s_tdata = 0; dma_s_tkeep = 0;
                 for (i = 0; i < 64; i++) begin
                     if (k*64 + i < total) begin
-                        int addr = (k*64 + i < 8) ? -1 : (SLOT_BASE + slot*4096 + (k*64+i-8));
-                        dma_s_tdata[i*8 +: 8] = (addr < 0) ? 8'hEE : ddr[addr[17:0]];
+                        int addr = SLOT_BASE + slot*4096 + (k*64+i);
+                        dma_s_tdata[i*8 +: 8] = ddr[addr[17:0]];
                         dma_s_tkeep[i] = 1'b1;
                     end
                 end
@@ -290,20 +291,22 @@ module bridge_dma_tb;
         repeat (20) @(posedge clk); rst_n = 1;
         repeat (10) @(posedge clk);
 
-        // ================= P1: engine=0 桥硬件读 =================
+        // ================= P1: 读回 2 帧 (DMA 路径; 原桥硬件读已退役) =================
         dma_engine = 0;
         send_frame(100, 8'h10);
         send_frame(64,  8'h50);
         #200;
-        // SEQ 读命令 x2 (等描述符到达再发下一条)
+        // SEQ 读命令 x2 (等描述符到达再发下一条) —— 每笔由 serve_dma 服务
         @(negedge clk); rc_data = 9'h000; rc_wr = 1;   // {rnd=0,slot=0} SEQ
         @(negedge clk); rc_wr = 0;
+        serve_dma;
         begin : w1
             int g = 0;
             while (desc_n < 1 && g < 20000) begin @(posedge clk); g = g + 1; end
         end
         @(negedge clk); rc_data = 9'h000; rc_wr = 1;
         @(negedge clk); rc_wr = 0;
+        serve_dma;
         begin : w2
             int g = 0;
             while (desc_n < 2 && g < 20000) begin @(posedge clk); g = g + 1; end
@@ -378,7 +381,7 @@ module bridge_dma_tb;
         end
         $display("[P2] engine=1: DMA round, retire OK");
 
-        // ================= P3: 引擎切回, 桥硬件读还能工作 =================
+        // ================= P3: 第二笔 DMA 读 (原"切回桥引擎"场景保留为第二笔) =================
         dma_engine = 0;
         got = 0; desc_n = 0;
         for (int q = 0; q < 4096; q++) cap[q] = 8'h00;
@@ -390,13 +393,14 @@ module bridge_dma_tb;
         end
         @(negedge clk); rc_data = 9'h000; rc_wr = 1;
         @(negedge clk); rc_wr = 0;
+        serve_dma;
         begin : w4
             int g = 0;
             while (desc_n < 1 && g < 20000) begin @(posedge clk); g = g + 1; end
             repeat (10) @(posedge clk);
         end
         chk_frame(0, 70, 8'hA0, "P3-f0");
-        $display("[P3] engine back to 0: bridge read still works");
+        $display("[P3] 第二笔 DMA 读: 逐字节 OK");
 
         $display("==== BRIDGE_DMA_TB: %0d errors ====", errs);
         if (errs == 0) $display("BRIDGE_DMA_TB: PASS"); else $display("BRIDGE_DMA_TB: FAIL");
