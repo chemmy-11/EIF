@@ -217,7 +217,7 @@
 | 四判据结果 | §10.2/§10.4：S2b/S4/S5/S6 + S8b/S8c/S8d 全部 PASS |
 | 绿 vs 退役掩码比对 | §10.2：`rdcap2_cmp_green_retired.log`（ndiff=0） |
 | NIC `+296` 原始读数 | §10.2：`rdcap2_nic_baseline.txt` + S4/S5 JUDGE 行 |
-| J3 脚本修复/入库 | 已修（工作树 M）；**commit PENDING** |
+| J3 脚本修复/入库 | ✅ **已提交 `e2feb08` 并推送**（`scripts/j3_soft_verify.py`，52 行改） |
 | 绿基线重跑确认 | §10.2：S1 绿 `708f15a4`+`2961b585` ping 3/3、'L' 应答、邻居 Permanent |
 | 离线回归归档 | `sim_*_run.log` 已在本目录（三份主日志），`.backup.log` 可选 |
 ---
@@ -308,8 +308,8 @@ Get-FileHash 'D:\FPGA\prj\project_11\out\S0S8_DESIGN.md' -Algorithm SHA256      
 | 四判据结果 | ✅ 全部取值通过（S2b/S4/S5/S6 + S8b/S8c/S8d） |
 | 绿 vs 退役 掩码比对日志 | ✅ `rdcap2_cmp_green_retired.log`（`ndiff_after_mask=0`） |
 | NIC `+296` 原始读数 | ✅ `rdcap2_nic_baseline.txt` + S4/S5 JUDGE 行（Bytes +74/+296） |
-| `j3_soft_verify.py` 修复入库 | ⏳ 代码已修（M 文件）；**commit 仍 PENDING（4 个 M 文件未提交）** |
-| 修复提交 commit | ⏳ **PENDING**（`{{PENDING:git hash}}`；本索引只登记证据） |
+| `j3_soft_verify.py` 修复入库 | ✅ **已提交 `e2feb08`**（4 个 M 文件同批提交） |
+| 修复提交 commit | ✅ **`e2feb08`**（`96efc39..e2feb08 master -> master`，42 文件；提交后 CI PASS） |
 | 绿基线重跑确认 | ✅ S1 绿 `708f15a4`+`2961b585` ping 3/3、'L' 应答、邻居 Permanent（`s0s8_20261017_213020.log`） |
 
 ### 10.4 四判据 → 证据一句话
