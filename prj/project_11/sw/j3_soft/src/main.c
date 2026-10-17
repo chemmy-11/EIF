@@ -203,14 +203,10 @@ static char wait_go(char type)
  *   且请求电平落零(退休) 再返回。'E' 命令的服务循环与 'N'(RND+DMA) 共用本件。
  * ------------------------------------------------------------------------ */
 static unsigned g_dma_service;          /* 1 = 本轮每笔读请求由软核服务 */
-static unsigned g_dma_mode;             /* 1 = 轮次内走 DMA 描述符 ('d' 切换; B3-1c 已板验)
-                                         *
-                                         * ⚠️ 2026-10-16 踩坑: 曾把「驻留服务」(主循环空闲即
-                                         * serve_dma_once) 设为默认开 ⇒ 软核上电后串口完全静默
-                                         * (同一 v5-RTL 位流下, 归档未改动 ELF 串口正常 ⇒ 判定为
-                                         * 软核侧问题, 非位流/硬件)。疑在 serve_dma_once 的长 guard
-                                         * (重置等 Halted 4e6 拍 / 等退休 1e5 次) 上打转。
-                                         * 驻留服务必须改成【非阻塞】版再启用 —— 见记录 §三之十五。 */
+static unsigned g_dma_mode = 1u;        /* ★B3-1c: 1 = 软核【驻留服务】DMA 读请求
+                                         * (退役桥硬件读引擎后必需: 栈自发帧也在环路上);
+                                         * 0 = 交给桥硬件读引擎 (v5-RTL 旧配对)。
+                                         * 'd' 命令可现场切换, 便于两者对照。 */
 
 static int serve_dma_once(void)
 {
@@ -398,10 +394,12 @@ int main(void)
     uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L/D/E)\r\n");
     for (;;) {
         char c, d;
-        /* ⚠️ 驻留服务(空闲期服务 DMA 请求)已回退: 2026-10-16 实测其默认开启会让软核
-         * 上电后串口静默(见 g_dma_mode 注释), 需先改成非阻塞版再启用。期间读请求仍由
-         * 'E' 循环与轮次内逐笔服务(g_dma_service)承担。 */
-        while (!urx_poll()) { }
+        /* ★B3-1c 驻留服务: 空闲期即刻服务桥 FSM 的 {slot,len} 读请求。
+         * 退役桥硬件读引擎后, 所有出向帧(数据帧 + 栈自发 ARP/ICMP/命令应答)
+         * 的读回都靠它 —— 无请求时本调用只是一次寄存器读(~1ms), 无副作用。 */
+        while (!urx_poll()) {
+            if (g_dma_mode) serve_dma_once();
+        }
         c = urx_get();
         /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。
          * 策略: 单字节命令 (S/I) 在「命令间」直接执行; 轮命令 M/A/B 要求
