@@ -323,8 +323,17 @@ def warmup_probe(dp):
 
 
 # ============================================================ 轮次与判据
-def run_round(ctl, dp, rtype, nslots, size, pace_s, seq_base, round_id):
-    """跑一轮 (M/A/B)。返回 (ok, stats dict)。判据全部由本函数独立推导。"""
+def run_round(ctl, dp, rtype, nslots, size, pace_s, seq_base, round_id,
+              warm_probe=True):
+    """跑一轮 (M/A/B)。返回 (ok, stats dict)。判据全部由本函数独立推导。
+
+    warm_probe: 只在引擎=桥硬件读(engine=0)时允许在 SEQ 窗内发预热帧。
+      ★2026-10-17 板上实证: DMA 模式(--dma, g_dma_mode=1)下, 桥内 R_ENGINE=1 而
+      SEQ 窗内**没有驻留服务**(软核正在 round_command 里等 GO) ⇒ 预热帧被写入内存后
+      读请求永泊 R_DRET, 占住 1 个槽; 随后写阶段的 256 帧中第 256 帧因槽表满被拒
+      ⇒ 板端 WAITWR-FAIL got+255（绿位流也复现, 与退役无关）。桥模式下该帧由桥
+      硬件读引擎自动读出并退休, 不留残槽。故 DMA 模式必须跳过预热帧。
+    """
     st = {"type": rtype, "ok": False, "errors": [], "warnings": [],
           "wr0": None, "n_expected": None, "missing": [], "extra": 0,
           "byte_diff": 0, "order_ok": True, "inv": 0,
@@ -346,7 +355,8 @@ def run_round(ctl, dp, rtype, nslots, size, pace_s, seq_base, round_id):
         st["errors"].append("未收到 SEQOK (last=%r)" % line)
         log("[%s] FAIL  <- %s" % (rtype, st["errors"][0]))
         return False, st
-    warmup_probe(dp)
+    if warm_probe:
+        warmup_probe(dp)
 
     log("[%s] GO: 等 READY (C 侧切 RND + 稳定基线)" % rtype)
     dp.start_rx()
@@ -595,7 +605,8 @@ def main(argv=None):
             if attempt > 1:
                 log("[%s] === 第 %d 次尝试 ===" % (rtype, attempt))
             ok, st = run_round(ctl, dp, rtype, nslots, args.size,
-                               args.pace_us / 1e6, seq_base, i + 1)
+                               args.pace_us / 1e6, seq_base, i + 1,
+                               warm_probe=(not args.dma))
             if ok:
                 break
             time.sleep(1.0)

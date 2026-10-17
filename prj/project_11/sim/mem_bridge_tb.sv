@@ -100,7 +100,7 @@ module mem_bridge_tb #(
     end
 
     // ---------------- DUT + DDR stand-in ----------------
-    frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) dut (
+    frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) dut (
         .user_clk(user_clk), .user_rst_n(user_rst_n),
         .wr_data(wr_data), .wr_en(wr_en), .wr_hold(wr_hold),
         .rd_data(rd_data), .rd_en(rd_en), .rd_slot_o(rd_slot_o), .rd_len_o(rd_len_o),

@@ -571,6 +571,7 @@ module axi4_master_bridge #(
         assign rd_wr_en   = brd_wr_en;
         assign rd_wr_data = brd_wr_data;
         assign dma_s_tready = 1'b0;
+        assign shim_frame_done = 1'b0;   // 该实例无 shim; R_DRET 不可达, 仅避免悬空网
     end endgenerate
 
     // ---- W5 timing fix (2026-10-07): command prefetch registers ----
@@ -690,17 +691,80 @@ module axi4_master_bridge #(
                     brd_wr_data <= {1'b1, 16'd0, 8'hFF};
                     dbg_rd_slot <= 8'hFF;
                     rstate      <= R_IDLE;
-                end else begin
+                end else if (HAS_DMA) begin
                     // ★B3-1c(2026-10-16): 桥硬件读引擎【已退役】—— 唯一读出路径 =
                     //   DMA 描述符 (软核编程 MM2S, 数据由 shim 拆包回灌, 退休由 shim
                     //   的 frame_done 脉冲触发)。原 R_AR/R_R/R_UNPACK/R_FIN 分支与其
                     //   dma_engine 二选一已删除; 读请求一律泊在 R_DRET。
+                    //   ★只对 HAS_DMA=1 实例(桥①)生效 —— DMA shim 只存在于该实例。
                     dma_req_new  <= 1'b1;
                     dma_req_slot <= p_eff;
                     dma_req_len  <= len_tab[p_eff];
                     dbg_rd_slot  <= p_eff;
                     rstate       <= R_DRET;     // 等 shim frame_done (或空答直接回)
+                end else begin
+                    // ★2026-10-17 修正: HAS_DMA=0 实例(桥②/u_mem2)必须保留硬件读引擎。
+                    //   退役改动曾把它无条件删除, 导致桥②: ①读 FSM 永泊 R_DRET
+                    //   (shim_frame_done 在该实例不存在) ②rf 无数据源 ⇒ 泵B 恒空
+                    //   ⇒ 所有出向帧(含栈自发 ARP/ICMP)不上线。DMA shim 只在桥①,
+                    //   无人能服务桥② ⇒ 退役只能作用于 HAS_DMA=1 实例。
+                    r_slot  <= p_eff;
+                    r_len   <= len_tab[p_eff];
+                    r_beats <= len_beats_tab[p_eff];
+                    r_beat  <= 8'd0;
+                    dbg_rd_slot <= p_eff;
+                    rstate  <= R_AR;
                 end
+            end
+            //-----------------------------------------------------------------
+            // ★2026-10-17: 硬件读引擎(HAS_DMA=0 实例专用, 桥② EGR 出口)。
+            //   与 R_PRE 的 HAS_DMA 分支配套: HAS_DMA=1 时这些状态不可达(综合剪枝),
+            //   读出路径为 DMA; HAS_DMA=0 时读出路径为下列四态。
+            R_AR: begin
+                m_axi_arvalid <= 1'b1;
+                if (m_axi_arvalid && m_axi_arready) begin
+                    m_axi_arvalid <= 1'b0;
+                    rstate <= R_R;
+                end
+            end
+            //-----------------------------------------------------------------
+            R_R: begin
+                // AXI handshake: READY must be high in the SAME cycle that VALID
+                // is sampled. Asserting rready only while rvalid is still low (and
+                // dropping it on the first rvalid) never completes the transfer on
+                // the slave side -> the slave stays mid-burst and the next AR is
+                // never accepted (W2 bring-up bug: bridge stuck in R_AR).
+                m_axi_rready <= 1'b1;
+                if (m_axi_rvalid && m_axi_rready) begin
+                    m_axi_rready <= 1'b0;
+                    r_beat_data  <= m_axi_rdata;
+                    r_bi         <= 8'd0;
+                    dbg_rd_beats <= dbg_rd_beats + 32'd1;
+                    rstate       <= R_UNPACK;
+                end
+            end
+            //-----------------------------------------------------------------
+            R_UNPACK: begin   // 1 byte / ui cycle into the ui->user byte FIFO
+                brf_wr_en   <= 1'b1;
+                brf_wr_data <= r_beat_data[r_bi*8 +: 8];
+                if (r_bi == (r_nbytes - 7'd1)) begin
+                    r_bi <= 8'd0;
+                    if (r_beat == (r_beats - 8'd1)) rstate <= R_FIN;
+                    else begin r_beat <= r_beat + 8'd1; rstate <= R_R; end
+                end else begin
+                    r_bi <= r_bi + 8'd1;
+                end
+            end
+            //-----------------------------------------------------------------
+            R_FIN: begin
+                rd_retire      <= 1'b1;
+                rd_retire_slot <= r_slot;
+                out_dec        <= 1'b1;
+                stat_rd_frame  <= stat_rd_frame + 16'd1;
+                if (!r_rnd) rd_seq_slot <= rd_seq_slot + 8'd1;
+                brd_wr_en   <= 1'b1;
+                brd_wr_data <= {1'b0, r_len, r_slot};
+                rstate     <= R_IDLE;
             end
             //-----------------------------------------------------------------
             // ★B3-1b: DMA 引擎退休等待。shim 在 TLAST 结算时发 frame_done

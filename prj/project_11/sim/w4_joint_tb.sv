@@ -142,7 +142,7 @@ module w4_joint_tb #(
     end
 
     // ============ DUTs ============
-    frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_memA (
+    frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_memA (
         .user_clk(user_clk), .user_rst_n(user_rst_n),
         .wr_data(wrA_data), .wr_en(wrA_en), .wr_hold(wrA_hold),
         .rd_data(rdA_data), .rd_en(rdA_en), .rd_slot_o(rdA_slot_o), .rd_len_o(rdA_len_o),
@@ -176,7 +176,7 @@ module w4_joint_tb #(
         .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0), .dma_s_tready(),
         .ro_dma_req());
 
-    frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_memB (
+    frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_memB (
         .user_clk(user_clk), .user_rst_n(user_rst_n),
         .wr_data(wrB_data), .wr_en(wrB_en), .wr_hold(wrB_hold),
         .rd_data(rdB_data), .rd_en(rdB_en), .rd_slot_o(rdB_slot_o), .rd_len_o(rdB_len_o),
