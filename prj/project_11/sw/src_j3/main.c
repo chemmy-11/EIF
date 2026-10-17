@@ -455,6 +455,10 @@ int main(void)
             for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_DMAREQ); }
             uputs("\r\n[B2] U reqX:");
             for (i = 0; i < 3u; i++) { uputc(' '); uputh(rd_reg((volatile unsigned *)(REGS_BASE + 0x34u))); }
+            uputs("\r\n[B2] U wmrd:");
+            for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_WM_RD); }
+            uputs("\r\n[B2] U stat:");
+            for (i = 0; i < 3u; i++) { uputc(' '); uputh(R_STAT); }
             uputs("\r\n[B2] U wmwr:");
             for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_WM_WR); }
             uputs("\r\n[B2] U ust:");
