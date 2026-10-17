@@ -437,6 +437,11 @@ int main(void)
             /* ★B3-1c: 切换读出引擎 (DMA 描述符 / 桥硬件读) —— 之后 'M'/'A'/'B'
              * 四条链都在所选引擎上跑, 供同一判据脚本复跑 (J3/J3′ + 负向 A/B)。 */
             g_dma_mode = !g_dma_mode;
+            /* ★N5: 引擎位必须与软件模式同步 —— 否则 'd' 只改了软件标志,
+             * 桥 FSM 仍走硬件读引擎 (退役位流上该位无意义, 但绿位流上
+             * 决定"栈自发帧由谁读出", 是复现退役条件的唯一开关)。 */
+            R_ENGINE = g_dma_mode ? 1u : 0u;
+            if (g_dma_mode) R_MODE = MODE_SEQ;
             uputs("[B2] DMAMODE now=");
             uputs(g_dma_mode ? "DMA\r\n" : "bridge\r\n");
         }
