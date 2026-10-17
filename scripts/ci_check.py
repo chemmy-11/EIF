@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ci_check.py — FPGA_Project 仓库体检（CI 与本地共用）。
+"""ci_check.py — EIF 仓库体检（CI 与本地共用）。
 
 检查项（全部不依赖 Vivado，可在任意机器运行）：
   1. 文档命名规范   docs/ 下 Markdown 文件名须合规范（见 docs/README.md）

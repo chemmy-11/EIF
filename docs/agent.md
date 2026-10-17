@@ -8,7 +8,7 @@
 | 路径 | 角色 |
 |---|---|
 | `C:\Users\***\Desktop\毕设\`（本目录） | 毕设文档目录：任务清单、路线图、操作文档、汇报、归档 |
-| `D:\FPGA\` | FPGA 工程目录（git 管理，远端 chemmy-11/FPGA_Project）：project_1~9、官方例程留档、docs 快照。开发主战场 |
+| `D:\FPGA\` | FPGA 工程目录（git 管理，远端 chemmy-11/EIF）：project_1~9、官方例程留档、docs 快照。开发主战场 |
 | `D:\BaiduNetdiskDownload\1_Verilog\KU060例程\` | 正点原子 KU060 官方例程源码库（56 章，GBK 编码）。事实源最高层 |
 
 多会话协同由用户自行编排（按需加载技能），无固定分工契约。

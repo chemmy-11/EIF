@@ -1,9 +1,11 @@
-# FPGA_Project — FPGA 高速互联网络平台
+# EIF — 面向边缘多节点协作的 FPGA 高速互联网络平台
+
+> **EIF = Edge Interconnect Fabric（边缘互联网络）** —— 原仓库名 `FPGA_Project`，2026-10-17 更名（旧链接由 GitHub 自动重定向）。
 
 [![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat)](scripts/)
 [![FPGA](https://img.shields.io/badge/FPGA-XCKU060-0b7285?style=flat)](prj/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat)](LICENSE)
-[![CI](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml)
+[![CI](https://github.com/chemmy-11/EIF/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/EIF/actions/workflows/ci.yml)
 
 基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
 
@@ -23,7 +25,7 @@
 
 ![AI-Infra 系统拓扑：FPGA 交换核心位于互联层](docs/images/topology-ai-infra.png)
 
-图中「**互联层 · FPGA 交换核心**」即本仓库。当前已达成的部分是**单板交换中心**（物理/链路/网络层：10G 过纤、误码 0E0、UDP 回环四包链）；**多端点**接入与**优先级队列 / 反压 / 纳秒时间戳**是后续目标。
+图中「**互联层 · FPGA 交换核心**」即本仓库。当前已完成**单板交换中心**（物理/链路/网络层：10G 过纤、误码 0E0、UDP 回环四包链）、**DDR4 整帧缓存队列**（路线 A：按地址随机读 + 1466B 帧 82.67k fps 零丢帧）与**软核 + AXI DMA 数据面**（路线 B：B3-1 读侧 2026-10-17 收口，DMA 为唯一读出路径）；**多端点**接入、**优先级队列 / 反压 / 纳秒时间戳**与**写侧 DMA 换层**是后续目标。
 
 ## 硬件平台
 
@@ -111,7 +113,8 @@
 | `prj/project_6/` | 千兆以太网 UDP 协议栈 | ping 0% 丢包、UDP 回显逐字节一致、Wireshark 抓包核对 | ✅ 2026-09-04 |
 | `prj/project_8/` | Aurora-UDP 桥接 | PC 发 UDP → 穿 Aurora 编解码往返 → payload 逐字节一致 | ✅ 2026-09-18 |
 | `prj/project_9/` | 真实光纤链路全链路 | 光口 A↔B 对接，10MB 文件 100% 到达 + SHA256 一致 | ✅ 2026-09-21 |
-| `prj/project_10/` | DDR4 帧队列（内存进环路） | W3 内存插入 → W4 两级全环路（10MB 100%+SHA、双桥对账闭合）→ **W5 按地址随机读**（导师原话四环节板卡证据）→ **速率线速化**（1466B 82.67k fps 零丢帧 ≈969 Mbps）→ W6 可观测性收口；J1–J6+J3′ 全过 | ✅ 路线 A 收口（2026-10-09）· 🔄 路线 B（软核+DMA）待启动 |
+| `prj/project_10/` | DDR4 帧队列（内存进环路） | W3 内存插入 → W4 两级全环路（10MB 100%+SHA、双桥对账闭合）→ **W5 按地址随机读**（导师原话四环节板卡证据）→ **速率线速化**（1466B 82.67k fps 零丢帧 ≈969 Mbps）→ W6 可观测性收口；J1–J6+J3′ 全过 | ✅ 路线 A 收口（2026-10-09）；路线 B 迁至 `project_11` |
+| `prj/project_11/` | 路线 B：MicroBlaze 软核控制面 + AXI DMA 数据面（fork prj10） | B0–B3-1 已上板：J3/J3′ + 负向 A/B 四链、四档零回归、发射字节流同构；**R1 读侧收口（2026-10-17，[L4]）**：修复版退役位流 `c8cd3a32` 上 S0–S8 全 PASS、四判据全过，DMA 为唯一读出路径 | 🔄 进行中（下一步 B3-2 写侧 S2MM） |
 | `prj/project_2/` | 8b/10b 编解码练手（仅起步即跳过，物理层由 IBERT 实验覆盖） | — | ⏸ 封存 |
 | `prj/project_7/` | SFP 光口以太网前端 | — | ⏸ 封存 |
 | `prj/aurora_64b66b_loop_ex/` | Aurora 官方例程 + 串口调试桥 | 例程内环已验证；串口桥验证未完成 | ⏸ 留档 |
@@ -140,6 +143,8 @@
 ![路线 B：MicroBlaze + AXI DMA + SmartConnect 承担数据搬运](docs/images/ddr-route-b.png)
 
 与路线 A 的差别只在**数据面换一层、控制面加一个**：MicroBlaze 经 AXI4-Lite 只下发参数（DMA 源/目的地址＝槽号、长度）、读回状态，**不进入数据通路**；搬运交给 AXI DMA，路由交给 SmartConnect。启动条件是**路线 A 的功能判据全部通过**（已于 2026-10-09 满足），两条路线的接口按"可替换"预留，**第二步不返工**。
+
+**当前进度（2026-10-17）**：B0 断点核查/脚手架 → B1 软核控制面 → B2 软核验证 → B3-0 延迟可观测 → **B3-1 读侧收口**（三主仲裁器 + DMA 读路径：修复版退役位流 `c8cd3a32` 上 S0–S8 全 PASS、四判据全过——ping/ARP、四档逐字节、J3/J3′ + 负向 A/B、发射流同构；DMA 为唯一读出路径）。下一步 **B3-2 写侧换层 S2MM**；过程与证据见 [prj11 B3-1 调试记录](docs/调试记录/阶段三_prj11_B3-1三主仲裁器与DMA读路径设计_2026-10-12.md) §三之二十。
 
 ## 快速开始
 
@@ -190,6 +195,7 @@ python -m vivado_mcp            # 启动 MCP server（stdio）
 ```
 prj/                    全部工程集中于此（2026-10-01 归类；本地路径同为 D:\FPGA\prj\）
   ├─ project_N/              各 Vivado 工程（rtl / sim / scripts / xdc / docs）
+  ├─ project_11/             路线 B：MicroBlaze 软核 + AXI DMA（当前主线）
   ├─ ibert_ultrascale_gth_0/ IBERT 眼图实验工程
   ├─ aurora_64b66b_loop_ex/  Aurora 官方例程留档（内含串口调试桥）
   └─ 0DMA_uart2ddr/          MicroBlaze+DDR4+DMA 参考设计（未验证，仅作骨架）
@@ -233,8 +239,8 @@ py scripts\ci_check.py      # 退出码 0 = 全过（Git Bash 里勿用 python �
 | [AGENTS.md](AGENTS.md) | **工程规范权威版**：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本（§九）、**当前工程状态（§十）**、CI 规范（§十二）——文件头有 30 秒目录导航 |
 | [docs/README.md](docs/README.md) | **文档中心索引**：docs/ 全部 75 篇文档的目录 + 命名规范（CI 保证索引与磁盘一致） |
 | [AGENTS.md §十 当前工程状态](AGENTS.md#十当前工程状态一屏速览内部详表见本节附录) | **现在做到哪、下一步是什么**（一屏速览） |
-| [docs/调试记录/阶段三_prj11_B3-1三主仲裁器与DMA读路径设计_2026-10-12.md](docs/调试记录/阶段三_prj11_B3-1三主仲裁器与DMA读路径设计_2026-10-12.md) | 最近里程碑：路线 B（软核+DMA）B3-1 三主仲裁器与 DMA 读路径——'E' 轮 0 回显根因定案与修复（2026-10-16） |
-| [docs/操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md](docs/操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md) | 最近里程碑：路线 B 剩余工作清单（退役桥②读引擎收尾） |
+| [docs/调试记录/阶段三_prj11_B3-1三主仲裁器与DMA读路径设计_2026-10-12.md](docs/调试记录/阶段三_prj11_B3-1三主仲裁器与DMA读路径设计_2026-10-12.md) | 最近里程碑：路线 B（软核+DMA）B3-1 读路径——0 回显根因定案与修复（2026-10-16）+ **R1 读侧收口定案（2026-10-17，[L4]）**：根因（共享模块退役误伤桥② 读 FSM）、修复（读 FSM 按 `HAS_DMA` 参数化）、S0–S8 与四判据全过 |
+| [docs/操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md](docs/操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md) | 路线 B 剩余工作清单：**R1 读侧收口完成（2026-10-17）**、R2 写侧 S2MM 进行中（§R1 / §二之八） |
 | [docs/追踪_cross_短期待办_2026-10-10.md](docs/追踪_cross_短期待办_2026-10-10.md) | 短期待办任务清单 |
 | [docs/规划_cross_长期路线图_2026-09-04.md](docs/规划_cross_长期路线图_2026-09-04.md) | 长期路线图（v4.5 · 架构定版，含决策记录） |
 
