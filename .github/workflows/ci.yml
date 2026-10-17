@@ -9,8 +9,9 @@ on:
 
 jobs:
   repo-check:
-    name: 仓库体检（文档规范 / 链接 / 脚本语法）
+    name: 仓库体检（文档规范 / 链接 / 索引 / 脚本语法）
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 

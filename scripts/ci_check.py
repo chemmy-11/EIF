@@ -8,6 +8,12 @@
   3. Python 语法    仓库内全部 .py 可编译
   4. .ps1 编码      仓库内全部 .ps1 必须带 UTF-8 BOM（坑账本 #17/#18）
   5. Tcl 可解析     仓库内全部 .tcl 可被 tclsh 解析（无 tclsh 时跳过）
+  6. 索引一致性     docs/README.md 索引须覆盖 docs/ 下全部 .md 且不列不存在的文件
+                    （2026-10-17 增补；口径 = 除 docs/README.md 自身外全部 .md，含 agent.md）
+
+另有一条**本地专用提示**（不计入失败、不卡 CI）：检测到本机 vault
+（C:/Users/15266/Desktop/毕设/）时比对 docs/ 快照与 vault 的字节一致性，
+不一致仅打印 [提示]（镜像存在既知的归档/漂移，见 AGENTS.md §十二）。
 
 用法：python scripts/ci_check.py    （在仓库根目录运行）
 退出码：0 = 全过；1 = 有失败项
@@ -20,15 +26,18 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+VAULT = Path(r"C:\Users\15266\Desktop\毕设")
+DOCS = ROOT / "docs"
 FAILS: list[str] = []
 SKIPS: list[str] = []
+HINTS: list[str] = []
 
 
 def tracked_files() -> list[Path]:
     """仓库已跟踪文件（CI 与本地一致；git 不可用时退回全盘扫描）。
 
     -c core.quotepath=false 必须带：默认 git 会把非 ASCII 文件名输出成八进制转义串
-    （docs/\\350\\247\\204...），Path 解析不到 ⇒ 全部中文名文件会被静默跳过检查（坑账本 #46）。
+    （docs/\350\247\204...），Path 解析不到 ⇒ 全部中文名文件会被静默跳过检查（坑账本 #46）。
     """
     try:
         out = subprocess.run(
@@ -150,6 +159,68 @@ def check_tcl(files: list[Path]) -> None:
         FAILS.append("Tcl 脚本不完整（引号/括号未闭合）:\n    " + "\n    ".join(bad))
 
 
+# ---------- 6. docs/README.md 索引与磁盘一致性 ----------
+def docs_index_targets() -> set[Path]:
+    """索引口径：docs/ 下除「任意 README.md」外的全部 .md（含 agent.md）。"""
+    if not DOCS.is_dir():
+        return set()
+    return {p for p in DOCS.rglob("*.md") if p.name != "README.md"}
+
+
+def check_docs_index() -> None:
+    idx = DOCS / "README.md"
+    disk = docs_index_targets()
+    if not idx.exists():
+        if disk:
+            FAILS.append("docs/README.md 不存在，索引检查无从进行")
+        return
+    text = idx.read_text(encoding="utf-8", errors="replace")
+    linked: set[Path] = set()
+    for m in LINK.finditer(text):
+        t = m.group(1).strip()
+        if t.startswith(("http://", "https://", "mailto:", "#")):
+            continue
+        t = t.split("#", 1)[0]
+        if not t or re.search(r"[<>*]|\.\.\.|xxx", t):
+            continue
+        target = (idx.parent / t).resolve()
+        # 只统计落在 docs/ 内的 .md 链接（指向仓库其它位置的链接由第 2 项负责）
+        if target.suffix == ".md" and target.is_relative_to(DOCS.resolve()):
+            linked.add(target)
+    missing = sorted(str(p.relative_to(DOCS)).replace("\\", "/") for p in disk - linked)
+    dangling = sorted(
+        str(p).replace("\\", "/") for p in linked - disk if p != idx.resolve()
+    )
+    parts: list[str] = []
+    if missing:
+        parts.append("以下 docs/ 文件未收录进 docs/README.md 索引（口径：docs/ 下除任意 README.md 外的全部 .md）:\n    " + "\n    ".join(missing))
+    if dangling:
+        parts.append("docs/README.md 索引列出了不存在的文件:\n    " + "\n    ".join(dangling))
+    if parts:
+        FAILS.append("docs/README.md 索引与磁盘不一致:\n" + "\n".join(parts))
+
+
+# ---------- 本地提示：docs/ 快照与 vault 镜像一致性（不计失败） ----------
+def check_mirror_hint() -> None:
+    if not VAULT.is_dir():
+        return  # 远程 CI / 异机环境：无 vault，自动跳过
+    diff: list[str] = []
+    for p in sorted(DOCS.rglob("*.md")):
+        if p.name in ("README.md", "agent.md"):
+            continue  # 协议/索引文件不参与镜像比对
+        v = VAULT / p.relative_to(DOCS)
+        if v.exists() and v.read_bytes() != p.read_bytes():
+            diff.append(str(p.relative_to(DOCS)).replace("\\", "/"))
+    if diff:
+        HINTS.append(
+            f"docs/ 快照与 vault 有 {len(diff)} 个文件字节不一致（仅提示，不卡 CI）。"
+            "差异多为脱敏所致（vault 用户名/人名 → ***/前辈），属设计而非缺陷；"
+            "禁止把 vault 原文直接覆盖进 docs/，确需同步须重新脱敏，详见 AGENTS.md 十二节:\n    "
+            + "\n    ".join(diff[:20])
+            + ("\n    ……" if len(diff) > 20 else "")
+        )
+
+
 def main() -> int:
     files = tracked_files()
     print(f"仓库体检：{len(files)} 个已跟踪文件\n")
@@ -158,7 +229,11 @@ def main() -> int:
     check_python(files)
     check_ps1_bom(files)
     check_tcl(files)
+    check_docs_index()
+    check_mirror_hint()
 
+    for h in HINTS:
+        print(f"  [提示] {h}")
     for s in SKIPS:
         print(f"  [跳过] {s}")
     if FAILS:
