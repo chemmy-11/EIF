@@ -104,8 +104,11 @@ create_bd_cell -type module -reference axi_lite_regs axi_lite_regs_0
 # ---- B3-1a: axi_dma (MM2S only, 512b, direct mode) ----
 #   控制口 S_AXI_LITE @ clk_100m; 存储映射口 m_axi_mm2s_aclk = ui_clk(300M,
 #   与 MIG 同域 -> 顶层接仲裁器 S02, 无需 AXI 时钟转换); 流输出同 ui_clk 域。
+#   B3-2 (2026-10-17): 追加 S2MM 通道 (512b MM / 512b 流, 直通非 SG) —— 桥① 写侧
+#   换层落点; M_AXI_S2MM 引到顶层接仲裁器 S00, S_AXIS_S2MM 由桥① 写引擎驱动,
+#   s2mm_introut 引到顶层作为写提交退休时刻 (见 rtl/frame_mem_if.v 4b 节)。
 set dma [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_dma:7.1 axi_dma_0]
-set_property -dict [list CONFIG.C_INCLUDE_MM2S {1} CONFIG.C_INCLUDE_S2MM {0} CONFIG.C_INCLUDE_SG {0} CONFIG.C_M_AXI_MM2S_DATA_WIDTH {512} CONFIG.C_M_AXIS_MM2S_TDATA_WIDTH {512} CONFIG.C_SG_LENGTH_WIDTH {16}] $dma
+set_property -dict [list CONFIG.C_INCLUDE_MM2S {1} CONFIG.C_INCLUDE_S2MM {1} CONFIG.C_INCLUDE_SG {0} CONFIG.C_M_AXI_MM2S_DATA_WIDTH {512} CONFIG.C_M_AXIS_MM2S_TDATA_WIDTH {512} CONFIG.C_M_AXI_S2MM_DATA_WIDTH {512} CONFIG.C_S_AXIS_S2MM_TDATA_WIDTH {512} CONFIG.C_SG_LENGTH_WIDTH {16}] $dma
 set ui_clk_port [create_bd_port -dir I -type clk ui_clk]
 set_property CONFIG.FREQ_HZ 300000000 $ui_clk_port
 puts "BD_STEP: cells created"
@@ -118,6 +121,9 @@ connect_bd_intf_net [get_bd_intf_pins axi_interconnect_0/M02_AXI] [get_bd_intf_p
 # DMA 存储映射主口 / 流输出 -> 引到顶层 (S02=仲裁器, sink=dma_sink)
 make_bd_intf_pins_external [get_bd_intf_pins axi_dma_0/M_AXI_MM2S]
 make_bd_intf_pins_external [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S]
+# B3-2: S2MM 通道 (M_AXI_S2MM -> 顶层仲裁器 S00; S_AXIS_S2MM 由桥① 写引擎驱动)
+make_bd_intf_pins_external [get_bd_intf_pins axi_dma_0/M_AXI_S2MM]
+make_bd_intf_pins_external [get_bd_intf_pins axi_dma_0/S_AXIS_S2MM]
 connect_bd_intf_net [get_bd_intf_pins mdm_1/MBDEBUG_0] [get_bd_intf_pins microblaze_0/DEBUG]
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/DLMB] [get_bd_intf_pins microblaze_0_local_memory/DLMB]
 connect_bd_intf_net [get_bd_intf_pins microblaze_0/ILMB] [get_bd_intf_pins microblaze_0_local_memory/ILMB]
@@ -144,7 +150,22 @@ connect_bd_net [get_bd_ports clk_100m] \
     [get_bd_pins axi_lite_regs_0/aclk] \
     [get_bd_pins axi_interconnect_0/M02_ACLK] \
     [get_bd_pins axi_dma_0/s_axi_lite_aclk]
-connect_bd_net [get_bd_ports ui_clk] [get_bd_pins axi_dma_0/m_axi_mm2s_aclk]
+# B3-2: S2MM 通道的存储映射/流时钟 = ui_clk (与 MIG 同域; 按实际存在的引脚连接)
+set uiclk_pins {}
+foreach clkpin {m_axi_mm2s_aclk m_axis_mm2s_aclk m_axi_s2mm_aclk s_axis_s2mm_aclk} {
+    set p [get_bd_pins -quiet axi_dma_0/$clkpin]
+    if {[llength $p] > 0} {
+        lappend uiclk_pins $p
+        puts "BD_DMA_UICLK_PIN: $clkpin"
+    } else {
+        puts "BD_DMA_UICLK_MISS: $clkpin (该时钟引脚在本配置下不存在/已并入)"
+    }
+}
+if {[llength $uiclk_pins] == 0} { error "BD: no axi_dma ui_clk-domain aclk pin found" }
+connect_bd_net [get_bd_ports ui_clk] {*}$uiclk_pins
+# B3-2: S2MM 完成中断 -> 顶层 (桥① 写引擎用它作为"DDR 写已提交"退休时刻)
+set s2mm_intr_port [create_bd_port -dir O s2mm_introut]
+connect_bd_net $s2mm_intr_port [get_bd_pins axi_dma_0/s2mm_introut]
 connect_bd_net [get_bd_pins rst_100m/peripheral_aresetn] \
     [get_bd_pins axi_interconnect_0/ARESETN] \
     [get_bd_pins axi_interconnect_0/S00_ARESETN] \
@@ -160,7 +181,8 @@ puts "BD_STEP: nets connected"
 foreach pin {clk_user rst_user_n u_wr_frame u_rd_frame u_buf_drop ctl_owner \
              cfg_mode cfg_rd_slot rd_req_pulse cfg_wr_pulse \
              lite_exec_cnt lite_rd_trig_cnt lat_w lat_r dma_q0 dma_q1 dma_q2 \
-             cfg_rd_engine dma_req dma_arl dbg_emit lite_engine_cnt} {
+             cfg_rd_engine dma_req dma_arl dbg_emit lite_engine_cnt \
+             dma_wr_req dma_wr_dbg cfg_wr_go cfg_wr_ack} {
     make_bd_pins_external [get_bd_pins axi_lite_regs_0/$pin]
     set_property name $pin [get_bd_ports ${pin}_0]
 }

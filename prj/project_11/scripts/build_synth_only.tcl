@@ -133,6 +133,9 @@ lappend nets0 [one_net dbg_lite_mode ]
 foreach n [bus_nets dbg_lite_slot  8] { lappend nets0 $n }
 foreach n [bus_nets dbg_lite_trig 16] { lappend nets0 $n }
 foreach n [bus_nets dbg_lite_exec 16] { lappend nets0 $n }
+# ---- B3-2: DMA 写引擎 (S2MM) user 域观测 (请求 pending / fault 粘滞) ----
+lappend nets0 [one_net dbg_s2mm_reqpend]
+lappend nets0 [one_net dbg_wr_fault]
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
@@ -261,6 +264,10 @@ foreach n [bus_nets dbg_mem2_wm     16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem2_wr_frm 16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem2_rd_frm 16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem2_ost     9] { lappend nets3 $n }
+# ---- B3-2: DMA 写引擎 (S2MM) ui 域观测 (状态/流握手, 仅 5 bit 保时序) ----
+foreach n [bus_nets dbg_s2mm_state  3] { lappend nets3 $n }
+lappend nets3 [one_net dbg_s2mm_tvalid]
+lappend nets3 [one_net dbg_s2mm_tready]
 set_property port_width [llength $nets3] [get_debug_ports u_ila_3/probe0]
 connect_debug_port u_ila_3/probe0 $nets3
 

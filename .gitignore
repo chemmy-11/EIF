@@ -98,3 +98,7 @@ prj/project_11/sw/.analytics
 *.log.old
 .tmpCRC/
 prj/project_11/scripts/iter_*_CongestedCLBsAndNets.txt
+
+# ===== prj11 R2 负向对照生成物（由 sim/r2_neg_patch.py 从冻结 RTL 生成，可再生成）=====
+prj/project_11/sim/r2_neg_cursor/
+prj/project_11/sim/r2_neg_tkeep/

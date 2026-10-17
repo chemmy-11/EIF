@@ -177,7 +177,30 @@ module axi4_master_bridge #(
     output wire         dma_s_tready,
     output reg          dma_req_new,     // 电平: R_DRET 泊住期间=1 (请求待服务), 退休清 0
     output reg  [7:0]   dma_req_slot,
-    output reg  [15:0]  dma_req_len
+    output reg  [15:0]  dma_req_len,
+
+    // ---------------- B3-2 (2026-10-17): DMA 写引擎 (S2MM) ----------------
+    // 仅 HAS_DMA=1 生效 (桥①); HAS_DMA=0 (桥②) 时新输出全部常量 0、输入忽略,
+    // 写路径仍为旧硬件 W FSM —— 坑 #55 纪律: 退役只在参数化分支内做。
+    // 握手: 桥把 {pending,toggle,slot,len} 镜像给软核; 软核编程 S2MM 后翻 GO;
+    //       完成由 axi_dma s2mm_introut (ui 域 2FF 后) 退休, 与旧 B 响应同语义。
+    input  wire         dma_wr_go,           // ui 域: 软核 GO 翻转 (来自 lite_regs, 经 frame_mem_if 2FF)
+    input  wire         dma_wr_ack,          // ui 域: 软核 fault 恢复确认翻转 (经 frame_mem_if 2FF)
+    input  wire         s2mm_introut,        // ui 域: S2MM 完成中断 (已完成 100M->ui 2FF)
+    output wire         dma_wr_req_toggle,   // 每发一笔新请求翻转
+    output wire         dma_wr_req_pending,  // 请求待服务 (电平)
+    output wire [7:0]   dma_wr_req_slot,
+    output wire [15:0]  dma_wr_req_len,
+    output wire [511:0] m_axis_s2mm_tdata,   // -> axi_dma S_AXIS_S2MM (ui_clk 域)
+    output wire [63:0]  m_axis_s2mm_tkeep,
+    output wire         m_axis_s2mm_tlast,
+    output wire         m_axis_s2mm_tvalid,
+    input  wire         m_axis_s2mm_tready,
+    output wire [15:0]  stat_wr_timeout,     // 写请求超时/完成中断丢失计数 (ui 域)
+    output wire         dbg_wr_fault,        // 粘滞: 流已发但完成中断超时 (不提交)
+    output wire [7:0]   dbg_wr_last_slot,    // 最近一次分配的槽号 (取证)
+    output wire [15:0]  dbg_wr_last_len,     // 最近一次提交的帧长 (取证)
+    output wire [2:0]   dbg_wr_state         // 写引擎状态 (0=IDLE, 1=WAITGO, 2=STREAM, 3=PUSH, 4=WAITDONE, 5=DRAIN)
 );
 
     //=========================================================================
@@ -318,8 +341,10 @@ module axi4_master_bridge #(
     wire        w_consume   = (wst == W_FILL) && !wf_empty && !w_beat_full;
     wire        w_drain_pop = (wst == W_DRAIN) && !wf_empty && (w_pop < w_len);
 
-    assign wf_rd_en = w_consume | w_drain_pop;
-    assign wd_rd_en = (wst == W_IDLE) && calib_ok && !wd_empty;
+    // B3-2: 写引擎二选一 (结构常量分派; HAS_DMA=1 -> DMA/S2MM 新引擎, HAS_DMA=0 -> 旧硬件 W FSM)
+    wire dma_wf_rd_en, dma_wd_rd_en;
+    assign wf_rd_en = (HAS_DMA == 0) ? (w_consume | w_drain_pop)                  : dma_wf_rd_en;
+    assign wd_rd_en = (HAS_DMA == 0) ? ((wst == W_IDLE) && calib_ok && !wd_empty) : dma_wd_rd_en;
 
     // ---- A1: sideband constants -------------------------------------------
     // awid/arid MUST be legal values. One ID per direction keeps the two streams
@@ -337,6 +362,15 @@ module axi4_master_bridge #(
     assign m_axi_awqos   = 4'h0;
     assign m_axi_arqos   = 4'h0;
 
+    //=========================================================================
+    // 3b. B3-2 (2026-10-17): 写路径按 HAS_DMA 结构分派
+    //   HAS_DMA=1 (桥①/u_mem): 旧硬件写 FSM 整体退役 -> S2MM 写引擎 (下一 generate 分支);
+    //                          仲裁器 S00 已改接 axi_dma M_AXI_S2MM, 本桥 AXI 写口不再驱动。
+    //   HAS_DMA=0 (桥②/u_mem2): 旧硬件写 FSM 原样 (文本零改动), 写 AXI 口照旧 -> 仲裁器 S01。
+    //   坑 #55 纪律: 作用域用参数 (结构常量), 不用运行态位 (dma_engine); 桥② 两条路径禁改。
+    //=========================================================================
+    generate if (!HAS_DMA) begin : g_wr_hw
+    // ---- 旧硬件写 FSM 的 AXI4 写口 (仅 HAS_DMA=0 例化) ----
     assign m_axi_awaddr  = SLOT_BASE + {w_slot, 12'b0};
     assign m_axi_awlen   = w_beats - 8'd1;
     assign m_axi_awsize  = 3'b110;      // 64 bytes per beat (512-bit)
@@ -344,6 +378,22 @@ module axi4_master_bridge #(
     assign m_axi_wdata   = w_data_r;
     assign m_axi_wstrb   = w_strb_r;
     assign m_axi_wlast   = (w_beat == (w_beats - 8'd1));
+    // ---- B3-2 新输出在 HAS_DMA=0 实例恒 0 (桥② 无 DMA shim/写引擎) ----
+    assign dma_wr_req_toggle  = 1'b0;
+    assign dma_wr_req_pending = 1'b0;
+    assign dma_wr_req_slot    = 8'd0;
+    assign dma_wr_req_len     = 16'd0;
+    assign m_axis_s2mm_tdata  = 512'd0;
+    assign m_axis_s2mm_tkeep  = 64'd0;
+    assign m_axis_s2mm_tlast  = 1'b0;
+    assign m_axis_s2mm_tvalid = 1'b0;
+    assign stat_wr_timeout    = 16'd0;
+    assign dbg_wr_fault       = 1'b0;
+    assign dbg_wr_last_slot   = 8'd0;
+    assign dbg_wr_last_len    = 16'd0;
+    assign dbg_wr_state       = 3'd0;
+    assign dma_wf_rd_en       = 1'b0;
+    assign dma_wd_rd_en       = 1'b0;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -505,6 +555,276 @@ module axi4_master_bridge #(
             endcase
         end
     end
+    end else begin : g_wr_dma
+    //=========================================================================
+    // B3-2 写引擎 (HAS_DMA=1): 逐帧 512b AXI4-Stream -> axi_dma S2MM
+    //-------------------------------------------------------------------------
+    // 规则号 1 (写槽 = 帧计数 mod 256) 逐字等价点:
+    //   * 槽游标 wr_slot_ptr 在【描述符接收拍】推进, 被拒帧同样推进 (W5/L2 语义);
+    //   * 槽地址 SLOT_BASE+{slot,12'b0}: 桥把 slot 交给软核, 软核换算 S2MM_SA;
+    //   * 长度 = 字节 FIFO 实际入队字节数 (描述符 wd_data), 提交时写 len_tab;
+    //   * 槽置满 (wr_commit) 时刻 = S2MM 完成中断 = DDR 写已提交 (与旧 B 响应同语义);
+    //   * 满槽拒收整帧丢弃/不覆盖未读槽/游标推进/stat_wr_stall 计数 (同旧 W_DRAIN)。
+    // 协议: 请求 {pending,toggle,slot,len} 经 frame_mem_if 镜像到 user 域给软核;
+    //       软核编程 S2MM (SA/LENGTH) 后翻 GO (ui 域 2FF); 完成后 s2mm_introut 退休。
+    //       toggle 非电平: 帧到达是外部驱动, 连续请求可能在 2FF 窗口内无缝衔接。
+    //=========================================================================
+    localparam WD_IDLE=3'd0, WD_WAITGO=3'd1, WD_STREAM=3'd2, WD_PUSH=3'd3,
+               WD_WAITDONE=3'd4, WD_DRAIN=3'd5, WD_HALT=3'd6;
+    reg [2:0]   wdst;
+    // ★注意: 不得在本分支内再声明 wr_slot_ptr (会遮蔽模块级同名信号, 读 FSM 的
+    //   c_clamp/c_in_rng/p_target_ok 用的是模块级副本 -> 静默断源)。本分支直接驱动模块级。
+    reg [7:0]   wd_slot, wd_beats, wd_beat, wd_bi;
+    reg [15:0]  wd_len, wd_pop, wd_rxc;
+    reg [511:0] wd_data_r;
+    reg [63:0]  wd_keep_r;
+    reg         wd_beat_full, wd_noroom, wd_go_ok;
+    reg         wd_go_seen, wd_req_pending, wd_req_toggle;
+    reg [7:0]   wd_req_slot_r;
+    reg [15:0]  wd_req_len_r;
+    reg [23:0]  wd_wait_cnt;
+    reg [23:0]  wd_stall_cnt;
+    reg [23:0]  wd_done_cnt;
+    reg [3:0]   wd_drain_wait;
+    reg         wd_ack_seen;
+    reg [15:0]  wr_timeout_r;
+    reg         wr_fault_r;
+    reg [7:0]   wr_last_slot_r;
+    reg [15:0]  wr_last_len_r;
+
+    wire [7:0]  wd_slot_next = wr_slot_ptr[7:0];
+    wire        wd_noroom_n  = full_bit_q[wd_slot_next];
+    wire        wd_badlen_n  = (wd_data == 16'd0) || (wd_data > MAX_LEN);
+    wire        wd_desc_av   = (wdst == WD_IDLE) && calib_ok && !wd_empty;
+    wire        wd_fill      = (wdst == WD_STREAM) && !wf_empty && !wd_beat_full;
+    wire        wd_drain_pop = (wdst == WD_DRAIN) && !wf_empty && (wd_pop < wd_len);
+    assign dma_wd_rd_en = wd_desc_av;
+    assign dma_wf_rd_en = wd_fill | wd_drain_pop;
+
+    assign dma_wr_req_toggle  = wd_req_toggle;
+    assign dma_wr_req_pending = wd_req_pending;
+    assign dma_wr_req_slot    = wd_req_slot_r;
+    assign dma_wr_req_len     = wd_req_len_r;
+    assign m_axis_s2mm_tdata  = wd_data_r;
+    assign m_axis_s2mm_tkeep  = wd_keep_r;
+    assign m_axis_s2mm_tlast  = (wdst == WD_PUSH) && (wd_beat == (wd_beats - 8'd1));
+    assign m_axis_s2mm_tvalid = (wdst == WD_PUSH);
+    assign stat_wr_timeout    = wr_timeout_r;
+    assign dbg_wr_fault       = wr_fault_r;
+    assign dbg_wr_last_slot   = wr_last_slot_r;
+    assign dbg_wr_last_len    = wr_last_len_r;
+    assign dbg_wr_state       = wdst;
+    // HAS_DMA=1: 桥① AXI4 写口整体退役 —— 输出钉 0 (仲裁器 S00 已改接 S2MM;
+    // 顶层对 u_mem 这些端口保持悬空, 不得再接/再 assign, 否则构成多驱动)
+    assign m_axi_awaddr  = 32'd0;
+    assign m_axi_awlen   = 8'd0;
+    assign m_axi_awsize  = 3'd0;
+    assign m_axi_awburst = 2'd0;
+    assign m_axi_wdata   = 512'd0;
+    assign m_axi_wstrb   = 64'd0;
+    assign m_axi_wlast   = 1'b0;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            wdst <= WD_IDLE; wr_slot_ptr <= 16'd0;
+            wd_slot <= 8'd0; wd_beats <= 8'd0; wd_beat <= 8'd0; wd_bi <= 8'd0;
+            wd_len <= 16'd0; wd_pop <= 16'd0; wd_rxc <= 16'd0;
+            wd_data_r <= 512'd0; wd_keep_r <= 64'd0;
+            wd_beat_full <= 1'b0; wd_noroom <= 1'b0; wd_go_ok <= 1'b0;
+            wd_go_seen <= 1'b0; wd_req_pending <= 1'b0; wd_req_toggle <= 1'b0;
+            wd_req_slot_r <= 8'd0; wd_req_len_r <= 16'd0;
+            wd_wait_cnt <= 24'd0; wd_stall_cnt <= 24'd0; wd_done_cnt <= 24'd0;
+            wd_drain_wait <= 4'd0; wd_ack_seen <= 1'b0;
+            wr_timeout_r <= 16'd0; wr_fault_r <= 1'b0;
+            wr_last_slot_r <= 8'd0; wr_last_len_r <= 16'd0;
+            wr_commit <= 1'b0; wr_commit_slot <= 8'd0; wr_commit_len <= 16'd0;
+            stat_wm <= 16'd0; stat_wr_frame <= 16'd0; stat_wr_stall <= 16'd0;
+            stat_bresp_err <= 16'd0; stat_len_err <= 16'd0;
+            dbg_wr_slot <= 8'd0; dbg_wr_cycles <= 32'd0; dbg_wr_beats <= 32'd0;
+            out_inc <= 1'b0;
+            m_axi_awvalid <= 1'b0; m_axi_wvalid <= 1'b0; m_axi_bready <= 1'b0;
+        end else begin
+            wr_commit     <= 1'b0;
+            out_inc       <= 1'b0;
+            // HAS_DMA=1: 桥① AXI4 写口退役 (仲裁器 S00 已改接 axi_dma M_AXI_S2MM)
+            m_axi_awvalid <= 1'b0;
+            m_axi_wvalid  <= 1'b0;
+            m_axi_bready  <= 1'b0;
+            if (wdst != WD_IDLE) dbg_wr_cycles <= dbg_wr_cycles + 32'd1;
+
+            case (wdst)
+            //-----------------------------------------------------------------
+            WD_IDLE: begin
+                if (wd_desc_av) begin
+                    wd_len       <= wd_data;
+                    wd_slot      <= wd_slot_next;
+                    wd_pop       <= 16'd0;
+                    wd_rxc       <= 16'd0;
+                    wd_beat      <= 8'd0;
+                    wd_bi        <= 8'd0;
+                    wd_beat_full <= 1'b0;
+                    wd_data_r    <= 512'd0;
+                    wd_keep_r    <= 64'd0;
+                    wd_noroom    <= wd_noroom_n;
+                    dbg_wr_slot     <= wd_slot_next;
+                    wr_last_slot_r  <= wd_slot_next;
+                    // ★规则号 1: 接收时推进 (被拒帧同样消耗槽号; 同旧 W5/L2 语义)
+                    wr_slot_ptr <= wr_slot_ptr + 16'd1;
+                    if (wd_noroom_n | wd_badlen_n) begin
+                        // 满槽/坏长度: 整帧丢弃, 不覆盖未读槽 (同旧 W_DRAIN)
+                        wd_drain_wait <= 4'd0;
+                        wdst <= WD_DRAIN;
+                        if (wd_badlen_n) stat_len_err <= stat_len_err + 16'd1;
+                    end else begin
+                        wd_beats <= (wd_data + 16'd63) >> 6;
+                        // 新请求: 翻转 toggle + 置 pending + 记下此刻 GO 电平
+                        wd_req_slot_r  <= wd_slot_next;
+                        wd_req_len_r   <= wd_data;
+                        wd_req_pending <= 1'b1;
+                        wd_req_toggle  <= ~wd_req_toggle;
+                        wd_go_ok       <= 1'b0;
+                        wd_go_seen     <= dma_wr_go;
+                        wd_wait_cnt    <= 24'd0;
+                        wdst <= WD_WAITGO;
+                    end
+                end
+            end
+            //-----------------------------------------------------------------
+            WD_WAITGO: begin
+                // 等软核: ① GO 翻转 ② 整帧字节可见 (同旧 W_WAIT) ③ introut 已清
+                if (!wd_go_ok && (dma_wr_go != wd_go_seen)) begin
+                    wd_go_seen <= dma_wr_go;
+                    wd_go_ok   <= 1'b1;
+                end
+                if (wd_go_ok && (wf_level >= wd_len[12:0]) && !s2mm_introut) begin
+                    wd_beat      <= 8'd0;
+                    wd_bi        <= 8'd0;
+                    wd_rxc       <= 16'd0;
+                    wd_beat_full <= 1'b0;
+                    wd_data_r    <= 512'd0;
+                    wd_keep_r    <= 64'd0;
+                    wd_stall_cnt <= 24'd0;
+                    wdst <= WD_STREAM;
+                end else if (wd_wait_cnt == 24'hFFFFFF) begin
+                    // 超时 (~56ms @300MHz): 软核未驻留/未编程 -> 整帧丢弃 (不停泊)
+                    wr_timeout_r   <= wr_timeout_r + 16'd1;
+                    wd_req_pending <= 1'b0;
+                    wd_pop         <= 16'd0;
+                    wd_drain_wait  <= 4'd0;
+                    wdst <= WD_DRAIN;
+                end else begin
+                    wd_wait_cnt <= wd_wait_cnt + 24'd1;
+                end
+            end
+            //-----------------------------------------------------------------
+            WD_STREAM: begin   // 逐字节攒拍 (尾拍 TKEEP 精确到字节, 与旧 WSTRB 等价)
+                if (wd_fill) begin
+                    wd_data_r[wd_bi*8 +: 8] <= wf_data;
+                    wd_keep_r[wd_bi]        <= 1'b1;
+                    wd_rxc <= wd_rxc + 16'd1;
+                    wd_stall_cnt <= 24'd0;
+                    if ((wd_bi == 8'd63) || ((wd_rxc + 16'd1) == wd_len)) begin
+                        wd_beat_full <= 1'b1;
+                    end else begin
+                        wd_bi <= wd_bi + 8'd1;
+                    end
+                end else if (wd_stall_cnt == 24'hFFFFFF) begin
+                    // ★fail-stop: 帧字节迟迟不到 (~56ms) -> 不提交、粘滞 fault、停泊 HALT
+                    wr_timeout_r   <= wr_timeout_r + 16'd1;
+                    wr_fault_r     <= 1'b1;
+                    wd_req_pending <= 1'b0;
+                    wd_ack_seen    <= dma_wr_ack;
+                    wdst <= WD_HALT;
+                end else begin
+                    wd_stall_cnt <= wd_stall_cnt + 24'd1;
+                end
+                if (wd_beat_full) wdst <= WD_PUSH;
+            end
+            //-----------------------------------------------------------------
+            WD_PUSH: begin     // AXI4-Stream 握手 (S_AXIS_S2MM)
+                if (m_axis_s2mm_tready) begin
+                    wd_beat_full <= 1'b0;
+                    wd_bi        <= 8'd0;
+                    wd_keep_r    <= 64'd0;
+                    wd_data_r    <= 512'd0;
+                    wd_stall_cnt <= 24'd0;
+                    dbg_wr_beats <= dbg_wr_beats + 32'd1;
+                    if (wd_beat == (wd_beats - 8'd1)) begin
+                        wd_done_cnt <= 24'd0;
+                        wdst <= WD_WAITDONE;
+                    end else begin
+                        wd_beat <= wd_beat + 8'd1;
+                        wdst <= WD_STREAM;
+                    end
+                end else if (wd_stall_cnt == 24'hFFFFFF) begin
+                    // ★fail-stop: S2MM 不接流 (halt/未编程, ~56ms) -> 粘滞 fault、停泊 HALT
+                    wr_timeout_r   <= wr_timeout_r + 16'd1;
+                    wr_fault_r     <= 1'b1;
+                    wd_req_pending <= 1'b0;
+                    wd_ack_seen    <= dma_wr_ack;
+                    wdst <= WD_HALT;
+                end else begin
+                    wd_stall_cnt <= wd_stall_cnt + 24'd1;
+                end
+            end
+            //-----------------------------------------------------------------
+            WD_WAITDONE: begin // 等 S2MM 完成中断 (=DDR 写已提交, 与旧 B 响应同语义)
+                if (s2mm_introut) begin
+                    wr_commit      <= 1'b1;
+                    wr_commit_slot <= wd_slot;
+                    wr_commit_len  <= wd_len;
+                    out_inc        <= 1'b1;
+                    stat_wm        <= stat_wm + 16'd1;
+                    stat_wr_frame  <= stat_wr_frame + 16'd1;
+                    wr_last_len_r  <= wd_len;
+                    wd_req_pending <= 1'b0;
+                    wdst <= WD_IDLE;
+                end else if (wd_done_cnt == 24'hFFFFFF) begin
+                    // 完成中断未到 (~56ms): 不提交 (fail-stop, 等软核复位 S2MM + ACK)
+                    wr_timeout_r   <= wr_timeout_r + 16'd1;
+                    wr_fault_r     <= 1'b1;
+                    wd_req_pending <= 1'b0;
+                    wd_ack_seen    <= dma_wr_ack;
+                    wdst <= WD_HALT;
+                end else begin
+                    wd_done_cnt <= wd_done_cnt + 24'd1;
+                end
+            end
+            //-----------------------------------------------------------------
+            WD_DRAIN: begin    // 拒收帧: 把整帧字节抽掉 (liveness 有界, 同旧 W_DRAIN)
+                if (wd_pop >= wd_len) begin
+                    if (wd_noroom) stat_wr_stall <= stat_wr_stall + 16'd1;
+                    wd_drain_wait <= 4'd0;
+                    wdst <= WD_IDLE;
+                end else if (wd_drain_pop) begin
+                    wd_pop        <= wd_pop + 16'd1;
+                    wd_drain_wait <= 4'd0;
+                end else if (wd_drain_wait == 4'd15) begin
+                    stat_len_err  <= stat_len_err + 16'd1;
+                    wd_drain_wait <= 4'd0;
+                    wdst <= WD_IDLE;
+                end else begin
+                    wd_drain_wait <= wd_drain_wait + 4'd1;
+                end
+            end
+            //-----------------------------------------------------------------
+            WD_HALT: begin     // ★fail-stop: 等软核复位 S2MM 通道并翻 ACK 才恢复
+                // (坑 #55 纪律: 任何超时后的不可恢复挂起必须在结构上有出口;
+                //  恢复动作 = 软核 DMACR 复位->RS + 清 IOC + 写 WRACK(翻转))
+                if (dma_wr_ack != wd_ack_seen) begin
+                    wd_ack_seen    <= dma_wr_ack;
+                    wr_fault_r     <= 1'b0;
+                    wd_req_pending <= 1'b0;
+                    wd_go_ok       <= 1'b0;
+                    wd_stall_cnt   <= 24'd0;
+                    wdst <= WD_IDLE;
+                end
+            end
+            default: wdst <= WD_IDLE;
+            endcase
+        end
+    end
+    end endgenerate
 
     //=========================================================================
     // 4. read FSM

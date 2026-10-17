@@ -133,7 +133,12 @@ module mem_bridge_tb #(
         // B3-1b: DMA engine ports tied off (bridge-engine regression path)
         .dma_engine(1'b0), .dma_s_tdata(512'd0), .dma_s_tkeep(64'd0),
         .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0), .dma_s_tready(),
-        .ro_dma_req());
+        .ro_dma_req(),
+        // R2（B3-2）最小端口补齐：只加 tie，不改用例语义（HAS_DMA=0 分支内部已钉常量）
+        .dma_wr_go(1'b0), .dma_wr_ack(1'b0), .s2mm_introut(1'b0),
+        .dma_wr_tdata(), .dma_wr_tkeep(), .dma_wr_tlast(), .dma_wr_tvalid(),
+        .dma_wr_tready(1'b0),
+        .ro_dma_wr_req(), .ro_dma_wr_dbg(), .ro_stat_wr_timeout(), .ro_dbg_wr_state());
 
     axi4_ram_model #(.MEM_BYTES(1<<20), .AR_LAT(AR_LAT_T), .W_RESP_DLY(W_DLY_T),
                      .STALL_EN(STALL_EN_T)) u_ram (

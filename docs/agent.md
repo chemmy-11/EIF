@@ -19,7 +19,7 @@
 |---|---|
 | **工程规范全文**（权威） | `D:\FPGA\AGENTS.md`；文件头有「目录（30 秒导航）」，覆盖 §一～§十二 |
 | **结论依据等级制度**（L0–L4 + 6 条硬规则） | AGENTS.md **§6a**；速览表见本文件下文「结论依据等级制度」节 |
-| **坑账本**（#1–#54，踩过的坑与修法） | AGENTS.md **§九** |
+| **坑账本**（#1–#58，踩过的坑与修法） | AGENTS.md **§九** |
 | **当前工程状态**（一屏速览） | AGENTS.md **§十** |
 | **CI 与远程仓库规范**（6 项检查 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
 | **文档索引与命名规范** | `D:\FPGA\docs\README.md`（全量索引，CI 第 6 项强制与磁盘一致） |
@@ -171,3 +171,10 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - **独立软件侧 [L4]**：J3 判据脚本 `j3_soft_verify.py` 的 DMA 预热帧缺陷（SEQ 窗预热帧占 1 槽 ⇒ `wr+255` 级联）已修 `warm_probe=(not args.dma)` 并复验 PASS；**最终 J3 口径 = 带 `--dma`**。
 - **NIC 口径**：静态 ARP ⇒ 板自发帧广播 dst ⇒ 主判据 = `ReceivedBytes`（单帧 ≥74、4 帧 ≥296），`ReceivedUnicast` 恒 0。
 - **下一步**：R2（B3-2 桥①写侧换层 S2MM，DMA 描述符驱动写槽，判据 = 四档 + 10MB 100%+SHA + 双桥计数对账）。
+
+## ★ 10-17 晚～10-18 凌晨：R2 写侧 S2MM —— 离线/审计全过，**构建时序未收口、板验未执行**
+
+- **结论（[L2] 离线）**：R2 设计与实现落地（写槽规则号 1 逐字等价、`HAS_DMA` 参数化：桥① 写换 DMA S2MM 新写引擎/桥② 写读硬件 FSM 原样）；独立审计 A1–A13（**A1 真阻塞缺陷已修**：写槽游标 generate 内同名遮蔽→读 FSM 断源，xvlog/综合均不报错，见坑 #57）；**独立 TB PASS 0 errors（101 commits）+ 2 负向对照按设计 FAIL + 三回归 PASS + 综合 0 errors/0 CW**。设计 v1.2：`prj/project_11/out/R2_S2MM_DESIGN.md`；审计：`out/evidence_2026-10-17/R2_rtl_audit.md`；固件 **ELF `1bc8088d`**。
+- **构建（未收口，NO_BITSTREAM）**：place/route 5 掷全部被时序门限拒（最好 `ExtraTimingOpt` 尾判 WNS **−0.098**；其余 MIG 瞬态/布局失败/−0.225/−0.175），失败轮不写位流、不覆盖在库产物；现役仍是 R1 修复版 `c8cd3a32` + ELF `2961b585`。**失败轮最差路径已定位 `[L2]`**：30 条中 25 条 = `u_mem/u_wr_bytes/wr_gray_s2`（user→ui FIFO 同步化写指针）→ `u_mem/u_bridge/g_wr_dma.wd_data_r_reg[*]/CE`（新写引擎 512b 数据寄存器逐字节使能；8 级 gray→decode 锥驱动 512 CE，route 56.6%），另 5 条 = 桥② 旧写 FSM 同族（未被 R2 改动）。**主修方向 = 新写引擎字节捕获加 1 级流水**（`byte_q/byte_valid_q`，`wf_rd_en` 仍由 `!wf_empty` 控制；吞吐不变；不动 `HAS_DMA=0` 分支）；次选裁 ILA3 低价值探针/换 place 指令。诊断与复现命令见 `prj/project_11/out/archive/b31b_r2_2026-10-17/BUILD_STATUS.md`。
+- **板验未执行（`NOT_OBTAINED`）**：10-18 00:2x 用户要求收尾+断电，板卡未被本次 R2 工作触碰（未烧录/未开串口/JTAG/未 ping）。
+- **下次开工**：① **先修时序再重建**：按 `BUILD_STATUS.md` §3 给新写引擎字节捕获加 1 级流水（`byte_q/byte_valid_q`）→ `build_synth_only.tcl`（~10min）→ `build_v5_sweep2.tcl`（~35min/掷，stdout 文件重定向，坑 #58）；备选裁 ILA3 低价值探针/换指令；② 位流归档 + 钉 hash 后 `out/r2_board.ps1 -Run` 跑 S0–S11（工具 dry-run 7/7 PASS；串口默认 COM5；NIC 主判据 `ReceivedBytes`；J3 带 `--dma` 不重试）；③ **S4 单帧 86B=64+22 尾拍逐字节 + 记 S2MM DMASR** 是 TKEEP→WSTRB 从 `[L1]` 升 `[L3]` 的唯一途径。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md`（§九=下次开工要点）。

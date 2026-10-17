@@ -61,12 +61,22 @@
 /* B3-1b: 读引擎选择 (+0x0C 写 engine 位) / DMA 请求 (+0x34 读) */
 #define R_ENGINE  (*(volatile unsigned *)(REGS_BASE + 0x0Cu))
 #define R_DMAREQ  (*(volatile unsigned *)(REGS_BASE + 0x34u))
+/* B3-2 (2026-10-17): DMA 写引擎 (S2MM) 协议寄存器
+ *   +0x40 WR_REQ 读: {pending[31],6'b0,toggle[24],slot[23:16],len[15:0]}
+ *   +0x44 WR_DBG 读: {fault[31],7'b0,last_alloc_slot[23:16],last_commit_len[15:0]}
+ *   +0x48 WR_GO  写: 翻 GO (软核已完成 S2MM 编程/清 IOC)
+ *   +0x4C WR_ACK 写: 翻 ACK (写引擎 fault 恢复确认, 桥 WD_HALT 出口) */
+#define R_WRREQ   (*(volatile unsigned *)(REGS_BASE + 0x40u))
+#define R_WRDBG   (*(volatile unsigned *)(REGS_BASE + 0x44u))
+#define R_WRGO    (*(volatile unsigned *)(REGS_BASE + 0x48u))
+#define R_WRACK   (*(volatile unsigned *)(REGS_BASE + 0x4Cu))
 
 #define MODE_SEQ 0u
 #define MODE_RND 1u
 
 #define NSLOTS    256u
-#define WR_WAIT_POLLS 10000u    /* ~1ms/次 rd_reg -> 等 256 帧写齐 10s 上限 */
+#define WR_WAIT_POLLS 2000000u  /* dread 轮询 ~1us/次 -> 等 256 帧写齐 ~2s 上限 */
+                             /* (B3-2: 轮内等待需每圈服务写请求; rd_reg 的 busy_ms 会拖慢服务) */
 #define RD_WAIT_POLLS 300u      /* 单槽读出 300ms 上限 (Lr 实测 <37.7us, 极宽) */
 #define DUP_WAIT_POLLS 120u     /* 负向 B 重读槽 120ms 观察窗 (预期无数据) */
 #define SKIP_FRAME 100u         /* 负向 A 跳过 帧#100 的槽 */
@@ -108,6 +118,16 @@ static void busy_ms(unsigned ms)
 #define DMA_DMASR   (*(volatile unsigned *)(DMA_BASE + 0x04u))
 #define DMA_SA      (*(volatile unsigned *)(DMA_BASE + 0x18u))
 #define DMA_LENGTH  (*(volatile unsigned *)(DMA_BASE + 0x28u))
+/* ---- B3-2: AXI DMA S2MM 通道寄存器 (PG021: 0x30/0x34/0x48/0x58) ---- */
+#define S2MM_DMACR   (*(volatile unsigned *)(DMA_BASE + 0x30u))
+#define S2MM_DMASR   (*(volatile unsigned *)(DMA_BASE + 0x34u))
+#define S2MM_SA      (*(volatile unsigned *)(DMA_BASE + 0x48u))
+#define S2MM_LENGTH  (*(volatile unsigned *)(DMA_BASE + 0x58u))
+#define DMA_CR_RESET 0x00000004u
+#define DMA_CR_RS    0x00000001u
+#define DMA_CR_IOCEN 0x00001000u   /* DMACR.IOC_IrqEn */
+#define DMA_SR_HALT  0x00000001u
+#define DMA_SR_IOC   0x00001000u   /* DMASR.IOC_Irq (W1C) */
 
 static void uputh(unsigned v)          /* 8 位十六进制 */
 {
@@ -255,6 +275,96 @@ static int serve_dma_once(void)
 }
 
 /* ---------------------------------------------------------------------------
+ * B3-2 (2026-10-17): DMA 写引擎 (S2MM) 的逐帧服务原语
+ *
+ * 协议 (与 RTL axi4_master_bridge.v g_wr_dma 分支配对):
+ *   桥出请求 {pending,toggle,slot,len} (+0x40) -> 软核编程 S2MM:
+ *     SA = SLOT_BASE(0x00100000) + slot*4096; LENGTH = len (写即启动)
+ *     清 IOC -> 编程 -> 翻 GO (+0x48) -> 桥放流 -> S2MM 完成中断 -> 桥提交槽
+ *   软核不需要等完成: 桥以 s2mm_introut 退休并清 pending; 软核只按
+ *   pending/toggle 变化认新请求。
+ * fault 恢复 (RTL WD_HALT): DMACR reset -> RS+IOC -> 清 IOC -> 翻 ACK(+0x4C)
+ * ------------------------------------------------------------------------ */
+static unsigned g_wr_last_toggle;        /* 最近已 arm 请求的 toggle 值 */
+
+static void s2mm_channel_init(void)
+{
+    unsigned sr, guard;
+    S2MM_DMACR = DMA_CR_RESET;
+    guard = 0;
+    while ((((sr = dread(&S2MM_DMASR))) & DMA_SR_HALT) == 0u)
+        if (++guard > 4000000u) break;
+    S2MM_DMACR = DMA_CR_IOCEN | DMA_CR_RS;      /* RS=1 + IOC 中断使能 */
+    guard = 0;
+    while ((((sr = dread(&S2MM_DMASR))) & DMA_SR_HALT) != 0u)
+        if (++guard > 4000000u) break;
+    S2MM_DMASR = DMA_SR_IOC;                    /* W1C: 清陈旧完成中断 */
+    g_wr_last_toggle = 0xFFFFFFFFu;             /* 首请求必 arm */
+}
+
+/* 非阻塞: 有新写请求才编程 (返回 1 = 本调用 arm 了一帧) */
+static int serve_write_once(void)
+{
+    unsigned v_req, v_dbg, slot, len, tog;
+
+    v_dbg = dread(&R_WRDBG);
+    if (v_dbg & 0x80000000u) {
+        /* ★fault 粘滞 (桥已停泊 WD_HALT 且已清 pending): 必须先恢复, 与 pending 无关;
+         * 恢复序列 = S2MM DMACR reset -> RS+IOC -> 清 IOC -> 翻 ACK (桥回 IDLE) */
+        uputs("[B2] WRFAULT recover\r\n");
+        s2mm_channel_init();
+        R_WRACK = 1u;
+        busy_ms(1);
+        return 1;
+    }
+
+    v_req = dread(&R_WRREQ);
+    if ((v_req & 0x80000000u) == 0u)
+        return 0;                               /* 无待服务写请求 */
+    tog = (v_req >> 24) & 1u;
+    if (tog == g_wr_last_toggle)
+        return 0;                               /* 同一请求已 arm, 不重复编程 */
+
+    slot = (v_req >> 16) & 0xffu;
+    len  = v_req & 0xffffu;
+    if (len == 0u || len > 1538u) {             /* 防御: 长度契约外不编程 */
+        uputs("[B2] WRBADLEN s="); uputd(slot);
+        uputs(" l=");              uputd(len);
+        uputs("\r\n");
+        R_WRACK = 1u;                           /* 让桥丢弃/恢复 */
+        return 0;
+    }
+    S2MM_DMASR = DMA_SR_IOC;                    /* 清上一帧完成中断 (GO 前必须为 0) */
+    S2MM_SA     = 0x00100000u + slot * 4096u;   /* 规则号 1: SA = SLOT_BASE + slot*4KB */
+    /* ★A4 残余窗口兜底 (审计建议): 写 LENGTH(=启动传输)/翻 GO 前二次确认请求仍有效;
+     * 若桥已因 WAITGO 超时丢弃该帧 (pending 落零或 toggle 已变) -> 不启动不翻 GO,
+     * 避免把旧帧的 LENGTH/GO 错配给下一帧。 */
+    {
+        unsigned v2 = dread(&R_WRREQ);
+        if (((v2 & 0x80000000u) == 0u) || (((v2 >> 24) & 1u) != tog)) {
+            uputs("[B2] WRABORT stale req\r\n");
+            return 0;
+        }
+    }
+    S2MM_LENGTH = len;                          /* 写 LENGTH = 启动传输 */
+    g_wr_last_toggle = tog;
+    R_WRGO = 1u;                                /* 翻 GO: 桥看到变化才放流 */
+    return 1;
+}
+
+/* 驻留服务统一入口: 读请求优先 (会占住出向帧), 否则服务写请求 */
+static void serve_any(void)
+{
+    if (g_dma_mode == 0u)
+        return;
+    if (dread((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u) {
+        serve_dma_once();
+        return;
+    }
+    serve_write_once();
+}
+
+/* ---------------------------------------------------------------------------
  * 一轮 J3 (主轮 M / 负向 A / 负向 B)。进入时模式已是 RND、基线已取好。
  * 返回 0 = 正常跑完; 1 = 等写超时; 2 = 读停摆。
  * ------------------------------------------------------------------------ */
@@ -270,7 +380,8 @@ static int run_round(char type, unsigned wr0, unsigned rd0)
     uputs("[B2] WRWAIT t=");
     uputc(type); uputs(" want+"); uputd(NSLOTS); uputs("\r\n");
     for (i = 0; i < WR_WAIT_POLLS; i++) {
-        wr = rd_reg(&R_WM_WR);
+        if (g_dma_mode) serve_any();     /* ★B3-2: 轮内每圈服务写请求 (否则 S2MM 写停摆) */
+        wr = dread(&R_WM_WR);
         if (d16(wr, wr0) >= NSLOTS)
             break;
     }
@@ -293,7 +404,7 @@ static int run_round(char type, unsigned wr0, unsigned rd0)
         issued++;
         for (wr = 0; wr < RD_WAIT_POLLS; wr++) {
             if (g_dma_service)
-                serve_dma_once();        /* ★B3-1c: RND 也走 DMA 描述符 */
+                serve_any();             /* ★B3-1c/★B3-2: 读请求优先, 顺带服务写请求 */
             rd = rd_reg(&R_WM_RD);
             if (d16(rd, rd0) == issued)
                 break;
@@ -410,7 +521,7 @@ int main(void)
          * 退役桥硬件读引擎后, 所有出向帧(数据帧 + 栈自发 ARP/ICMP/命令应答)
          * 的读回都靠它 —— 无请求时本调用只是一次寄存器读(~1ms), 无副作用。 */
         while (!urx_poll()) {
-            if (g_dma_mode) serve_dma_once();
+            if (g_dma_mode) serve_any();
         }
         c = urx_get();
         /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。
@@ -441,7 +552,18 @@ int main(void)
              * 桥 FSM 仍走硬件读引擎 (退役位流上该位无意义, 但绿位流上
              * 决定"栈自发帧由谁读出", 是复现退役条件的唯一开关)。 */
             R_ENGINE = g_dma_mode ? 1u : 0u;
-            if (g_dma_mode) R_MODE = MODE_SEQ;
+            if (g_dma_mode) {
+                R_MODE = MODE_SEQ;
+                /* ★B3-2: 切 DMA 时初始化 S2MM 写通道 + 对齐请求 toggle 基线
+                 * (有挂起写请求时把 last 置反, 让首圈服务立即 arm) */
+                s2mm_channel_init();
+                {
+                    unsigned v = dread(&R_WRREQ);
+                    g_wr_last_toggle = (v >> 24) & 1u;
+                    if (v & 0x80000000u)
+                        g_wr_last_toggle ^= 1u;
+                }
+            }
             uputs("[B2] DMAMODE now=");
             uputs(g_dma_mode ? "DMA\r\n" : "bridge\r\n");
         }
@@ -463,6 +585,22 @@ int main(void)
             for (i = 0; i < 3u; i++) { uputc(' '); uputh(dread((volatile unsigned *)(REGS_BASE + 0x38u))); }
             uputs("\r\n[B2] U emit:");
             for (i = 0; i < 3u; i++) { uputc(' '); uputh(dread((volatile unsigned *)(REGS_BASE + 0x3Cu))); }
+            /* ★B3-2: DMA 写引擎取证 (先读完再打印, 守坑 #44) */
+            uputs("\r\n[B2] U wreq:");
+            {
+                unsigned w1 = dread(&R_WRREQ), w2 = dread(&R_WRREQ), w3 = dread(&R_WRREQ);
+                uputc(' '); uputh(w3); uputc(' '); uputh(w2); uputc(' '); uputh(w1);
+            }
+            uputs("\r\n[B2] U wdbg:");
+            {
+                unsigned w1 = dread(&R_WRDBG), w2 = dread(&R_WRDBG), w3 = dread(&R_WRDBG);
+                uputc(' '); uputh(w3); uputc(' '); uputh(w2); uputc(' '); uputh(w1);
+            }
+            uputs("\r\n[B2] U s2sr:");
+            {
+                unsigned s1 = dread(&S2MM_DMASR), s2 = dread(&S2MM_DMASR);
+                uputc(' '); uputh(s2); uputc(' '); uputh(s1);
+            }
             uputs("\r\n[B2] U wmwr:");
             for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_WM_WR); }
             uputs("\r\n[B2] U ust:");
@@ -507,6 +645,7 @@ int main(void)
 
             rd0 = rd_reg(&R_WM_RD);
             for (guard = 0; guard < 8000u; guard++) {
+                serve_write_once();                     /* ★B3-2: E 轮 ping 帧写请求 */
                 rd = rd_reg(&R_WM_WR);
                 if (d16(rd, 0) >= 1u) break;        /* wait first frame in */
                 busy_ms(1);
@@ -514,6 +653,7 @@ int main(void)
             {
                 unsigned wr_last = 0, same = 0;
                 for (;;) {
+                    serve_write_once();                 /* ★B3-2: 每圈服务写请求 */
                     v_req = rd_reg((volatile unsigned *)(REGS_BASE + 0x34u));
                     if (v_req & 0x02000000u) {      /* sticky=bit25 ({1,1,slot[8],len[16]} 共 26 位拼接) */
                         slot = (v_req >> 16) & 0xffu;
@@ -549,6 +689,7 @@ int main(void)
                             ;
                         served++;
                     } else {
+                        serve_write_once();                 /* ★B3-2: 无读请求时服务写请求 */
                         busy_ms(1);
                     }
                     rd = rd_reg(&R_WM_RD);

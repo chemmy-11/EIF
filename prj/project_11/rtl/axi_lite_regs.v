@@ -87,12 +87,19 @@ module axi_lite_regs (
     output reg         rd_req_pulse,     // single user_clk pulse
     output reg         cfg_wr_pulse,     // single user_clk strobe (owner flip)
     output reg  [15:0] lite_exec_cnt,    // lite commands executed (user dom)
-    output reg  [15:0] lite_rd_trig_cnt  // read triggers (= RD_SLOT writes)
+    output reg  [15:0] lite_rd_trig_cnt, // read triggers (= RD_SLOT writes)
+    // ---- B3-2 (2026-10-17): DMA 写引擎 (S2MM) 握手 ----
+    input  wire [31:0] dma_wr_req,       // {pending,6'b0,toggle,slot,len} (user 域镜像)
+    input  wire [31:0] dma_wr_dbg,       // {fault,7'b0,last_alloc_slot,last_commit_len}
+    output reg         cfg_wr_go,        // 软核 S2MM 编程完成后翻转 (桥见翻转才放流)
+    output reg         cfg_wr_ack        // 软核 fault 恢复确认翻转 (桥 WD_HALT 出口)
 );
 
     localparam [7:0] OP_SET_MODE   = 8'h01;   // same codes as cmd_channel
     localparam [7:0] OP_READ_SLOT  = 8'h02;
     localparam [7:0] OP_SET_ENGINE = 8'h03;   // B3-1b: 读引擎选择 0=桥 1=DMA
+    localparam [7:0] OP_SET_WRGO   = 8'h05;   // B3-2: +0x48 写, 翻转 cfg_wr_go (S2MM 已编程)
+    localparam [7:0] OP_SET_WRACK  = 8'h06;   // B3-2: +0x4C 写, 翻转 cfg_wr_ack (写引擎 fault 恢复)
 
     localparam [31:0] REG_ID = 32'h5031_4231;  // "P1B1"
 
@@ -198,6 +205,10 @@ module axi_lite_regs (
                         a_data <= {OP_READ_SLOT, wd_byte};
                     else if (aw_word == 6'h03)         // B3-1b: +0x0C SET_ENGINE
                         a_data <= {OP_SET_ENGINE, wd_byte};
+                    else if (aw_word == 6'h12)         // B3-2: +0x48 SET_WRGO (翻转)
+                        a_data <= {OP_SET_WRGO, wd_byte};
+                    else if (aw_word == 6'h13)         // B3-2: +0x4C SET_WRACK (翻转)
+                        a_data <= {OP_SET_WRACK, wd_byte};
                     else
                         a_data <= 16'd0;              // ignored offset, OKAY
                     a_req      <= 1'b1;
@@ -310,6 +321,8 @@ module axi_lite_regs (
             cfg_mode         <= 1'b0;                  // SEQ after reset
             cfg_rd_slot      <= 8'd0;
             cfg_rd_engine    <= 1'b0;                  // B3-1b: 桥硬件读
+            cfg_wr_go        <= 1'b0;                  // B3-2: DMA 写 GO 翻转位
+            cfg_wr_ack       <= 1'b0;                  // B3-2: DMA 写 fault 恢复 ACK 翻转位
             lite_engine_cnt  <= 16'd0;
             rd_req_pulse     <= 1'b0;
             cfg_wr_pulse     <= 1'b0;
@@ -339,6 +352,16 @@ module axi_lite_regs (
                         lite_exec_cnt  <= lite_exec_cnt + 16'd1;
                         ust            <= U_CLOSE;
                     end
+                    else if (a_data[15:8] == OP_SET_WRGO) begin    // B3-2
+                        cfg_wr_go     <= ~cfg_wr_go;
+                        lite_exec_cnt <= lite_exec_cnt + 16'd1;
+                        ust           <= U_CLOSE;
+                    end
+                    else if (a_data[15:8] == OP_SET_WRACK) begin   // B3-2: fault 恢复 ACK
+                        cfg_wr_ack    <= ~cfg_wr_ack;
+                        lite_exec_cnt <= lite_exec_cnt + 16'd1;
+                        ust           <= U_CLOSE;
+                    end
                     else if (a_data[15:8] == OP_READ_SLOT) begin
                         cfg_mode         <= 1'b1;
                         cfg_rd_slot      <= a_data[7:0];
@@ -365,6 +388,16 @@ module axi_lite_regs (
                         lite_exec_cnt  <= lite_exec_cnt + 16'd1;
                         lite_engine_cnt<= lite_engine_cnt + 16'd1;
                         ust            <= U_CLOSE;
+                    end
+                    else if (a_data[15:8] == OP_SET_WRGO) begin    // B3-2: S2MM 已编程, 翻 GO
+                        cfg_wr_go     <= ~cfg_wr_go;
+                        lite_exec_cnt <= lite_exec_cnt + 16'd1;
+                        ust           <= U_CLOSE;
+                    end
+                    else if (a_data[15:8] == OP_SET_WRACK) begin   // B3-2: 写引擎 fault 恢复 ACK
+                        cfg_wr_ack    <= ~cfg_wr_ack;
+                        lite_exec_cnt <= lite_exec_cnt + 16'd1;
+                        ust           <= U_CLOSE;
                     end
                     else if (a_data[15:8] == OP_READ_SLOT) begin
                         cfg_mode      <= 1'b1;          // reads imply RND
@@ -445,6 +478,9 @@ module axi_lite_regs (
                         6'h0D: d_data <= dma_req;
                         6'h0E: d_data <= dma_arl;
                         6'h0F: d_data <= dbg_emit_q1;   // B3-1b: {len,slot,byte0}
+                        // B3-2: +0x40 WR_REQ / +0x44 WR_DBG (DMA 写引擎取证)
+                        6'h10: d_data <= dma_wr_req;
+                        6'h11: d_data <= dma_wr_dbg;
                         default: d_data <= 32'd0;
                     endcase
                     d_req <= 1'b1;                      // data held stable

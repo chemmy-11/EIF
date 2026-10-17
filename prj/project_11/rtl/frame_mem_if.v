@@ -77,6 +77,21 @@ module frame_mem_if #(
     output wire         dma_s_tready,
     output wire [31:0]  ro_dma_req,      // user 域 26 位拼接: sticky[25] engine[24] slot[23:16] len[15:0]
 
+    // ---- B3-2 (2026-10-17): DMA 写引擎 (S2MM) ----
+    // 仅 HAS_DMA=1 (桥①) 有 shim 侧语义; HAS_DMA=0 (桥②) 全部常量 0/输入忽略。
+    input  wire         dma_wr_go,          // user 域: 软核 GO 翻转 (lite_regs)
+    input  wire         dma_wr_ack,         // user 域: 软核 fault 恢复 ACK 翻转 (lite_regs)
+    input  wire         s2mm_introut,       // 100M 域: S2MM 完成中断 (mb_ctrl BD 直出)
+    output wire [511:0] dma_wr_tdata,       // -> axi_dma S_AXIS_S2MM (ui_clk 域)
+    output wire [63:0]  dma_wr_tkeep,
+    output wire         dma_wr_tlast,
+    output wire         dma_wr_tvalid,
+    input  wire         dma_wr_tready,
+    output wire [31:0]  ro_dma_wr_req,      // user 域 {pending[31],6'b0,toggle[24],slot[23:16],len[15:0]}
+    output wire [31:0]  ro_dma_wr_dbg,      // user 域 {fault[31],7'b0,last_alloc_slot[23:16],last_commit_len[15:0]}
+    output wire [15:0]  ro_stat_wr_timeout, // ui 域: 写请求/完成中断超时计数
+    output wire [2:0]   ro_dbg_wr_state,    // ui 域: 0=IDLE 1=WAITGO 2=STREAM 3=PUSH 4=WAITDONE 5=DRAIN
+
     // ================= DDR side (ui_clk domain) =================
     input  wire         ui_clk,
     input  wire         ui_rst_n,
@@ -418,6 +433,94 @@ module frame_mem_if #(
     assign ro_u_rd_frame = u_rd_frame_cnt;
 
     //=========================================================================
+    // 4b. B3-2: DMA 写引擎 (S2MM) 握手镜像 (HAS_DMA=1 才生成逻辑; HAS_DMA=0 钉 0)
+    //     请求/GO/introut 协议见 axi4_master_bridge.v 的 g_wr_dma 分支。
+    //=========================================================================
+    wire        dma_wr_req_toggle_i, dma_wr_req_pending_i;
+    wire [7:0]  dma_wr_req_slot_i;
+    wire [15:0] dma_wr_req_len_i;
+    wire [511:0] dma_wr_tdata_i;
+    wire [63:0]  dma_wr_tkeep_i;
+    wire        dma_wr_tlast_i, dma_wr_tvalid_i;
+    wire [15:0] stat_wr_timeout_i;
+    wire        dbg_wr_fault_i;
+    wire [7:0]  dbg_wr_last_slot_i;
+    wire [15:0] dbg_wr_last_len_i;
+    wire [2:0]  dbg_wr_state_i;
+    wire        dma_wr_go_ui;
+    wire        dma_wr_ack_ui;
+    wire        s2mm_introut_ui;
+
+    generate if (HAS_DMA) begin : gen_wr_dma_obs
+        // user -> ui: GO 翻转 2FF (准静态配置事件)
+        reg go_s1, go_ui;
+        always @(posedge ui_clk or negedge ui_rst_n) begin
+            if (!ui_rst_n) begin go_s1 <= 1'b0; go_ui <= 1'b0; end
+            else begin go_s1 <= dma_wr_go; go_ui <= go_s1; end
+        end
+        assign dma_wr_go_ui = go_ui;
+
+        // user -> ui: fault 恢复 ACK 翻转 2FF (fail-stop 出口, 见桥 WD_HALT)
+        reg ack_s1, ack_ui;
+        always @(posedge ui_clk or negedge ui_rst_n) begin
+            if (!ui_rst_n) begin ack_s1 <= 1'b0; ack_ui <= 1'b0; end
+            else begin ack_s1 <= dma_wr_ack; ack_ui <= ack_s1; end
+        end
+        assign dma_wr_ack_ui = ack_ui;
+
+        // 100M -> ui: S2MM 完成中断 2FF (电平事件, 软核每次 arm 前清 IOC)
+        reg intr_s1, intr_ui;
+        always @(posedge ui_clk or negedge ui_rst_n) begin
+            if (!ui_rst_n) begin intr_s1 <= 1'b0; intr_ui <= 1'b0; end
+            else begin intr_s1 <= s2mm_introut; intr_ui <= intr_s1; end
+        end
+        assign s2mm_introut_ui = intr_ui;
+
+        // ui -> user: 写请求 {pending,toggle,slot,len} 2FF (同源同拍, 元组不混)
+        reg        rq_p_s1, rq_p_s2, rq_t_s1, rq_t_s2;
+        reg [7:0]  rq_sl_s1, rq_sl_s2;
+        reg [15:0] rq_ln_s1, rq_ln_s2;
+        always @(posedge user_clk or negedge user_rst_n) begin
+            if (!user_rst_n) begin
+                rq_p_s1 <= 1'b0; rq_p_s2 <= 1'b0; rq_t_s1 <= 1'b0; rq_t_s2 <= 1'b0;
+                rq_sl_s1 <= 8'd0; rq_sl_s2 <= 8'd0; rq_ln_s1 <= 16'd0; rq_ln_s2 <= 16'd0;
+            end else begin
+                rq_p_s1 <= dma_wr_req_pending_i; rq_p_s2 <= rq_p_s1;
+                rq_t_s1 <= dma_wr_req_toggle_i;  rq_t_s2 <= rq_t_s1;
+                rq_sl_s1 <= dma_wr_req_slot_i;   rq_sl_s2 <= rq_sl_s1;
+                rq_ln_s1 <= dma_wr_req_len_i;    rq_ln_s2 <= rq_ln_s1;
+            end
+        end
+        assign ro_dma_wr_req = {rq_p_s2, 6'b0, rq_t_s2, rq_sl_s2, rq_ln_s2};
+
+        // ui -> user: 取证 {fault,last_alloc_slot,last_commit_len} 2FF
+        reg        fl_s1, fl_s2;
+        reg [7:0]  ls_s1, ls_s2;
+        reg [15:0] ll_s1, ll_s2;
+        always @(posedge user_clk or negedge user_rst_n) begin
+            if (!user_rst_n) begin
+                fl_s1 <= 1'b0; fl_s2 <= 1'b0; ls_s1 <= 8'd0; ls_s2 <= 8'd0;
+                ll_s1 <= 16'd0; ll_s2 <= 16'd0;
+            end else begin
+                fl_s1 <= dbg_wr_fault_i;     fl_s2 <= fl_s1;
+                ls_s1 <= dbg_wr_last_slot_i; ls_s2 <= ls_s1;
+                ll_s1 <= dbg_wr_last_len_i;  ll_s2 <= ll_s1;
+            end
+        end
+        assign ro_dma_wr_dbg = {fl_s2, 7'b0, ls_s2, ll_s2};
+        assign ro_stat_wr_timeout = stat_wr_timeout_i;
+        assign ro_dbg_wr_state    = dbg_wr_state_i;
+    end else begin : gen_no_wr_dma_obs
+        assign dma_wr_go_ui       = 1'b0;
+        assign dma_wr_ack_ui      = 1'b0;
+        assign s2mm_introut_ui    = 1'b0;
+        assign ro_dma_wr_req      = 32'd0;
+        assign ro_dma_wr_dbg      = 32'd0;
+        assign ro_stat_wr_timeout = 16'd0;
+        assign ro_dbg_wr_state    = 3'd0;
+    end endgenerate
+
+    //=========================================================================
     // 5. the AXI4 master + slot table (pure ui_clk)
     //=========================================================================
     // B3-1b: DMA 读请求镜像声明 (须在 u_bridge 实例前)
@@ -473,7 +576,31 @@ module frame_mem_if #(
         .dma_s_tlast(dma_s_tlast), .dma_s_tvalid(dma_s_tvalid),
         .dma_s_tready(dma_s_tready),
         .dma_req_new(dma_req_new_i), .dma_req_slot(dma_req_slot_i),
-        .dma_req_len(dma_req_len_i));
+        .dma_req_len(dma_req_len_i),
+        // B3-2: DMA 写引擎 (S2MM) 握手 (HAS_DMA=0 时桥内分支钉常量)
+        .dma_wr_go(dma_wr_go_ui),
+        .dma_wr_ack(dma_wr_ack_ui),
+        .s2mm_introut(s2mm_introut_ui),
+        .dma_wr_req_toggle(dma_wr_req_toggle_i),
+        .dma_wr_req_pending(dma_wr_req_pending_i),
+        .dma_wr_req_slot(dma_wr_req_slot_i),
+        .dma_wr_req_len(dma_wr_req_len_i),
+        .m_axis_s2mm_tdata(dma_wr_tdata_i),
+        .m_axis_s2mm_tkeep(dma_wr_tkeep_i),
+        .m_axis_s2mm_tlast(dma_wr_tlast_i),
+        .m_axis_s2mm_tvalid(dma_wr_tvalid_i),
+        .m_axis_s2mm_tready(dma_wr_tready),
+        .stat_wr_timeout(stat_wr_timeout_i),
+        .dbg_wr_fault(dbg_wr_fault_i),
+        .dbg_wr_last_slot(dbg_wr_last_slot_i),
+        .dbg_wr_last_len(dbg_wr_last_len_i),
+        .dbg_wr_state(dbg_wr_state_i));
+
+    // B3-2: S2MM 流引出口 (HAS_DMA=0 时桥内恒 0)
+    assign dma_wr_tdata  = dma_wr_tdata_i;
+    assign dma_wr_tkeep  = dma_wr_tkeep_i;
+    assign dma_wr_tlast  = dma_wr_tlast_i;
+    assign dma_wr_tvalid = dma_wr_tvalid_i;
 
     //=========================================================================
     // 2c. B3-1b: DMA 读请求 ui->user 镜像 (准静态事件, 2FF + sticky 展宽)

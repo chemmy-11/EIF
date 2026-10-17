@@ -68,6 +68,27 @@ module bridge_dma_tb;
     wire [7:0]  dma_req_slot;
     wire [15:0] dma_req_len;
 
+    // ---- R2（B3-2）补丁：写路径已换 S2MM，原用例靠 "AXI 写 + B 响应" 提交；
+    //      本 TB 只补一个最小 S2MM 行为模型（软核协议 + 流->ddr），用例语义不变：
+    //      "写 n 帧后 stat_wm 递增、可按槽读回"。读路径部分零改动。
+    wire        dma_wr_req_toggle, dma_wr_req_pending;
+    wire [7:0]  dma_wr_req_slot;
+    wire [15:0] dma_wr_req_len;
+    wire [511:0] dma_wr_tdata;
+    wire [63:0]  dma_wr_tkeep;
+    wire        dma_wr_tlast, dma_wr_tvalid;
+    wire [15:0] stat_wr_timeout;
+    wire        dbg_wr_fault;
+    wire [7:0]  dbg_wr_last_slot;
+    wire [15:0] dbg_wr_last_len;
+    wire [2:0]  dbg_wr_state;
+    reg         dma_wr_go = 1'b0, s2mm_introut = 1'b0, dma_wr_tready = 1'b0;
+    reg         wr_model_last_tg = 1'b0;
+    reg  [1:0]  wr_model_st = 2'd0;
+    reg  [2:0]  wr_model_cnt = 3'd0;
+    reg  [7:0]  wr_model_slot = 8'd0;
+    reg  [15:0] wr_model_off = 16'd0;
+
     // ---- 简化 FIFO: TB 用数组 + 指针模拟 async_fifo 行为 (同钟单域) ----
     // 写字节 FIFO
     reg [7:0] wf_mem [0:4095];
@@ -142,7 +163,17 @@ module bridge_dma_tb;
         .dma_s_tdata(dma_s_tdata), .dma_s_tkeep(dma_s_tkeep),
         .dma_s_tlast(dma_s_tlast), .dma_s_tvalid(dma_s_tvalid),
         .dma_s_tready(dma_s_tready),
-        .dma_req_new(dma_req_new), .dma_req_slot(dma_req_slot), .dma_req_len(dma_req_len)
+        .dma_req_new(dma_req_new), .dma_req_slot(dma_req_slot), .dma_req_len(dma_req_len),
+        // R2（B3-2）最小端口补齐 + 写引擎服务模型（tie 仅为接口；服务模型见下方）
+        .dma_wr_go(dma_wr_go), .dma_wr_ack(1'b0), .s2mm_introut(s2mm_introut),
+        .m_axis_s2mm_tdata(dma_wr_tdata), .m_axis_s2mm_tkeep(dma_wr_tkeep),
+        .m_axis_s2mm_tlast(dma_wr_tlast), .m_axis_s2mm_tvalid(dma_wr_tvalid),
+        .m_axis_s2mm_tready(dma_wr_tready),
+        .dma_wr_req_toggle(dma_wr_req_toggle), .dma_wr_req_pending(dma_wr_req_pending),
+        .dma_wr_req_slot(dma_wr_req_slot), .dma_wr_req_len(dma_wr_req_len),
+        .stat_wr_timeout(stat_wr_timeout), .dbg_wr_fault(dbg_wr_fault),
+        .dbg_wr_last_slot(dbg_wr_last_slot), .dbg_wr_last_len(dbg_wr_last_len),
+        .dbg_wr_state(dbg_wr_state)
     );
 
     // B 通道: bvalid 保持到 bready 握手完成 (AXI 合法行为)
@@ -164,6 +195,64 @@ module bridge_dma_tb;
                     ddr[((cur_awaddr + {w_beat, 6'd0}) & 18'h3FFFF) + k] <= m_axi_wdata[k*8 +: 8];
             if (m_axi_wlast) w_beat <= 0;
             else             w_beat <= w_beat + 1;
+        end
+    end
+
+    // ---- R2（B3-2）最小 S2MM 写引擎服务模型（行为级；只补写提交协议） ----
+    //   IDLE: 见到 {pending,toggle 变化} -> 清 IOC -> 3 拍后翻 GO
+    //   STREAM: 按 TKEEP 把 512b 流写进 ddr（与 read 侧 18bit 掩码口径一致）
+    //   DONE: 2 拍后拉 s2mm_introut 1（桥此时 commit），再落 0 回 IDLE
+    localparam [1:0] WM_IDLE = 2'd0, WM_GO = 2'd1, WM_STREAM = 2'd2, WM_DONE = 2'd3;
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            wr_model_st <= WM_IDLE; wr_model_cnt <= 3'd0; wr_model_last_tg <= 1'b0;
+            wr_model_slot <= 8'd0; wr_model_off <= 16'd0;
+            dma_wr_go <= 1'b0; s2mm_introut <= 1'b0; dma_wr_tready <= 1'b0;
+        end else begin
+            case (wr_model_st)
+            WM_IDLE: begin
+                if (dma_wr_req_pending && (dma_wr_req_toggle !== wr_model_last_tg)) begin
+                    wr_model_last_tg <= dma_wr_req_toggle;
+                    wr_model_slot    <= dma_wr_req_slot;
+                    wr_model_off     <= 16'd0;
+                    s2mm_introut     <= 1'b0;          // 清 IOC
+                    wr_model_cnt     <= 3'd0;
+                    wr_model_st      <= WM_GO;
+                end
+            end
+            WM_GO: begin
+                wr_model_cnt <= wr_model_cnt + 3'd1;
+                if (wr_model_cnt == 3'd3) begin
+                    dma_wr_go      <= ~dma_wr_go;      // 软核已编程 -> 翻 GO
+                    dma_wr_tready  <= 1'b1;
+                    wr_model_st    <= WM_STREAM;
+                end
+            end
+            WM_STREAM: begin
+                if (dma_wr_tvalid && dma_wr_tready) begin
+                    for (int k = 0; k < 64; k++) begin
+                        if (dma_wr_tkeep[k])
+                            ddr[(SLOT_BASE + wr_model_slot*4096 + wr_model_off + k) & 18'h3FFFF]
+                                <= dma_wr_tdata[k*8 +: 8];
+                    end
+                    wr_model_off <= wr_model_off + 16'd64;
+                    if (dma_wr_tlast) begin
+                        dma_wr_tready <= 1'b0;
+                        wr_model_cnt  <= 3'd0;
+                        wr_model_st   <= WM_DONE;
+                    end
+                end
+            end
+            WM_DONE: begin
+                wr_model_cnt <= wr_model_cnt + 3'd1;
+                if (wr_model_cnt == 3'd1) s2mm_introut <= 1'b1;   // 完成中断
+                if (wr_model_cnt == 3'd5) begin
+                    s2mm_introut <= 1'b0;
+                    wr_model_st  <= WM_IDLE;
+                end
+            end
+            default: wr_model_st <= WM_IDLE;
+            endcase
         end
     end
 

@@ -1,0 +1,54 @@
+R2 构建失败轮（ExtraPostPlacementOpt）最差路径节选 —— 源: rpt2_ExtraPostPlacementOpt.worst.rpt
+门限: WNS>=0 & WHS>=0 @ mmcm_clkout0 (ui_clk 300MHz, 3.333ns); 本轮最终 WNS=-0.175 WHS=+0.004
+结论: 30 条中最差 10 条 = 字节 FIFO 同步化写指针 (gray) -> 写引擎数据寄存器 CE/D;
+      其中 25/30 落在 u_mem/u_bridge/g_wr_dma.wd_data_r_reg[*]/CE (R2 新写引擎).
+
+[01] slack=-0.175ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[74]/CE
+     delay=3.238ns  (logic 1.405ns (43.391%)  route 1.833ns (56.609%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[02] slack=-0.175ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[76]/CE
+     delay=3.238ns  (logic 1.405ns (43.391%)  route 1.833ns (56.609%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[03] slack=-0.175ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[78]/CE
+     delay=3.238ns  (logic 1.405ns (43.391%)  route 1.833ns (56.609%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[04] slack=-0.175ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[79]/CE
+     delay=3.238ns  (logic 1.405ns (43.391%)  route 1.833ns (56.609%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[05] slack=-0.173ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[106]/CE
+     delay=3.233ns  (logic 1.333ns (41.231%)  route 1.900ns (58.769%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[06] slack=-0.173ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[176]/CE
+     delay=3.228ns  (logic 1.422ns (44.052%)  route 1.806ns (55.948%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[07] slack=-0.172ns
+     src=u_mem2/u_wr_bytes/rd_bin_reg[1]_rep__1_replica_3/C
+     dst=u_mem2/u_bridge/g_wr_hw.w_data_r_reg[465]/D
+     delay=3.228ns  (logic 0.751ns (23.265%)  route 2.477ns (76.735%)) ; logic=6  (LUT4=1 LUT6=2 MUXF7=1 MUXF8=1 RAMD64E=1)
+
+[08] slack=-0.172ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[102]/CE
+     delay=3.240ns  (logic 1.330ns (41.049%)  route 1.910ns (58.951%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[09] slack=-0.172ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[96]/CE
+     delay=3.240ns  (logic 1.330ns (41.049%)  route 1.910ns (58.951%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)
+
+[10] slack=-0.172ns
+     src=u_mem/u_wr_bytes/wr_gray_s2_reg[3]/C
+     dst=u_mem/u_bridge/g_wr_dma.wd_data_r_reg[97]/CE
+     delay=3.240ns  (logic 1.330ns (41.049%)  route 1.910ns (58.951%)) ; logic=8  (CARRY8=3 LUT2=1 LUT4=1 LUT6=3)

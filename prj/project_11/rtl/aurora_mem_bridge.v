@@ -280,6 +280,22 @@ wire [511:0] dma_tdata;    wire [63:0] dma_tkeep;
 wire         dma_tlast, dma_tvalid;
 wire         dma_tready_sink, dma_tready_shim;        // B3-1b: 引擎 mux 后见 dma_tready
 wire [31:0]  dma_q0, dma_q1, dma_q2;                  // dma_sink 捕获结果 -> Lite 回读
+// ★ B3-2 (2026-10-17): AXI DMA S2MM —— 桥① 写引擎换层
+//   M_AXI_S2MM -> 仲裁器 S00 (原桥① AXI 写口位置; 桥① 读已退役、写改走后此口全归 S2MM)
+//   S_AXIS_S2MM <- u_mem 写引擎 512b 流;  s2mm_introut = 写提交退休时刻
+wire [31:0]  s2mm_awaddr;  wire [7:0]  s2mm_awlen;  wire [2:0]  s2mm_awsize;
+wire [1:0]   s2mm_awburst; wire        s2mm_awvalid; wire       s2mm_awready;
+wire [511:0] s2mm_wdata;   wire [63:0] s2mm_wstrb;  wire       s2mm_wlast;
+wire         s2mm_wvalid;  wire        s2mm_wready;
+wire [1:0]   s2mm_bresp;   wire        s2mm_bvalid;  wire       s2mm_bready;
+wire [511:0] s2mm_tdata;   wire [63:0] s2mm_tkeep;  wire       s2mm_tlast;
+wire         s2mm_tvalid;  wire        s2mm_tready;
+wire         s2mm_introut_w;
+wire         dma_wr_go_w;
+wire         dma_wr_ack_w;
+wire [31:0]  mem_dma_wr_req, mem_dma_wr_dbg;
+wire [15:0]  mem_stat_wr_timeout;
+wire [2:0]   mem_dbg_wr_state;
 // B3-1b: DMA 读引擎 —— engine(user 域 lite 寄存器) -> ui 域 2FF; 请求镜像回读
 wire        lite_cfg_rd_engine;
 wire [31:0] mem_dma_req;
@@ -736,7 +752,32 @@ mb_ctrl u_mb_ctrl (
     .M_AXIS_MM2S_0_tkeep  (dma_tkeep   ),
     .M_AXIS_MM2S_0_tlast  (dma_tlast   ),
     .M_AXIS_MM2S_0_tready (dma_tready  ),
-    .M_AXIS_MM2S_0_tvalid (dma_tvalid  )
+    .M_AXIS_MM2S_0_tvalid (dma_tvalid  ),
+    // B3-2: AXI DMA S2MM (桥① 写引擎)
+    .M_AXI_S2MM_0_awaddr  (s2mm_awaddr ),
+    .M_AXI_S2MM_0_awlen   (s2mm_awlen  ),
+    .M_AXI_S2MM_0_awsize  (s2mm_awsize ),
+    .M_AXI_S2MM_0_awburst (s2mm_awburst),
+    .M_AXI_S2MM_0_awvalid (s2mm_awvalid),
+    .M_AXI_S2MM_0_awready (s2mm_awready),
+    .M_AXI_S2MM_0_wdata   (s2mm_wdata  ),
+    .M_AXI_S2MM_0_wstrb   (s2mm_wstrb  ),
+    .M_AXI_S2MM_0_wlast   (s2mm_wlast  ),
+    .M_AXI_S2MM_0_wvalid  (s2mm_wvalid ),
+    .M_AXI_S2MM_0_wready  (s2mm_wready ),
+    .M_AXI_S2MM_0_bresp   (s2mm_bresp  ),
+    .M_AXI_S2MM_0_bvalid  (s2mm_bvalid ),
+    .M_AXI_S2MM_0_bready  (s2mm_bready ),
+    .S_AXIS_S2MM_0_tdata  (s2mm_tdata  ),
+    .S_AXIS_S2MM_0_tkeep  (s2mm_tkeep  ),
+    .S_AXIS_S2MM_0_tlast  (s2mm_tlast  ),
+    .S_AXIS_S2MM_0_tvalid (s2mm_tvalid ),
+    .S_AXIS_S2MM_0_tready (s2mm_tready ),
+    .s2mm_introut         (s2mm_introut_w),
+    .dma_wr_req           (mem_dma_wr_req),
+    .dma_wr_dbg           (mem_dma_wr_dbg),
+    .cfg_wr_go            (dma_wr_go_w   ),
+    .cfg_wr_ack           (dma_wr_ack_w  )
 );
 
 // prj11 B1: ILA0(@user_clk) 观测 —— J_B1 ③ 寄存器回读一致性
@@ -792,29 +833,41 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .ro_dbg_wr_slot(mem_dbg_wr_slot), .ro_dbg_rd_slot(mem_dbg_rd_slot),
     .dbg_wr_cycles(mem_dbg_wr_cycles), .dbg_rd_cycles(mem_dbg_rd_cycles),
     .dbg_wr_beats(mem_dbg_wr_beats), .dbg_rd_beats(mem_dbg_rd_beats),
-    // AXI4 (ui_clk) → MIG
+    // AXI4 (ui_clk) —— ★B3-2: HAS_DMA=1 时桥① AXI 口退役 (S00 已改接 axi_dma S2MM),
+    //   输入钉常量/输出悬空 (顶层不再把它们接到仲裁器; 旧写 FSM 在该实例不例化)
     .m_axi_awaddr(m_awaddr), .m_axi_awlen(m_awlen), .m_axi_awsize(m_awsize),
-    .m_axi_awburst(m_awburst), .m_axi_awvalid(m_awvalid), .m_axi_awready(m_awready),
+    .m_axi_awburst(m_awburst), .m_axi_awvalid(m_awvalid), .m_axi_awready(1'b0),
     .m_axi_wdata(m_wdata), .m_axi_wstrb(m_wstrb), .m_axi_wlast(m_wlast),
-    .m_axi_wvalid(m_wvalid), .m_axi_wready(m_wready),
-    .m_axi_bresp(m_bresp), .m_axi_bvalid(m_bvalid), .m_axi_bready(m_bready),
+    .m_axi_wvalid(m_wvalid), .m_axi_wready(1'b0),
+    .m_axi_bresp(2'b00), .m_axi_bvalid(1'b0), .m_axi_bready(m_bready),
     .m_axi_araddr(m_araddr), .m_axi_arlen(m_arlen), .m_axi_arsize(m_arsize),
-    .m_axi_arburst(m_arburst), .m_axi_arvalid(m_arvalid), .m_axi_arready(m_arready),
-    .m_axi_rdata(m_rdata), .m_axi_rresp(m_rresp), .m_axi_rlast(m_rlast),
-    .m_axi_rvalid(m_rvalid), .m_axi_rready(m_rready),
+    .m_axi_arburst(m_arburst), .m_axi_arvalid(m_arvalid), .m_axi_arready(1'b0),
+    .m_axi_rdata(512'd0), .m_axi_rresp(2'b00), .m_axi_rlast(1'b0),
+    .m_axi_rvalid(1'b0), .m_axi_rready(m_rready),
     .m_axi_awid(m_awid), .m_axi_awlock(m_awlock),
     .m_axi_awcache(m_awcache), .m_axi_awprot(m_awprot),
-    .m_axi_awqos(m_awqos), .m_axi_bid(m_bid),
+    .m_axi_awqos(m_awqos), .m_axi_bid(4'd0),
     .m_axi_arid(m_arid), .m_axi_arlock(m_arlock),
     .m_axi_arcache(m_arcache), .m_axi_arprot(m_arprot),
-    .m_axi_arqos(m_arqos), .m_axi_rid(m_rid),
+    .m_axi_arqos(m_arqos), .m_axi_rid(4'd0),
     // B3-1b: DMA read engine pass-through (user-domain bit; fmi 2FFs to ui)
     .dma_engine (dma_engine),
     .dma_s_tdata(dma_tdata), .dma_s_tkeep(dma_tkeep),
     .dma_s_tlast(dma_tlast), .dma_s_tvalid(dma_tvalid),
     .dma_s_tready(dma_tready_shim),
     .ro_dma_req(mem_dma_req),
-    .ro_dbg_emit(mem_dbg_emit)
+    .ro_dbg_emit(mem_dbg_emit),
+    // B3-2: DMA 写引擎 (S2MM) —— HAS_DMA=1 分支 (frame_mem_if 端口口径)
+    .dma_wr_go(dma_wr_go_w),
+    .dma_wr_ack(dma_wr_ack_w),
+    .s2mm_introut(s2mm_introut_w),
+    .dma_wr_tdata(s2mm_tdata), .dma_wr_tkeep(s2mm_tkeep),
+    .dma_wr_tlast(s2mm_tlast), .dma_wr_tvalid(s2mm_tvalid),
+    .dma_wr_tready(s2mm_tready),
+    .ro_dma_wr_req(mem_dma_wr_req),
+    .ro_dma_wr_dbg(mem_dma_wr_dbg),
+    .ro_stat_wr_timeout(mem_stat_wr_timeout),
+    .ro_dbg_wr_state(mem_dbg_wr_state)
 );
 
 //*******************************************************************
@@ -958,50 +1011,67 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_mem
     .dma_s_tlast(1'b0), .dma_s_tvalid(1'b0),
     .dma_s_tready(),
     .ro_dma_req(),
-    .ro_dbg_emit()
+    .ro_dbg_emit(),
+    // B3-2: 桥② 无 DMA 写引擎 (HAS_DMA=0, 桥内新输出钉 0) —— 写/读仍为硬件 FSM
+    .dma_wr_go(1'b0),
+    .dma_wr_ack(1'b0),
+    .s2mm_introut(1'b0),
+    .dma_wr_tdata(),
+    .dma_wr_tkeep(),
+    .dma_wr_tlast(),
+    .dma_wr_tvalid(),
+    .dma_wr_tready(1'b0),
+    .ro_dma_wr_req(),
+    .ro_dma_wr_dbg(),
+    .ro_stat_wr_timeout(),
+    .ro_dbg_wr_state()
 );
 
-    // ---- 自研 AXI 仲裁器(2026-10-06): S00=桥① S01=桥② M=MIG, 事务级轮转 ----
+    // ---- 自研 AXI 仲裁器(2026-10-06): S00=桥①/★B3-2 改 S2MM S01=桥② M=MIG, 事务级轮转 ----
     //   (SmartConnect/AXI Interconnect 2023.1 均锁 IP Integrator, 实测独立生成产物为空壳)
     // B3-1: 2 主 -> 3 主（S02 预留 AXI DMA MM2S；MIG 只有一个从机口）
+    // B3-2: S00 由"桥① AXI 写口"改接"axi_dma M_AXI_S2MM"(写-only 主) —— 桥① AXI 口
+    //       在 HAS_DMA=1 下已整体退役(读 DMA-only / 写 AXI4-Stream)，故原位置直接复用。
     axi_arb_3to1 u_arb (
-        .s00_axi_awid(m_awid),
-        .s00_axi_awaddr(m_awaddr),
-        .s00_axi_awlen(m_awlen),
-        .s00_axi_awsize(m_awsize),
-        .s00_axi_awburst(m_awburst),
-        .s00_axi_awlock(m_awlock),
-        .s00_axi_awcache(m_awcache),
-        .s00_axi_awprot(m_awprot),
-        .s00_axi_awqos(m_awqos),
-        .s00_axi_awvalid(m_awvalid),
-        .s00_axi_awready(m_awready),
-        .s00_axi_wdata(m_wdata),
-        .s00_axi_wstrb(m_wstrb),
-        .s00_axi_wlast(m_wlast),
-        .s00_axi_wvalid(m_wvalid),
-        .s00_axi_wready(m_wready),
-        .s00_axi_bresp(m_bresp),
-        .s00_axi_bvalid(m_bvalid),
-        .s00_axi_bready(m_bready),
-        .s00_axi_bid(m_bid),
-        .s00_axi_arid(m_arid),
-        .s00_axi_araddr(m_araddr),
-        .s00_axi_arlen(m_arlen),
-        .s00_axi_arsize(m_arsize),
-        .s00_axi_arburst(m_arburst),
-        .s00_axi_arlock(m_arlock),
-        .s00_axi_arcache(m_arcache),
-        .s00_axi_arprot(m_arprot),
-        .s00_axi_arqos(m_arqos),
-        .s00_axi_arvalid(m_arvalid),
-        .s00_axi_arready(m_arready),
-        .s00_axi_rdata(m_rdata),
-        .s00_axi_rresp(m_rresp),
-        .s00_axi_rlast(m_rlast),
-        .s00_axi_rvalid(m_rvalid),
-        .s00_axi_rready(m_rready),
-        .s00_axi_rid(m_rid),
+        // ---- S00: axi_dma S2MM (B3-2: 桥① 写引擎; 仅 AW/W/B) ----
+        .s00_axi_awid(4'h0),
+        .s00_axi_awaddr(s2mm_awaddr),
+        .s00_axi_awlen(s2mm_awlen),
+        .s00_axi_awsize(s2mm_awsize),
+        .s00_axi_awburst(s2mm_awburst),
+        .s00_axi_awlock(1'b0),
+        .s00_axi_awcache(4'h0),
+        .s00_axi_awprot(3'h0),
+        .s00_axi_awqos(4'h0),
+        .s00_axi_awvalid(s2mm_awvalid),
+        .s00_axi_awready(s2mm_awready),
+        .s00_axi_wdata(s2mm_wdata),
+        .s00_axi_wstrb(s2mm_wstrb),
+        .s00_axi_wlast(s2mm_wlast),
+        .s00_axi_wvalid(s2mm_wvalid),
+        .s00_axi_wready(s2mm_wready),
+        .s00_axi_bresp(s2mm_bresp),
+        .s00_axi_bvalid(s2mm_bvalid),
+        .s00_axi_bready(s2mm_bready),
+        .s00_axi_bid(),
+        // S00 无读通道 (S2MM 只有写): AR/R 全部钉无效
+        .s00_axi_arid(4'h0),
+        .s00_axi_araddr(32'h0),
+        .s00_axi_arlen(8'h0),
+        .s00_axi_arsize(3'h0),
+        .s00_axi_arburst(2'h0),
+        .s00_axi_arlock(1'b0),
+        .s00_axi_arcache(4'h0),
+        .s00_axi_arprot(3'h0),
+        .s00_axi_arqos(4'h0),
+        .s00_axi_arvalid(1'b0),
+        .s00_axi_arready(),
+        .s00_axi_rdata(),
+        .s00_axi_rresp(),
+        .s00_axi_rlast(),
+        .s00_axi_rvalid(),
+        .s00_axi_rready(1'b1),
+        .s00_axi_rid(),
         .s01_axi_awid(m2_axi_awid),
         .s01_axi_awaddr(m2_axi_awaddr),
         .s01_axi_awlen(m2_axi_awlen),
@@ -1378,6 +1448,14 @@ end
 (* mark_debug = "true" *) wire [8:0]  dbg_mem2_ost    = mem2_outstanding;
 (* mark_debug = "true" *) wire [15:0] dbg_mem2_u_wr   = mem2_u_wr_frame;
 (* mark_debug = "true" *) wire [15:0] dbg_mem2_u_rd   = mem2_u_rd_frame;
+// ★ B3-2 (2026-10-17): DMA 写引擎 (S2MM) 观测集（严格按域分挂 ILA）
+//   ui_clk 域 (挂 ILA3): 状态/流握手;   user_clk 域 (挂 ILA0): 请求 pending / fault
+//   完整 {slot,len} / timeout 经 Lite 'U' 回读, 不上 ILA (保 300MHz 时序)
+(* mark_debug = "true" *) wire [2:0]  dbg_s2mm_state   = mem_dbg_wr_state;
+(* mark_debug = "true" *) wire        dbg_s2mm_tvalid  = s2mm_tvalid;
+(* mark_debug = "true" *) wire        dbg_s2mm_tready  = s2mm_tready;
+(* mark_debug = "true" *) wire        dbg_s2mm_reqpend = mem_dma_wr_req[31];
+(* mark_debug = "true" *) wire        dbg_wr_fault     = mem_dma_wr_dbg[31];
 
 // 未观测信号聚合（防剪枝告警; 数值不使用）
 wire unused = ^{mem_rd_slot_o, mem_rd_len_o, mem_rd_frame_done, mem_wr_hold,
