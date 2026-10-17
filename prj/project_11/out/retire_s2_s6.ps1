@@ -1,4 +1,4 @@
-# retire_s2_s6.ps1 — 新退役位流上板判据 S1–S6 一键执行并把原始输出落盘
+﻿# retire_s2_s6.ps1 — 新退役位流上板判据 S1–S6 一键执行并把原始输出落盘
 # 用法: pwsh -File retire_s2_s6.ps1 -Bit <绝对路径.bit> -Elf <绝对路径.elf> [-Port COM5] [-SkipBurn]
 param(
     [Parameter(Mandatory = $true)][string]$Bit,
