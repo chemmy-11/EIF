@@ -143,13 +143,22 @@ static unsigned d16(unsigned now, unsigned base)
     return (unsigned)(unsigned short)(now - base);
 }
 
+/* ★N4 根因修复 (2026-10-17 板证): M01 读"一笔滞后"且**同址连读第二笔即正确**
+ * ('U' 探针软核侧实测: R_ID 首读 0x17 → 之后 6 读恒 0x50314231; R_DMAREQ 首读
+ *  恒为上一笔的值)。原来的 urx_poll/urx_get 是单次读 —— 绿色 ELF 的空闲环里
+ *  只有 UART_ST 连读, 第二圈就自我纠正所以能用; 驻留服务把 rd_reg(0x34) 插进
+ *  空闲环后, UART_ST 的单读**每一笔都陈旧** ⇒ 软核永远收不到字节 ⇒ 串口静默
+ *  (与位流无关)。修法 = RX 方向一律同址双读取第二笔 (dread)。 */
 static int urx_poll(void)          /* 0 = 无字节 */
 {
-    return (UART_ST & UART_ST_RX_VALID) ? 1 : 0;
+    return (dread(&UART_ST) & UART_ST_RX_VALID) ? 1 : 0;
 }
 
 static char urx_get(void)
 {
+    /* ★注意: UART_RX 是"读即弹出"的副作用地址, **不能**同址双读(会吞掉两个字节,
+     * 且第二笔返回下一个字节 ⇒ 命令全乱)。滞后只威胁"紧跟写之后的第一笔读",
+     * 而本调用紧跟在 urx_poll() 的两次 ST 读之后(前一事务是读, 非写) ⇒ 单读正确。 */
     return (char)(UART_RX & 0xffu);   /* 读 RX 即清 FIFO */
 }
 
@@ -203,7 +212,8 @@ static char wait_go(char type)
  *   且请求电平落零(退休) 再返回。'E' 命令的服务循环与 'N'(RND+DMA) 共用本件。
  * ------------------------------------------------------------------------ */
 static unsigned g_dma_service;          /* 1 = 本轮每笔读请求由软核服务 */
-static unsigned g_dma_mode = 1u;        /* ★B3-1c: 1 = 软核【驻留服务】DMA 读请求
+static unsigned g_dma_mode = 0u;        /* 默认 0 = 不驻留服务 (串口可测); 'd' 切 1
+                                         * ★B3-1c: 1 = 软核【驻留服务】DMA 读请求
                                          * (退役桥硬件读引擎后必需: 栈自发帧也在环路上);
                                          * 0 = 交给桥硬件读引擎 (v5-RTL 旧配对)。
                                          * 'd' 命令可现场切换, 便于两者对照。 */
@@ -212,7 +222,7 @@ static int serve_dma_once(void)
 {
     unsigned v_req, slot, len, sa, sr, guard;
 
-    v_req = rd_reg((volatile unsigned *)(REGS_BASE + 0x34u));
+    v_req = dread((volatile unsigned *)(REGS_BASE + 0x34u));
     if ((v_req & 0x02000000u) == 0u)
         return 0;                       /* 无待服务请求 */
 
@@ -235,9 +245,11 @@ static int serve_dma_once(void)
     do { sr = dread(&DMA_DMASR); }
     while (((sr & 0x2u) == 0u) && (++guard < 80000000u));
 
-    guard = 0;                          /* 等退休(请求电平落零) 再取下一笔 */
-    while ((rd_reg((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u)
-           && (++guard < 100000u))
+    guard = 0;                          /* 等退休(请求电平落零) 再取下一笔。
+                                         * 用 dread 而非 rd_reg: rd_reg 内含 busy_ms(1)
+                                         * (实测 0.15ms) ⇒ 10万轮 = 15s 卡住空闲环。 */
+    while ((dread((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u)
+           && (++guard < 200000u))
         ;
     return 1;
 }
@@ -391,7 +403,7 @@ int main(void)
         for (;;) { }
     }
 
-    uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L/D/E)\r\n");
+    uputs("[B2-SOFT] WAITCMD (M/A/B/S/I/L/D/E/U)\r\n");
     for (;;) {
         char c, d;
         /* ★B3-1c 驻留服务: 空闲期即刻服务桥 FSM 的 {slot,len} 读请求。
@@ -428,7 +440,24 @@ int main(void)
             uputs("[B2] DMAMODE now=");
             uputs(g_dma_mode ? "DMA\r\n" : "bridge\r\n");
         }
-        else if (c == 'S') {
+        else if (c == 'U') {
+            /* ★N3 探针: 从软核自身视角取 M01/UART 读的滞后形态 (坑 #39 机制取证)。
+             * 每行都是"连续背靠背读同一地址", 用软核自己的总线时序, 不经 JTAG。 */
+            unsigned i;
+            uputs("[B2] U id:");
+            for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_ID); }
+            uputs("\r\n[B2] U req:");
+            for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_DMAREQ); }
+            uputs("\r\n[B2] U reqX:");
+            for (i = 0; i < 3u; i++) { uputc(' '); uputh(rd_reg((volatile unsigned *)(REGS_BASE + 0x34u))); }
+            uputs("\r\n[B2] U wmwr:");
+            for (i = 0; i < 6u; i++) { uputc(' '); uputh(R_WM_WR); }
+            uputs("\r\n[B2] U ust:");
+            for (i = 0; i < 6u; i++) { uputc(' '); uputh(UART_ST); }
+            uputs("\r\n[B2] U mode=");
+            uputd(g_dma_mode);
+            uputs("\r\n");
+        } else if (c == 'S') {
             R_MODE = MODE_SEQ;
             uputs("[B2] SEQRESTORED (cmd S)\r\n");
         } else if (c == 'L') {
