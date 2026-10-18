@@ -122,7 +122,7 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-18\tools\
 
 - **本轮结果：R2 板验未收口**（板已断电）。已收口：`axi_lite_regs` AXI 协议违例修复（RVALID/BVALID 多拍→重复 R/B 握手，[L2] 单元仿真+修复；读滞后同源）；AXI 楔死可用"S2MM `R_WRGO` 后 1ms 间隔"规避（根治未收口）；round2f 位流 `8A8FE378` 过时序门限并上板，**S0/S1/S3 PASS**、写/读数据面计数推进（ILA `wm/wr_frm/rd_frm=5/5/5`、`WR_DBG.last_commit_len=86`）。
 - **主阻塞：TX 无帧**（`r2_tx_probe`=NO_FRAME）；**R1 绿位流 `c8cd3a32` 同板同线对照 'd' 后 ping 4/4** ⇒ 环境正常、问题在 R2 数据面（写流首拍/前导/TKEEP/读出链待 ILA5 取证）。
-- **构建**：round3（lite fix2 `d5d16d46` + `u_ila_5@ui` 写流探针 + ILA0 101b）综合 0 err/0 CW，place/route 最好 **WNS=-0.002 / WHS=+0.004（差 0.002ns）⇒ NO_BITSTREAM**；下轮先降 ILA 深度重掷。
+- **构建（10-19 00:36 更新）**：**round3b 位流 PASS** —— lite fix2 `d5d16d46` + `u_ila_5@ui` 写流探针（64/8/1/1/1，深 1024）+ ILA0 101b（ILA3 深降 1024）；`ExtraTimingOpt` 首掷 **WNS/WHS +0.004**；bit **`02F7153A`** / ltx `0B2CC2F5`（3 核）/ xsa `95E1D156` / 诊断 ELF `16D06BD3`；归档 `out/archive/b31b_r2_2026-10-19_round3b/`。**板已断电收尾**，待上电按 BUILD_STATUS §4 跑 'd'→'W'→ping→'W'→ILA5 首拍。
 - **新对话入口**：`操作文档/阶段三_prj11_R2板验续作交接单_2026-10-18.md`；证据：记录 §十二–§十六、`prj/project_11/out/archive/`、`R2_tools_README.md`。
 
 ### 历史状态（≤2026-10-17，仅供追溯；最新以本节上方与 AGENTS.md §十 为准）
@@ -216,4 +216,4 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-18\tools\
 - **round2c 位流** `28921C6B` 过门限（+0.004）并上板：S0/S1/S3 PASS；随后发现 **lite_regs AXI 协议违例**（RVALID/BVALID 多拍→重复 R/B 握手）与固件读滞后，独立审计用单元仿真定位并给修复；写引擎 WAITGO 首拍缺陷由审计完整 TB 拦截（fix2 `c92c20c7`）。
 - **round2f 位流 `8A8FE378` 过门限（+0.004）**：AXI 楔死用"GO 后 1ms 间隔"规避；写/读数据面计数推进（ILA `wm/wr_frm/rd_frm=5/5/5`、`WR_DBG.last_commit_len=86`），但 **PC 仍无帧**（`r2_tx_probe`=NO_FRAME；R1 绿位流对照 'd' 后 ping **4/4** ⇒ 环境正常，问题在 R2 数据面）；固件 `'F'` 取证因 `dma_sink.s_tvalid` tie 0 不可用。
 - **round3**：合入 lite fix2 `d5d16d46` + top 探针 alias `6150212e` + `u_ila_5@ui` 写流探针（64/8/1/1/1）+ ILA0 写入口 9b（92→101）；综合 0 err/0 CW；place/route 最好 **WNS=-0.002 / WHS=+0.004**（差 0.002ns）⇒ **NO_BITSTREAM 未收口**；用户 22:3x 要求断电收尾，本轮未上板。
-- **下一步**：① 构建：ILA5 深 1024→512 / ILA3 2048→1024 后重掷（差 0.002ns）；② 板验：烧 round2f `8A8FE378` 或 round3b 位流 → `tools/r2_ila5_capture.tcl` 首拍触发抓 S2MM 写流（期望 beat0 `0xD555555555555555`、beat1 tkeep 低 22 lane/tlast=1）→ 对照 ILA0 `dbg_pfwd_data` 判层；③ 修数据面 → S0–S11 全序列。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十二–§十六。
+- **下一步**：① 上电烧 **round3b `02F7153A`** + 诊断 ELF `16D06BD3`；② `'U'`/`'d'` → `'W'`（期望 s2sr=0/s2len=0）→ ping 1 → `'W'`（关键判据：**s2len=86、s2sr=0x1002**，无 int/slv/dec 错误）→ 无错则 ILA5 首拍触发抓 S2MM 写流（期望 beat0 `0xD555555555555555`、beat1 tkeep `0x003F_FFFF`/tlast=1）；③ 判读写侧/读出链（官方 IP 仿真基准见 `out/ip_sim_r2/REPORT.md`）→ 修数据面 → S0–S11 + 四档/10MB/双桥对账。详见记录 §十二–§十七、`out/archive/b31b_r2_2026-10-19_round3b/BUILD_STATUS.md`。
