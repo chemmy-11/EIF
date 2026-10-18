@@ -99,6 +99,9 @@ foreach n [bus_nets dbg_mem2_u_wr  16] { lappend nets0 $n }
 foreach n [bus_nets dbg_mem2_u_rd  16] { lappend nets0 $n }
 lappend nets0 [one_net dbg_s2mm_reqpend]
 lappend nets0 [one_net dbg_wr_fault]
+# ★round3: 写入口字节 (泵A→桥写) 9b: 判定"上游数据源/写入口"层
+foreach n [bus_nets dbg_pfwd_data 8] { lappend nets0 $n }
+lappend nets0 [one_net dbg_pfwd_en]
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
@@ -166,6 +169,39 @@ lappend nets3 [one_net dbg_s2mm_tvalid]
 lappend nets3 [one_net dbg_s2mm_tready]
 set_property port_width [llength $nets3] [get_debug_ports u_ila_3/probe0]
 connect_debug_port u_ila_3/probe0 $nets3
+
+# ============ ILA5 @ ui_clk —— round3: S2MM 写流首拍取证 (75b, 拆分 5 probe) ============
+#   目的: 核对 S2MM 写入 DDR 的 AXI-Stream 首拍是否 = 55x7,D5 前导+SFD (厂商 INDET_BTT:
+#   WSTRB 来自 TKEEP, TLAST 终止) -> 判定"写引擎/上游数据源" vs "写参数/读出链"故障层。
+#   触发: tvalid & tready & !tlast (首拍)。深度 1024 省 300MHz 面积 (WNS 仅 +0.004)。
+create_debug_core u_ila_5 ila
+set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_5]
+set_property C_TRIGIN_EN false [get_debug_cores u_ila_5]
+set_property C_TRIGOUT_EN false [get_debug_cores u_ila_5]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_5]
+set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_5]
+set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_5]
+set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_5]
+set_property port_width 1 [get_debug_ports u_ila_5/clk]
+connect_debug_port u_ila_5/clk $uiclk_net
+
+set nets5a [bus_nets dbg_s2mm_tdata64 64]
+set nets5b [bus_nets dbg_s2mm_tkeep8 8]
+set_property port_width [llength $nets5a] [get_debug_ports u_ila_5/probe0]
+connect_debug_port u_ila_5/probe0 $nets5a
+create_debug_port u_ila_5 probe
+set_property port_width [llength $nets5b] [get_debug_ports u_ila_5/probe1]
+connect_debug_port u_ila_5/probe1 $nets5b
+create_debug_port u_ila_5 probe
+set_property port_width 1 [get_debug_ports u_ila_5/probe2]
+connect_debug_port u_ila_5/probe2 [list [one_net dbg_s2mm_tvalid]]
+create_debug_port u_ila_5 probe
+set_property port_width 1 [get_debug_ports u_ila_5/probe3]
+connect_debug_port u_ila_5/probe3 [list [one_net dbg_s2mm_tready]]
+create_debug_port u_ila_5 probe
+set_property port_width 1 [get_debug_ports u_ila_5/probe4]
+connect_debug_port u_ila_5/probe4 [list [one_net dbg_s2mm_tlast_w]]
+puts "ILA5_PROBES: tdata64=$([llength $nets5a]) tkeep8=$([llength $nets5b]) + tvalid/tready/tlast"
 
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design

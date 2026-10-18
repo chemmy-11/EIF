@@ -198,6 +198,17 @@ LR_IDLE:
   * beat1（86B 帧）：`tdata[63:0]` 低 22 字节 = 帧字节 64..85，`tkeep = 0x0000_003F_FFFF`、`tlast=1`；
   * 若 beat0 即 FF/0 ⇒ 写引擎/上游数据源问题；若 beat0 正确而 'F' 读槽为 FF ⇒ S2MM 写入参数/地址/MM2S 读出问题。
 
+### E.4 2026-10-18 21:0x 更新：`'F'` 判别在 R2 结构性不可用（已核实 RTL）+ 下一轮计划定稿
+* Lead 板测：`'F'` 输出 `q1[-64]=q1[0]=q1[+64]=00000000`（发 'd' 前后一致）。
+* **RTL 核实（[L2] 接线直证）**：`aurora_mem_bridge.v:1168-1173` 的 `dma_sink u_dma_sink` 实例 `.s_tvalid(1'b0)`（注释"★B3-1c: 硬件读引擎退役 + shim 独占流 → dma_sink 让路(冒烟路退休)"）⇒ dma_sink 永不捕获 ⇒ `dma_q1` 恒 0 ⇒ **`'F'` 在 R2 位流中不可能反映槽内容**（不是槽内容=0）。原 B3-1b v4 的 'F' 判据只对旧 bitstream 有效。
+* 教训/记录：以后用 'F' 做槽内容取证前先确认 `dma_sink.s_tvalid` 是否接真实流；R2 已结构性断开，只能靠写流/读出探针。
+* **下一轮定稿（Lead 计划，已采纳我的修正）**：
+  1) 新建 `u_ila_5 @ui_clk` 75b：`s2mm_tdata[63:0]+tkeep[7:0]+tvalid+tready+tlast`（拆 5 probe 以便触发首拍），深度 1024、C_INPUT_PIPE_STAGES=1；
+  2) lite_regs 合入 fix2（`R2_axi_lite_regs_fix2.v`；AW/W ready 单拍 + bvalid 未消费不接新写 + 写关闭前不接受 AR）；busy_ms 保留到板证；
+  3) ILA0 追加写入口 9b（`pump_fwd_data[7:0]+pump_fwd_en`，user 域；probe0 92→101）；
+  4) 探针集合变化 → ltx 期望 3 核 + ILA0=101 / ILA5=64/8/1/1/1；`R2_probe_map.md §5.4` 已有草案（待新 ltx 核对）。
+* 判读口径沿用 §E.2：beat0 tdata 期望 `0xD555555555555555`、tkeep 全1；beat1 tkeep 低 22 lane、tlast=1（INDET_BTT=1 → WSTRB 来自 TKEEP）。
+
 ### E.3 结论/下一步（供 Lead）
 1. **先跑 'F'**（零重建）判定槽内容；这决定 B 是"写侧内容错"还是"读侧参数错"。
 2. 若重建：按 E.2 方案 1 加 ui ILA（75b）或方案 3 加 ILA0 写入口 9b；probe map 需同步更新（届时我核对 ltx）。

@@ -8,6 +8,7 @@
 > **实物核对已完成（2026-10-18 位流 `28921C6B…` / ltx `4AC25546…`）：§5 全部通过（宽度/位序/核数量/裁剪项缺失），发现 2 处非阻塞事实：`dbg_mem_rden` 在 probe0 bit48 被 Vivado 重命名为 `dbg_mem_rden_1`（同 net 双挂，功能同源）；ltx 不携带 ILA 时钟网名（时钟关联 `[待上板 hw_manager 确认]`，信号域归属已核）。详见 §5.1。**
 > **round2d 更新（2026-10-18 17:0x）**：`axi_lite_regs.v` 已合入 AXI 握手修复（blob `421df59c…`→**`d133b508…`**，见 `R2_rtl_audit §15`），**探针集合/位宽/位偏移全部不变**（裁剪后列表不含 lite_* 探针）；其余三文件 blob 不变；新 bit/ltx 到位后按 §5/§5.1 同清单核对，并确认归档 RTL 四副本 hash 集合含 `d133b508…`。
 > **round2f 更新（2026-10-18 18:2x）**：bridge `4d1c50c7`（WAITGO 首拍并行执行缺陷 → 独立 TB 判定 FAIL，**未上板**）→ 采纳修正版 fix2，新 blob **`c92c20c7fb1884cb6238daf6e03dd69daa93f172`**；fmi/top/lite 均不变；**探针/ltx 期望仍全部不变**（92/9/152、仅 2 核、裁剪项不出现）；新 bit/ltx 到位后按 §5/§5.1/§5.3 核对，且 bit↔RTL 四副本必须为 round2f 集合（bridge `c92c20c7…`）。
+> **round3 草案（2026-10-18 21:0x，待新 ltx）**：Lead 计划新增 `u_ila_5 @ui_clk`（写流 AXIS，5 probe/75b）+ ILA0 追加写入口 9b（probe0 92→101）+ lite fix2 合入；**期望 ltx = 3 核（u_ila_0/3/5）、ILA0 probe0=101 / probe1=9、ILA3 probe0=152、ILA5=64+8+1+1+1**。详见 §5.4。
 
 ---
 
@@ -157,6 +158,55 @@
 * **ltx 期望不变**：ILA0 probe0=92、probe1=9、ILA3 probe0=152；仅 `u_ila_0`/`u_ila_3` 两核；`dbg_mem_bresp/wslot/rslot` 不出现；末 5bit 顺序不变（`state[2:0]`/`tvalid`/`tready`）。
 * 新增核对项：归档 `rtl_axi_lite_regs.v` 的 `git hash-object` 必须 = `d133b508f80480bb8fa70a7f4a7953a07d8cb230`（bit↔RTL 绑定，旧 bit 28921C6B 对应 421df59c，勿混）。
 * `u_ila_5 @eth_rxc` **暂不加**（等 Lead PC 侧零成本判别结果）；`dbg_mem_rden_1` 命名注记与时钟网 `[待上板]` 项维持。
+
+### 5.4 round3 探针草案（Lead 计划，**待新 ltx 实物核对**）
+
+> 来源：Lead 2026-10-18 21:0x 计划（写流字节探针重建一轮）。本节为**纸面草案**，所有"实际 net 名/宽度"以新 ltx 为准；核对通过后本表升级。
+> 变更：① 新增 `u_ila_5` @ui_clk（写流 AXIS 观测）；② ILA0 probe0 追加 9b 写入口字节（user 域）；③ lite_regs 合入 fix2（AXIS 握手加固，探针集合无影响）。
+
+#### 5.4.1 期望 ILA 核集合（round3）
+| ILA | 时钟 | 期望 probe | 说明 |
+|---|---|---|---|
+| `u_ila_0` | user_clk | probe0=**101**、probe1=9 | 追加写入口 9b；其余 92b 与 round2f 相同（位偏移 0..91 不变） |
+| `u_ila_3` | ui_clk | probe0=152 | 不变 |
+| `u_ila_5`（**新增**） | ui_clk | probe0=64、probe1=8、probe2=1、probe3=1、probe4=1 | 写流 AXIS：tdata 低 64b / tkeep 低 8b / tvalid / tready / tlast |
+| `u_ila_1` / `u_ila_2` | — | **仍应不存在** | 保持 round2b 裁剪 |
+
+#### 5.4.2 ILA0 probe0 追加段（bits 92..100）
+| 位偏移 | 期望 net（建议名） | 源信号（top，user 域） | 宽 | 语义 |
+|---|---|---|---|---|
+| 99:92 | `dbg_pfwd_data[7:0]` | `pump_fwd_data[7:0]`（泵A 出 → u_mem `.wr_data`，top:188/816） | 8 | 进桥写入口的帧字节（期望首字节序列 55 55 … D5 …；与 `dbg_mem_rd_data`/发射探针对照可分层 写入口/S2MM/读出） |
+| 100 | `dbg_pfwd_en` | `pump_fwd_en`（top:188/816） | 1 | 写入口字节有效 |
+> 若 Lead 直接用原始 net 名，则 ltx 里应为 `pump_fwd_data[i]` / `pump_fwd_en`；若建 `dbg_*` 别名则按别名。**偏移 92..100 为本草案预测，待 ltx 核对。**
+> 注：追加 9b 后 ILA0=101b（历史 376b 过，无预算问题）。
+
+#### 5.4.3 u_ila_5 @ui_clk 布局（75b，建议 5 个独立 probe 以便硬件触发）
+| probe | 宽 | 位偏移(该 probe 内) | 期望 net（建议名） | 源信号（top，ui 域） | 判据/期望值 |
+|---|---|---|---|---|---|
+| probe0 | 64 | 63:0 | `dbg_s2mm5_tdata[63:0]` | `s2mm_tdata[63:0]`（top:291；写引擎 `wd_data_r[63:0]`） | **beat0 = `0xD555555555555555`**（byte0=0x55…byte7=0xD5）；beat1 = 帧字节 64..85（低 22B） |
+| probe1 | 8 | 7:0 | `dbg_s2mm5_tkeep[7:0]` | `s2mm_tkeep[7:0]`（top:291） | beat0=`0xFF`；beat1=`0x3F`（低 6 bit=1，覆盖 22 lane 的低 8 位部分） |
+| probe2 | 1 | 0 | `dbg_s2mm_tvalid`（复用 ILA3 同名 net 可） | `s2mm_tvalid`（top:292） | 触发用；beat0/beat1=1 |
+| probe3 | 1 | 0 | `dbg_s2mm_tready`（复用） | `s2mm_tready`（top:292） | 触发用 |
+| probe4 | 1 | 0 | `dbg_s2mm_tlast`（**新增 alias**） | `s2mm_tlast`（top:291） | beat0=0、beat1=1 |
+> **为什么拆 5 个 probe**：单 75b 总线探针无法做"tvalid&&tready&&!tlast"的部分位触发；拆开后可用硬件 trigger（probe2==1、probe3==1、probe4==0）抓**首拍**，1024 深度窗口可覆盖 beat0+beat1+帧间隔。
+> C_DATA_DEPTH=1024、C_INPUT_PIPE_STAGES=1；@300MHz 为新增负载，若 WNS 紧可先降 IL A3/5 深度或只保留此 75b。
+> 采样 CS V 解析：ILA5 有 5 个 probe（64/8/1/1/1），hex 列；判读顺序按表。
+
+#### 5.4.4 `R2_EXPECT_PROBES` 更新草案（`out/r2_ilacap.tcl:117` 的默认值）
+```
+dbg_s2mm_reqpend,dbg_wr_fault,dbg_s2mm_state,dbg_s2mm_tvalid,dbg_s2mm_tready,dbg_pfwd_data,dbg_pfwd_en,dbg_s2mm5_tdata,dbg_s2mm5_tkeep,dbg_s2mm_tlast
+```
+* `R2_ILA_MATCH_EXTRA` 草案 = `dbg_s2mm5_tdata`（第三个 ILA pattern；r2_ilacap 已支持该 env，默认空）。
+* 期望宽度注释同步：`dbg_pfwd_data 8 / dbg_pfwd_en 1 / dbg_s2mm5_tdata 64 / dbg_s2mm5_tkeep 8 / dbg_s2mm_tlast 1`。
+* 存在性检查仍为 WARN-only，不改变 S 判据 PASS/FAIL。
+
+#### 5.4.5 新 ltx 到位后的 round3 核对清单（在 §5 基础上增补）
+- [ ] ILA 核 = **3 个**：`u_ila_0`、`u_ila_3`、`u_ila_5`（无 ILA1/2）。
+- [ ] ILA0 probe0=**101**：bits 0..91 与 round2f 完全相同；**92..99 为新 8b、100 为 1b**；net 名与上表一致（`dbg_pfwd_*` 或 `pump_fwd_*`）。
+- [ ] ILA0 probe1=9 不变；ILA3 probe0=152 不变。
+- [ ] ILA5 = 5 个 probe，宽度 **64/8/1/1/1**（总 75b），时钟 ui_clk；net 名与上表一致。
+- [ ] 若 ILA5 做成单 75b probe ⇒ 无法做首拍触发，需改为 5-probe 或改用 `-trigger_now` 连续抓（不推荐）。
+- [ ] lite_regs 新 blob（fix2 合入后）另行记录；本 ltx 核对不涉及 lite 内部信号（探针集合不含）。
 
 ---
 

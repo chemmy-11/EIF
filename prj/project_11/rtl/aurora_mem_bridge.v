@@ -1456,6 +1456,12 @@ end
 (* mark_debug = "true" *) wire        dbg_s2mm_tready  = s2mm_tready;
 (* mark_debug = "true" *) wire        dbg_s2mm_reqpend = mem_dma_wr_req[31];
 (* mark_debug = "true" *) wire        dbg_wr_fault     = mem_dma_wr_dbg[31];
+// ★2026-10-18 round3 板验取证探针: 写入口字节 (user 域) + S2MM 写流首拍 (ui 域)
+(* mark_debug = "true" *) wire [7:0]   dbg_pfwd_data    = pump_fwd_data;
+(* mark_debug = "true" *) wire         dbg_pfwd_en      = pump_fwd_en;
+(* mark_debug = "true" *) wire [63:0]  dbg_s2mm_tdata64 = s2mm_tdata[63:0];
+(* mark_debug = "true" *) wire [7:0]   dbg_s2mm_tkeep8  = s2mm_tkeep[7:0];
+(* mark_debug = "true" *) wire         dbg_s2mm_tlast_w = s2mm_tlast;
 
 // 未观测信号聚合（防剪枝告警; 数值不使用）
 wire unused = ^{mem_rd_slot_o, mem_rd_len_o, mem_rd_frame_done, mem_wr_hold,
