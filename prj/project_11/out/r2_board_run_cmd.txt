@@ -1,0 +1,29 @@
+R2 round2c 板验执行命令（钉身份；已 dry-run 验证 S0 PASS / 工具齐备 / GUARD 全 0）
+================================================================================
+
+前置（用户上电后）：
+- 板子 USB-JTAG + 网线 + 串口 COM5 保持连接；上电后先等 ~10s。
+- 本机探测：以太网 Adapter Up、`arp -a` 出现 192.168.1.10、`ping -n 1 192.168.1.10` 有回包（未烧录前 FPGA 空白可能无 ping，则直接烧）。
+- 工件 SHA256 必须先核（见 archive\b31b_r2_2026-10-18\SHA256.txt；bit 28921C6B…、ltx 4AC25546…、xsa 16A4F01F…、ELF 1BC8088D…）。
+
+烧写（先核 hash，再烧；绝对路径）：
+  xsct D:\FPGA\prj\project_11\out\jb31b_burn_pair.tcl D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\aurora_mem_bridge_r2_28921C6B.bit D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf
+  （期望输出 PAIR_BURNED；失败查 hw_server/USB-JTAG）
+
+判据 S0–S11（一条命令；日志落 out\evidence_2026-10-18\）：
+  powershell -NoProfile -ExecutionPolicy Bypass -File D:\FPGA\prj\project_11\out\r2_board.ps1 -Run `
+    -Bit D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\aurora_mem_bridge_r2_28921C6B.bit `
+    -Elf D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf `
+    -Xsa D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\mb_ctrl_r2.xsa `
+    -ExpectBitHash8 28921C6B -ExpectElfHash8 1BC8088D -ExpectXsaHash8 16A4F01F `
+    -ExpectRtlBlob f43267db82b84305cfeb519adcfa76f79443f6b3 `
+    -BuildLog D:\FPGA\prj\project_11\out\r2e_sweep2.log `
+    -IlaLtx D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\probes_r2_28921C6B.ltx `
+    -IlaCapture -Port COM5
+
+判读要点（round2b 裁剪口径）：
+- S3/S4：'d' 后 'U' 双确认 mode=1 & WR_REQ.bit24=1；`dbg_s2mm_state` 7=ARM 正常瞬态、6=HALT 才 fail-stop；`dbg_wr_fault` 全程应 0。
+- S4：单帧 86B 尾拍 22 lane 逐字节 + 记 S2MM DMASR 错误位 ⇒ TKEEP→WSTRB [L1]→[L3] 唯一途径。
+- S6/S10：使用 ILA0(92+9b)/ILA3(152b) 保留探针；`dbg_mem_bresp/wslot/rslot` 与 ILA1/2 已裁 ⇒ INFO/NOT_OBTAINED（判据未取得≠失败）。
+- S9：J3 带 `--dma`；`wr+255`/停摆不重试（先查 fault，必要时重烧）。
+- S11 收尾后回读 mode=1&bit24=1。
