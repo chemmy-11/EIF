@@ -616,6 +616,39 @@ int main(void)
             uputs("\r\n[B2] U mode=");
             uputd(g_dma_mode);
             uputs("\r\n");
+        } else if (c == 'W') {
+            /* ★2026-10-18 依据 AMD PG021 的 DMA 状态取证命令:
+             *  S2MM_DMASR(0x34) bit0=Halted bit1=Idle bit4=DMAIntErr bit5=DMASlvErr
+             *                   bit6=DMADecErr bit12=IOC_Irq bit14=Err_Irq
+             *  S2MM_LENGTH(0x58) 传输完成后 = 实际写入字节数 (PG021 S2MM_LENGTH 节)
+             *  直连模式下 Halted=1 时写 LENGTH "has no effect on DMA operations"
+             *  ⇒ 若 s2sr=0x1 且 s2len 不为实际帧长, 说明 S2MM 根本没跑/已停。
+             * 纪律: 先读完再打印 (坑 #44)。 */
+            unsigned s2cr, s2sr, s2len, m2sr, m2len, wreq, wdbg, dreq;
+            s2cr  = rd_reg(&S2MM_DMACR);
+            s2sr  = rd_reg(&S2MM_DMASR);
+            s2len = rd_reg(&S2MM_LENGTH);
+            m2sr  = rd_reg(&DMA_DMASR);
+            m2len = rd_reg(&DMA_LENGTH);
+            wreq  = rd_reg(&R_WRREQ);
+            wdbg  = rd_reg(&R_WRDBG);
+            dreq  = rd_reg((volatile unsigned *)(REGS_BASE + 0x34u));
+            uputs("[B2] W s2cr=");   uputh(s2cr);
+            uputs(" s2sr=");         uputh(s2sr);
+            uputs(" s2len=");        uputh(s2len);
+            uputs(" m2sr=");         uputh(m2sr);
+            uputs(" m2len=");        uputh(m2len);
+            uputs("\r\n[B2] W wreq="); uputh(wreq);
+            uputs(" wdbg=");         uputh(wdbg);
+            uputs(" dreq=");         uputh(dreq);
+            uputs("\r\n[B2] W dec halt="); uputd(s2sr & 0x1u);
+            uputs(" idle=");         uputd((s2sr >> 1) & 0x1u);
+            uputs(" ioc=");          uputd((s2sr >> 12) & 0x1u);
+            uputs(" int=");          uputd((s2sr >> 4) & 0x1u);
+            uputs(" slv=");          uputd((s2sr >> 5) & 0x1u);
+            uputs(" dec=");          uputd((s2sr >> 6) & 0x1u);
+            uputs(" err=");          uputd((s2sr >> 14) & 0x1u);
+            uputs("\r\n");
         } else if (c == 'S') {
             R_MODE = MODE_SEQ;
             uputs("[B2] SEQRESTORED (cmd S)\r\n");

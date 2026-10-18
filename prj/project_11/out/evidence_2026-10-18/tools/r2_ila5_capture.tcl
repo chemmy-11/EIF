@@ -39,19 +39,31 @@ proc setcmp {ila pat val} {
     puts "R2ILA5_SET: [get_property NAME $p] <= $val"
     return 1
 }
+# ★2026-10-18 按官方 hw-ila-debug skill 修正:
+#   - 显式 BASIC 触发模式 + AND 条件 (多个单 bit probe 的 compare 默认按 AND 合成)
+#   - wait_on_hw_ila 的 -timeout 单位是【分钟】(原脚本误按秒传 30)
+set ila_name [get_property NAME $ila]
+set_prop_safe {prop val obj} {
+    if {[catch {set_property $prop $val $obj} e]} { puts "R2ILA5_SET_WARN: $prop=$val -> $e" }
+}
+set_prop_safe CONTROL.TRIGGER_MODE BASIC_ONLY $ila
+set_prop_safe CONTROL.TRIGGER_CONDITION AND $ila
+set_prop_safe CONTROL.TRIGGER_POSITION 512 $ila
+catch {set_prop_safe CONTROL.DATA_DEPTH 1024 $ila}
 setcmp $ila tvalid "eq1'b1"
 setcmp $ila tready "eq1'b1"
 setcmp $ila tlast  "eq1'b0"
-set_property CONTROL.TRIGGER_POSITION 512 $ila
-catch {set_property CONTROL.DATA_DEPTH 1024 $ila}
+puts "R2ILA5_CFG: mode=[get_property CONTROL.TRIGGER_MODE $ila] cond=[get_property CONTROL.TRIGGER_CONDITION $ila] pos=[get_property CONTROL.TRIGGER_POSITION $ila]"
 run_hw_ila $ila
 puts "R2ILA5_ARMED"
-set ok [catch {wait_on_hw_ila -timeout $timeout $ila} err]
-puts "R2ILA5_WAIT_OK=$ok ERR=$err"
+set timeout_min 1
+if {[string is integer -strict $timeout] && $timeout > 0} { set timeout_min $timeout }
+set ok [catch {wait_on_hw_ila -timeout $timeout_min $ila} err]
+puts "R2ILA5_WAIT_OK=$ok ERR=$err (timeout_min=$timeout_min)"
 set data [upload_hw_ila_data $ila]
-set csv [file join $outdir "R2_ila5_${tag}.csv"]
+set csv [file join $outdir "R2_ila5_${tag}"]
 write_hw_ila_data -csv_file $csv -force $data
-puts "R2ILA5_CSV: $csv"
+puts "R2ILA5_CSV: ${csv}.csv"
 close_hw_target
 disconnect_hw_server
 exit 0
