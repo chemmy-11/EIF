@@ -1,0 +1,78 @@
+--- rtl 4d1c50c7
++++ proposed fix2 (WAITGO arm/wait mutual-exclusive)
+@@ -704,13 +704,20 @@
+                 end
+             end
+             //-----------------------------------------------------------------
+             WD_WAITGO: begin
+-                // ★首拍: 按注册判据 (wd_noroom/wd_badlen_r) 决定拒收或正式发请求
++                // ★首拍: 按注册判据 (wd_noroom/wd_badlen_r) 决定拒收或正式发请求。
++                // ★FIX(2026-10-18 round2e): 首拍分支与等待分支必须互斥 (else) ——
++                //   原实现两段 if 并行执行, 首拍会用上一帧残留的 wd_wait_cnt==0xFFFFFF
++                //   误触发超时 (且 wd_wait_cnt<=0 被后面 else 的 +1 覆盖), 导致
++                //   "一次 WAITGO 超时后, 此后所有帧都被静默丢弃" (TB 实测 FAIL-TIMEOUT).
+                 if (wd_arm_pend) begin
+-                    wd_arm_pend   <= 1'b0;
+-                    wd_drain_wait <= 4'd0;
+-                    wd_pop        <= 16'd0;
++                    wd_arm_pend    <= 1'b0;
++                    wd_drain_wait  <= 4'd0;
++                    wd_pop         <= 16'd0;
++                    wd_go_ok       <= 1'b0;
++                    wd_go_seen     <= dma_wr_go;
++                    wd_wait_cnt    <= 24'd0;
+                     if (wd_noroom | wd_badlen_r) begin
+                         // 满槽/坏长度: 整帧丢弃, 不覆盖未读槽 (同旧 W_DRAIN)
+                         if (wd_badlen_r) stat_len_err <= stat_len_err + 16'd1;
+                         wdst <= WD_DRAIN;
+@@ -719,31 +726,29 @@
+                         wd_req_slot_r  <= wd_slot;
+                         wd_req_len_r   <= wd_len;
+                         wd_req_pending <= 1'b1;
+                         wd_req_toggle  <= ~wd_req_toggle;
+-                        wd_go_ok       <= 1'b0;
+-                        wd_go_seen     <= dma_wr_go;
+-                        wd_wait_cnt    <= 24'd0;
+                     end
+                 end
+-                // 等软核: ① GO 翻转 ② 整帧字节可见 (同旧 W_WAIT) ③ introut 已清
+-                else if (!wd_go_ok && (dma_wr_go != wd_go_seen)) begin
+-                    wd_go_seen <= dma_wr_go;
+-                    wd_go_ok   <= 1'b1;
+-                end
+-                if (wd_go_ok && (wf_level >= wd_len[12:0]) && !s2mm_introut) begin
+-                    // ★2026-10-18 时序修复: 本拍不再清 512 数据寄存器 (否则 level 比较锥
+-                    //   被并入 512 CE 成为关键路径); 改入 WD_ARM 一拍由状态译码清零.
+-                    wdst <= WD_ARM;
+-                end else if (wd_wait_cnt == 24'hFFFFFF) begin
+-                    // 超时 (~56ms @300MHz): 软核未驻留/未编程 -> 整帧丢弃 (不停泊)
+-                    wr_timeout_r   <= wr_timeout_r + 16'd1;
+-                    wd_req_pending <= 1'b0;
+-                    wd_pop         <= 16'd0;
+-                    wd_drain_wait  <= 4'd0;
+-                    wdst <= WD_DRAIN;
+-                end else begin
+-                    wd_wait_cnt <= wd_wait_cnt + 24'd1;
++                else begin
++                    // 等软核: ① GO 翻转 ② 整帧字节可见 (同旧 W_WAIT) ③ introut 已清
++                    if (!wd_go_ok && (dma_wr_go != wd_go_seen)) begin
++                        wd_go_seen <= dma_wr_go;
++                        wd_go_ok   <= 1'b1;
++                    end
++                    if (wd_go_ok && (wf_level >= wd_len[12:0]) && !s2mm_introut) begin
++                        // ★2026-10-18 时序修复: 本拍不再清 512 数据寄存器
++                        wdst <= WD_ARM;
++                    end else if (wd_wait_cnt == 24'hFFFFFF) begin
++                        // 超时 (~56ms @300MHz): 软核未驻留/未编程 -> 整帧丢弃 (不停泊)
++                        wr_timeout_r   <= wr_timeout_r + 16'd1;
++                        wd_req_pending <= 1'b0;
++                        wd_pop         <= 16'd0;
++                        wd_drain_wait  <= 4'd0;
++                        wdst <= WD_DRAIN;
++                    end else begin
++                        wd_wait_cnt <= wd_wait_cnt + 24'd1;
++                    end
+                 end
+             end
+             //-----------------------------------------------------------------
+             WD_ARM: begin      // ★2026-10-18: 独立一拍清拼帧寄存器 (CE 只依赖状态译码)

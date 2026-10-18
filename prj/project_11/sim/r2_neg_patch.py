@@ -18,8 +18,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.abspath(os.path.join(HERE, '..'))
 RTL = os.path.join(PROJ, 'rtl', 'axi4_master_bridge.v')
 
-# Lead 冻结值（2026-10-18 18:0x round2e：IDLE 只注册满槽/坏长判据, 请求填充移入 WAITGO 首拍）
-EXPECT_HASH = '4d1c50c7efe013d7038cbe2f2981f20fd2703bb1'
+# Lead 冻结值（2026-10-18 18:2x round2f：采纳 fix2 —— WD_WAITGO arm/wait 互斥, 修 4d1c50c7 的首拍并行执行缺陷）
+EXPECT_HASH = 'c92c20c7fb1884cb6238daf6e03dd69daa93f172'
 
 # 附加守卫（2026-10-18 round2d）：TB 的 DUT 例化 frame_mem_if（内部例化 bridge），
 # fmi 变化同样会改变仿真语义 -> 一并冻结。lite_regs/顶层不在本 TB 依赖内（TB 不编译），

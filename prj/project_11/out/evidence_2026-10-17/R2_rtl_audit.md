@@ -550,7 +550,7 @@
 
 ### 15.3 新 bit/ltx 出来后的核对顺序（不阻断 Lead，仅列清单）
 1. bit/ltx SHA256 实测 vs Lead 通知；
-2. 归档 RTL 四副本 `git hash-object` = 上表 **round2d 四文件集合**（bit↔RTL 绑定，必须含 `d133b508`）；
+2. 归档 RTL 四副本 `git hash-object` = **round2f 四文件集合**（bridge `c92c20c7…`，见 §16.7；round2d 旧集合已随 `4d1c50c7` 废弃，勿混）；
 3. ltx 探针：**期望与 round2c 完全一致**（ILA0 probe0=92、probe1=9、ILA3 probe0=152、仅 2 核、裁剪项不出现）——lite_regs 修复不改变裁剪后探针列表（列表里没有 lite_* 探针）；
 4. 时钟网名仍需上板 `hw_manager` 一次性确认（ltx 不含时钟网）；`dbg_mem_rden_1` 命名注记仍适用；
 5. `u_ila_5 @eth_rxc` **先不加**：等 Lead PC 侧零成本判别（`Get-NetAdapterStatistics` ReceivedErrors/Discarded + 可选 pcap）决定 C（TX 无帧）是否需要 eth 探针，避免再一轮重建；
@@ -560,6 +560,67 @@
 * `R2_sim_r2_wr_tb_round2d_{pos,neg_cursor,neg_tkeep,suite}_run.log`（新守卫下 suite 复跑结果：PASS/FAIL/FAIL + SUITE PASS）。
 * AXI 缺陷/修复证据：`R2_sim_lite_proto_{frozen,fix}_{r,w}.log`、`R2_axi_lite_regs_fix.{diff,v}`（见分析文件 §0）。
 * 状态：**AXI 楔死根因记 [L2]（RTL 缺陷：RVALID/BVALID 多拍 → 重复握手；读滞后同源）**；板证待 round2d 位流。修复后若仍有楔死，则按 §0.2 的次级窗口（arready 丢失 AR）/复位失配/互连行为继续二分。
+
+---
+
+## 16. round2e：`WD_WAITGO` 注册判据 patch（`4d1c50c7…`）复核 —— **原 patch 有功能 bug，已给出并验证修正版 fix2**
+
+> 背景：round2d（lite_regs 修复）首掷 place/route WNS=-0.096 门限拒；30/30 最差路径 = `u_mem/u_bridge/full_bit_q_reg[179]` → `g_wr_dma.wd_wait_cnt_reg[*]/CE`（route 80%）。
+> Lead patch（blob **`4d1c50c7efe013d7038cbe2f2981f20fd2703bb1`**）：IDLE 接收只注册判据（`wd_noroom/wd_badlen_r/wd_arm_pend`），请求/拒收执行移到 WAITGO 首拍。
+> 结论（[L2] 代码级+独立 TB 直证）：**该 patch 在"一次 WAITGO 超时之后"会永久丢弃后续所有帧**（完整正型 TB FAIL）；根因=WAITGO 首拍的 arm 分支与等待逻辑被写成**两个并行 if 语句**（非互斥），首拍用残留寄存器值参与等待判定。
+
+### 16.1 失败证据（完整正型 TB，非 FAST，`R2_sim_r2_wr_tb_round2e_fail_pos_run.log`）
+```
+[T6] WAITGO watchdog fired ui_cycles=16777037 (基线 16777221, -184 拍 = 从上一帧残留计数起步)
+[FAIL-TIMEOUT] commit target=8 got=7  frame len=200 slot=9 not committed
+[T6] not stalled: next frame committed cmt=7   ← 期望 cmt=8
+[T7]/[T8] 之后所有帧连续 [FAIL-TIMEOUT]（永久性，cmt 停在 7）
+```
+负向对照（cursor/tkeep 文本缺陷）仍按设计 FAIL（判据本身无问题）。
+
+### 16.2 根因（`axi4_master_bridge.v` 旧 `WD_WAITGO`，代码级 [L2]）
+新结构把首拍 arm 与等待逻辑写成**并行**：
+```
+if (wd_arm_pend) begin ... wd_wait_cnt<=0; ... end
+else if (!wd_go_ok && ...) ...
+if (wd_go_ok && level>=len && !intr) ... 
+else if (wd_wait_cnt == 24'hFFFFFF) ...超时→DRAIN...
+else wd_wait_cnt <= wd_wait_cnt + 1;      // ← 同一拍也执行, 覆盖 arm 的 <=0
+```
+1. 首拍 `wd_wait_cnt<=24'd0` 被后面的 `+1` 覆盖（Verilog 非阻塞"最后赋值生效"）⇒ 计数器不清零、从上一帧残留值起步（T6 -184 拍印证）；
+2. 首拍 `else if (wd_wait_cnt==24'hFFFFFF)` 用**旧**计数判断：上一帧 WAITGO 超时后残留 0xFFFFFF（超时分支不清它）⇒ **下一帧首拍立即误超时→DRAIN**；如此每帧首拍都误超时 ⇒ **永久静默丢帧**；
+3. 潜伏：首拍旧 `wd_go_ok`（上一帧 commit 后常为 1）会被同拍独立 GO 判定使用（当前仅被 `!s2mm_introut` 偶然挡住），语义上首拍不应参与等待判定。
+
+### 16.3 修正版 fix2（已独立 TB 全绿；候选用）
+**改法**：`WD_WAITGO` 内 arm/wait 互斥 —— `if (wd_arm_pend) begin 首拍只 arm（含 wd_go_ok<=0、wd_go_seen<=dma_wr_go、wd_wait_cnt<=0、拒绝判据执行） end else begin GO/level/超时/计数 end`。
+* 保持时序目标：`full_bit_q[slot]` 仍只驱动 `wd_noroom/wd_badlen_r` 两个 FF；等待链 CE 仍只由 状态译码 + `wd_arm_pend` FF 驱动。
+* **候选 blob**：`c92c20c7fb1884cb6238daf6e03dd69daa93f172`（= `R2_axi4_master_bridge_fix2.v` 逐字拷贝；Lead 若采纳请以此为新冻结值，我据此更新 `EXPECT_HASH`）。
+* 文件：`out/evidence_2026-10-17/R2_axi4_master_bridge_fix2.{v,diff}`（diff 已标注与 4d1c50c7 的差异只在 WD_WAITGO 结构 + arm 首拍归位）。
+
+### 16.4 等价复核（Lead patch 中**正确**的部分，fix2 全部保留）
+* 拒绝帧不置 pending/toggle、不覆盖未读槽 ✓；规则号 1：槽号只在 IDLE 接收时单点推进（被拒帧同样消耗）✓；
+* `wd_beats`/`wd_req_len_r` 改用 `wd_len`、`wd_req_slot_r` 用 `wd_slot` 与旧 `wd_data/wd_slot_next` **等价**（IDLE accept 同拍锁存）✓；
+* badlen 统计移到 WAITGO 首拍、`wd_badlen_r` 复位正确 ✓；`wd_noroom` 复用不变 ✓；
+* 每帧 +1 拍（拒收帧也 +1，`dbg_wr_cycles` 仅观测）——与 ARM 修复同类，可忽略 ✓。
+
+### 16.5 fix2 独立 TB 结果（`R2_sim_r2_wr_tb_fix2_*_run.log`）
+* **正型（完整非 FAST）**：`=== R2 WR TB: PASS (0 errors) ===`；commits=101/exp=101/wm=101；T6 `ui_cycles=16777222`（基线 16777221，+1 = 首拍 arm 语义）；**T6 恢复帧 cmt=8**；T7/T8 计数逐字同基线；T9 恢复+提交 OK；总仿真 `56,684,046,209 ps` 与 round2c 基线逐字相同（+1 拍被 TB 软核轮询粒度吸收，无吞吐可观测差异）。
+* **负向对照（从 fix2 文件生成缺陷副本）**：cursor → `[FAIL-T4-CURSOR]` FAIL(2)；tkeep → `[FAIL-KEEP-MASK]` FAIL(1) —— 判据对 fix2 仍有效。
+
+### 16.6 状态与建议
+* **Lead 已采纳 fix2**（2026-10-18 18:2x）：buggy `4d1c50c7` 的 place/route 已 kill，`rtl/axi4_master_bridge.v` 用 `R2_axi4_master_bridge_fix2.v` **逐字替换**，实测 blob = **`c92c20c7fb1884cb6238daf6e03dd69daa93f172`**（与候选一致）；xvlog 0 err，重综合已启动。
+* mini TB 补"WAITGO 超时帧 → 后接正常帧"用例已被 Lead 采纳（下轮加入并留痕）。
+* **`4d1c50c7` 不得烧录/归档为通过版**（永久丢帧），仅作失败复现。
+
+### 16.7 round2f（fix2 采纳后）冻结与 TB 证据
+* **新冻结四文件集合**：bridge **`c92c20c7…`** / fmi `96d5b136…` / top `1885225f…` / lite `d133b508…`；ELF `f8cf4022`；新 bit/ltx 待重建。
+* suite 守卫已更新：`EXPECT_HASH = c92c20c7…`、`EXPECT_FMI_HASH = 96d5b136…`；**复跑通过**：
+  `frozen rtl hash : c92c20c7…` / `expected hash : c92c20c7…` / `frozen fmi : 96d5b136…` →
+  `POS_PASS=1 NEG1_CURSOR_FAIL=1 NEG2_TKEEP_FAIL=1` + `=== R2 WR TB SUITE: PASS ===`（exit 0）；
+  正型：commits=101/exp=101/wm=101、T6 `ui_cycles=16777222`、**T6 恢复帧 cmt=8**、T8 cursor=320/refused=10/stall=11、T9 恢复+提交 OK、total `56,684,046,209 ps`（与 fix2 验证跑一致）。
+  负向：`[FAIL-T4-CURSOR]`（FAIL 2）与 `[FAIL-KEEP-MASK]`（FAIL 1）按设计。
+* 日志：`R2_sim_r2_wr_tb_round2f_{pos,neg_cursor,neg_tkeep,suite}_run.log`；fix2 源/diff：`R2_axi4_master_bridge_fix2.{v,diff}`。
+* 结论：**round2f TB 绿灯**；等 Lead 新 bit/ltx 做实物核对（期望 ltx 探针与 round2c/2d 完全一致：92/9/152、仅 2 核、裁剪项不出现），板验先最小序列确认 lite 修复 + 写路径，再 S0–S11。
 
 > **脚本编码说明（对任务书"bat 带 BOM"的落实）**：`run_r2_wr_tb.bat` 采用 **ASCII-only 注释 + CRLF、无 BOM**。
 > 理由：本仓库 9 个既有 `run_*.bat` 均为无 BOM；AGENTS.md #17/#18 的 BOM 要求针对 `.ps1`（PS 5.1 解析）；
