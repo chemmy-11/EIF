@@ -21,6 +21,7 @@
 | **结论依据等级制度**（L0–L4 + 6 条硬规则） | AGENTS.md **§6a**；速览表见本文件下文「结论依据等级制度」节 |
 | **坑账本**（#1–#64，踩过的坑与修法） | AGENTS.md **§九** |
 | **外部 AI 技能 / 官方文档检索**（2026-10-18 新增） | 本文件「★ 外部 AI 技能与官方文档检索」节；细节 `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18`；AGENTS.md **§6b** |
+| **交接单（新对话从这里开始）** | `操作文档/阶段三_prj11_R2板验续作交接单_2026-10-18.md`（状态/哈希/下一步/坑/开工 checklist）；进度底稿见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十二–§十六 |
 | **当前工程状态**（一屏速览） | AGENTS.md **§十** |
 | **CI 与远程仓库规范**（6 项检查 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
 | **文档索引与命名规范** | `D:\FPGA\docs\README.md`（全量索引，CI 第 6 项强制与磁盘一致） |
@@ -42,6 +43,7 @@
 | 条目 | 内容 |
 |---|---|
 | `追踪_cross_短期待办_2026-10-10.md` | 任务清单与里程碑（当前任务的水位线）|
+| `操作文档/阶段三_prj11_R2板验续作交接单_2026-10-18.md` | **R2 续作交接单（新对话第一份读）**：当前状态、证据哈希、环境、下一步与坑清单 |
 | `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18.md` | 官方 AI 技能与文档检索：接入、调用、2023.1 待实测（2026-10-18）|
 | `规划_cross_长期路线图_2026-09-04.md` | 长期路线与决策记录 |
 | `操作文档/` | **操作开发类**（照着做）：实操单 / 实施单 / 开工开发文档 / 前置清单 / 验证单 / 作战卡（命名 `[阶段]_prj标识_概要_日期`）；`操作文档/挂起/` 为挂起课题收纳区（状态轴）|
@@ -57,7 +59,7 @@
 
 1. 每步标注「为什么」——工程优先，写清依据（契约/实证/官方例程出处），不只给结论。
 2. 物理层经允许可代劳：工具链 = 工程仓库 `vivado-mcp/`（运行时 `D:\vivado-mcp`）+ xsct，经用户允许后代劳烧录/ILA/串口/JTAG 上板验证；插拔光纤/电源、开关机仍归用户。协作 agent 推荐同一工具链。
-3. 事实源优先级：官方例程与官方 XDC > 已上板验证的 prj > 板卡手册 > AI 生成文档（仅参考）。
+3. **两轴采信**（AGENTS.md §二/§6b）：**知识/工具语义轴** = AMD 官方文档/知识库**最高权威**（Tcl/属性/IP 参数/协议/报错，引用带 `docs.amd.com` URL）；**工程事实/判据轴** = 本项目实测优先（官方文档与本板实测冲突时以实测为准，记录并列两栏）。引用官方文档必须给「URL + 本工程落点（2023.1/器件/IP 实例/验证动作）」两件套。
 4. 官方文件不改动原件：修复用「同名模块顶替」或「派生新文件」。
 5. Vivado 相关路径全 ASCII（中文路径 GBK 实坑）。
 6. 改动可追溯：工程改动走 git；文档遵守命名规范。
@@ -81,11 +83,28 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 
 佐证：Wireshark 过滤 `udp.port==1234`，请求/回显成对且 payload 相同。三层证明力：T23=链路、ping=通路、udp_verify=数据完整性。
 
+**prj11 R2 主线判据（当前在推进；prj9 段为历史基线）**：
+
+```powershell
+# 板验 S0–S11（需板上电 + 已烧归档绝对路径 bit+ELF；-Run 才真执行）
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\FPGA\prj\project_11\out\r2_board.ps1 -Run `
+  -Bit <归档 bit> -Elf <归档 ELF> -Xsa <归档 xsa> -IlaLtx <归档 ltx> `
+  -ExpectBitHash8 <前8位> -ExpectElfHash8 <前8位>
+# 写流首拍取证（round3 位流；触发 tvalid&&tready&&!tlast）
+$env:R2_LTX='<归档 ltx>'; $env:R2_OUT_DIR='D:\FPGA\prj\project_11\out\evidence_<日期>'
+$env:R2_TAG='wstream'
+vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-18\tools\r2_ila5_capture.tcl
+```
+
+口径：R2 位流 `'d'` 后必须 ping 回包 + NIC `ReceivedBytes` 增长；双桥对账 = `mem/mem2` 各自 `wm=wr_frm=rd_frm`、`ost=0`、`fault=0`；规则号 1 = 槽号接收即推进（被拒帧同样消耗）。
+
 ## 环境事实
 
 - Vivado 2023.1：`D:\Xilinx\Vivado\2023.1\bin\vivado.bat`；批处理 `-mode batch -source <tcl>`，日志落文件再检索。
 - Python：`C:\Users\***\AppData\Local\Python\pythoncore-3.14-64\python.exe`。
-- JTAG：Digilent USB-JTAG（210512180081）；串口 COM7。
+- JTAG：Digilent USB-JTAG（210512180081）；**板卡串口 = COM5（USB-SERIAL CH340，9600 8N1；115200 无响应属正常，非故障）**。
+- **板卡物理状态（2026-10-18 23:30 收尾）**：**已断电**；最后在役配置 = R2 round2f 位流 `8A8FE378` + 固件 `b614a2dc`（断电即失，下次开场重烧，见交接单）。
+- **prj11 主线工具入口**：判据 `D:\FPGA\prj\project_11\out\r2_board.ps1`（S0–S11；工具 README `R2_tools_README.md`）；PC 侧 TX 判别 `out\r2_tx_probe.ps1`；ILA 抓取 `out\r2_ilacap.tcl` 与 `out\evidence_2026-10-18\tools\r2_ila5_capture.tcl`。
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
 - **配套工具 `vivado-mcp`（已随仓库入库）**：MCP 服务，**32 个工具**——会话/Tcl/工程/流程/报告/诊断/CDC/位流探针/IP/波形十类；其中 `parse_xpr`·`parse_bit_header`·`parse_ltx`·`xdc_lint` 为**离线工具**（不启 Vivado）。**上游 = [mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26（Apache-2.0，LICENSE 已随源码入库）**——本仓库副本**零代码改动**、仅目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 平铺入包内；逐字节比对 52 同 / 0 改）。上游基准 **Vivado 2019**，本项目 **2023.1**：离线工具与 Vivado 会话实测可用；**`compare_xci` 不可用**（上游按 XML 版 xci 设计，本项目 2023.1 的 xci 全为 JSON 版）。 仓库内为**可移植副本**（`D:\FPGA\vivado-mcp\`，零本机配置），安装与清单见 `vivado-mcp/README.md`。⚠️ **与下条「工具纪律」里的本机 CLI 壳是两回事**：那层壳是开发者本地设施、不入库。两条硬约束：安装路径必须**纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；Vivado 会话与综合/实现/仿真**全局串行**。
 - **AI 技能与官方文档检索（2026-10-18 新增）**：项目级技能 `毕设\.dsh\skills\`（7 个，**仅本工作区可见**；全局 `~/.agents/skills` 不放 Vivado 技能）；官方文档检索 hosted `amd-doc-search`（MCP 已配置在 DSH web profile，**重启 `dsh web` 后生效**；未重启时用项目桥 `py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>"`）。调用与引用纪律见下节。
@@ -99,7 +118,14 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - **执行层不变**：技能只是知识与流程；官方 skill 里的 `vivadoExecute`/`vivado_start`/`vivado_doc_search` 按技能顶部「本机适配注记」映射到本工程 `run_tcl`/`start_session`/`mcp_ctl.py` CLI 桥。只读日志分析**不启动 Vivado、不占全局串行锁**；原始日志先复制到 C: 侧副本再解析。
 - **细节**：[[参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18]]；坑账本 #62–#64；2023.1 适配待实测项见该文档 §6。
 
-## 当前状态（2026-10-16 更新；主线 = prj11 B3 数据面换层）
+## 当前状态（2026-10-18 23:30 收尾；主线 = prj11 R2 写侧 S2MM 板验）
+
+- **本轮结果：R2 板验未收口**（板已断电）。已收口：`axi_lite_regs` AXI 协议违例修复（RVALID/BVALID 多拍→重复 R/B 握手，[L2] 单元仿真+修复；读滞后同源）；AXI 楔死可用"S2MM `R_WRGO` 后 1ms 间隔"规避（根治未收口）；round2f 位流 `8A8FE378` 过时序门限并上板，**S0/S1/S3 PASS**、写/读数据面计数推进（ILA `wm/wr_frm/rd_frm=5/5/5`、`WR_DBG.last_commit_len=86`）。
+- **主阻塞：TX 无帧**（`r2_tx_probe`=NO_FRAME）；**R1 绿位流 `c8cd3a32` 同板同线对照 'd' 后 ping 4/4** ⇒ 环境正常、问题在 R2 数据面（写流首拍/前导/TKEEP/读出链待 ILA5 取证）。
+- **构建**：round3（lite fix2 `d5d16d46` + `u_ila_5@ui` 写流探针 + ILA0 101b）综合 0 err/0 CW，place/route 最好 **WNS=-0.002 / WHS=+0.004（差 0.002ns）⇒ NO_BITSTREAM**；下轮先降 ILA 深度重掷。
+- **新对话入口**：`操作文档/阶段三_prj11_R2板验续作交接单_2026-10-18.md`；证据：记录 §十二–§十六、`prj/project_11/out/archive/`、`R2_tools_README.md`。
+
+### 历史状态（≤2026-10-17，仅供追溯；最新以本节上方与 AGENTS.md §十 为准）
 
 - **DDR 线闭环（2026-10-06，git c27eea3/2465cf4）**：**D1 DDR4 校准双位流全过**（MIG JTAG 报告全绿；例程自带比对测试有自身缺陷链——极性/awlen 跨 4KB/读回错乱，根因未再追，内存正确性以集成位流全链判据为准）；**W3 内存插入联调全过**（T23/T22 亮 · ping 20/20 · UDP 12/12 逐字节 · 10MB 冲击内存桥零丢零错 · 七级差分链逐级闭合）；一条命令验证 `prj_loop/scripts/udp_verify_ddr.py`（四档全 PASS）；截图归档 `截图归档/ddr_*.png` 三张。
 - **过载硬冻结已修复（2026-10-06 晚，git 9f29d7c）**：根因 = udp_tx 忙时丢发送请求→无帧边界 FIFO 字节永久错位（prj9 遗留，板上两次复现+仿真证实）；修复走 **prj_loop 派生副本** `rtl_patch/udp_tx.v`（忙时锁存 pending start + 伴随参数，prj9 原件零改动）；R4 TB 验证：忙帧正确补发/FIFO 清零/零错位；板上重放 pace 13µs 冻结场景**不再冻结**（过载只降速不冻结达成）。
@@ -134,6 +160,7 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 
 - 「当前状态」节随里程碑更新，同时更新追踪待办。
 - 其余各节为 `D:\FPGA\AGENTS.md` 的镜像摘要；规范变更先改 AGENTS.md 再同步本文件。
+- **官方知识库/技能引用**：按 AGENTS.md §二「两轴采信规则」与 §6b——官方文档是知识/工具语义最高权威，工程事实以本项目实测为准；引用给「官方 URL（核对 family/version）+ 本工程落点（2023.1/器件/IP 实例/验证动作）」两件套。
 
 ## ★ 结论依据等级制度（2026-10-16 新增，全文见 AGENTS.md §6a）
 
