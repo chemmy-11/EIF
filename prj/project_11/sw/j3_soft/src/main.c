@@ -243,6 +243,12 @@ static unsigned g_dma_mode = 0u;        /* 默认 0 = 不驻留服务 (串口可
                                          * 0 = 交给桥硬件读引擎 (v5-RTL 旧配对)。
                                          * 'd' 命令可现场切换, 便于两者对照。 */
 
+/* ★2026-10-18 官方文档(PG021)定位探针: 写服务关键时刻的 DMA 寄存器快照。
+ * 存 LMB 全局变量 (JTAG 可读) ⇒ 即使 ping 后 AXI 总线楔死, 也能通过 JTAG 取回
+ * "S2MM 是否真的启动/写了多少字节/有无错误 halt" 的后验现场。 */
+volatile unsigned g_wa_s2cr, g_wa_s2sr, g_wa_s2len, g_wa_s2sr2, g_wa_s2len2;
+volatile unsigned g_wa_wreq, g_wa_wdbg, g_wa_cnt, g_wa_done;
+
 static int serve_dma_once(void)
 {
     unsigned v_req, slot, len, sa, sr, guard;
@@ -352,6 +358,14 @@ static int serve_write_once(void)
         }
     }
     S2MM_LENGTH = len;                          /* 写 LENGTH = 启动传输 */
+    /* ★PG021 定位快照(1): 启动后立即读 DMACR/DMASR/LENGTH (LMB 全局, JTAG 可取) */
+    g_wa_s2cr  = rd_reg(&S2MM_DMACR);
+    g_wa_s2sr  = rd_reg(&S2MM_DMASR);
+    g_wa_s2len = rd_reg(&S2MM_LENGTH);
+    g_wa_wreq  = rd_reg(&R_WRREQ);
+    g_wa_wdbg  = rd_reg(&R_WRDBG);
+    g_wa_cnt++;
+    g_wa_done  = 0u;
     g_wr_last_toggle = tog;
     R_WRGO = 1u;                                /* 翻 GO: 桥看到变化才放流 */
     busy_ms(1);                                 /* 2026-10-18 板验: 写后间隔, 规避写后紧接读的 AXI 楔死 (待 RTL 根因收口后评估移除) */
@@ -366,6 +380,15 @@ static void serve_any(void)
     if (dread((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u) {
         serve_dma_once();
         return;
+    }
+    /* ★PG021 定位快照(2): pending 已落零时取"完成态" DMASR/LENGTH 到 LMB */
+    {
+        unsigned v = dread(&R_WRREQ);
+        if (((v & 0x80000000u) == 0u) && g_wa_cnt != 0u && g_wa_done == 0u) {
+            g_wa_s2sr2  = rd_reg(&S2MM_DMASR);
+            g_wa_s2len2 = rd_reg(&S2MM_LENGTH);
+            g_wa_done   = 1u;
+        }
     }
     serve_write_once();
 }
@@ -527,9 +550,10 @@ int main(void)
          * 退役桥硬件读引擎后, 所有出向帧(数据帧 + 栈自发 ARP/ICMP/命令应答)
          * 的读回都靠它 —— 无请求时本调用只是一次寄存器读(~1ms), 无副作用。 */
         while (!urx_poll()) {
-            /* 2026-10-18: AXI 楔死根因 = lite_regs RVALID/BVALID 多拍(已修 RTL);
-             * 恢复满速驻留服务 (不再需要 1ms 限速). */
-            if (g_dma_mode) serve_any();
+            /* ★2026-10-18 官方文档定位轮: 高频轮询 lite_regs 0x34 在 round2f 位流
+             * (lite fix1) 上会复现 AXI 楔死; 10ms 慢轮询: 服务延迟 << 桥 56ms
+             * 等待超时, 且 ping 后 UART 仍活着, 可用 'W' 读 S2MM_DMASR/LENGTH。 */
+            if (g_dma_mode) { serve_any(); busy_ms(10); }
         }
         c = urx_get();
         /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。

@@ -123,7 +123,8 @@ puts "ILA0_PROBE1_EMIT_BYTES: [llength $nets_rd] nets"
 # ============ ILA3 @ ui_clk (MIG ~300MHz) —— prj10 新增 ============
 #   ui 域信号严禁挂 ILA0/1/2; 桥的 ui 侧计数器全部在此观测
 create_debug_core u_ila_3 ila
-set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_3]
+# ★round3b 时序: ILA3 深 2048->1024 (300MHz 面积余量; 判据探针不动)
+set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_3]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_3]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_3]
 set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_3]
@@ -175,7 +176,8 @@ connect_debug_port u_ila_3/probe0 $nets3
 #   WSTRB 来自 TKEEP, TLAST 终止) -> 判定"写引擎/上游数据源" vs "写参数/读出链"故障层。
 #   触发: tvalid & tready & !tlast (首拍)。深度 1024 省 300MHz 面积 (WNS 仅 +0.004)。
 create_debug_core u_ila_5 ila
-set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_5]
+# ★round3b 时序: ILA5 深 1024->512 (窗口 1.7us 仍覆盖 86B=2 拍)
+set_property C_DATA_DEPTH 512 [get_debug_cores u_ila_5]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_5]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_5]
 set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_5]
