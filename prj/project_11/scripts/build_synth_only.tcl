@@ -201,7 +201,9 @@ connect_debug_port u_ila_5/probe3 [list [one_net dbg_s2mm_tready]]
 create_debug_port u_ila_5 probe
 set_property port_width 1 [get_debug_ports u_ila_5/probe4]
 connect_debug_port u_ila_5/probe4 [list [one_net dbg_s2mm_tlast_w]]
-puts "ILA5_PROBES: tdata64=$([llength $nets5a]) tkeep8=$([llength $nets5b]) + tvalid/tready/tlast"
+set n5a [llength $nets5a]
+set n5b [llength $nets5b]
+puts "ILA5_PROBES: tdata64=$n5a tkeep8=$n5b + tvalid/tready/tlast"
 
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design

@@ -172,11 +172,9 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - **NIC 口径**：静态 ARP ⇒ 板自发帧广播 dst ⇒ 主判据 = `ReceivedBytes`（单帧 ≥74、4 帧 ≥296），`ReceivedUnicast` 恒 0。
 - **下一步**：R2（B3-2 桥①写侧换层 S2MM，DMA 描述符驱动写槽，判据 = 四档 + 10MB 100%+SHA + 双桥计数对账）。
 
-## ★ 10-18：R2 写侧 S2MM —— 位流已出（WNS/WHS +0.004），板验待上电
+## ★ 10-18 全天/晚间：R2 写侧 S2MM —— 构建多轮、板验进行中（未收口）
 
-- **结论（[L2] 离线 + 构建产物直证）**：R2 设计与实现同前（写槽规则号 1 逐字等价、HAS_DMA 参数化、桥② 写读零改动）；独立审计 **A1–A19 全闭环**；**round2c 位流过时序门限**：`ExtraTimingOpt` 后布 WNS +0.042 → 尾判 **+0.004 / WHS +0.004**、DRC **0 Errors/22 Warnings**、`V5_SWEEP2_OK`。
-- **关键修复链**：① 字节捕获 1 级流水（审计抓到首版“满拍保持拍重复 fetch 覆盖跨拍预取”缺陷并修复，坑 #59）；② `WD_ARM` 拆拍——把 `wf_level>=wd_len`（3×CARRY8）从 512 位数据寄存器 CE 上移走（WNS −0.127→+0.004，坑 #60）；③ ILA 裁剪（ILA1/2 整核移除、ILA0 374→92、ILA3 184→152，缺失探针列=INFO）。
-- **产物**：bit **`28921C6B…`**（10,266,180 B）/ ltx `4AC25546…`（审计 ltx 实物核对通过：仅 2 核、92/9/152、末 5bit 正确）/ xsa `16A4F01F…` / ELF `1bc8088d`；归档 `prj/project_11/out/archive/b31b_r2_2026-10-18/`（27 项清单 + SHA256.txt（28 文件），清单 SHA256 `73FB1AAE…`）；RTL 冻结 blob **`f43267db`**。
-- **S0 已钉**：`r2_board.ps1` dry-run **S0 PASS**（WNS/WHS/DRC/hash 全过；判据工具链 7/7 PASS）。
-- **板验待用户上电**：烧归档 bit+ELF → S0–S11（S4 单帧 86B 尾拍逐字节 + S2MM DMASR；`dbg_s2mm_state` 7=ARM 正常/6=HALT fail-stop；`fault` 全程 0；S10 bresp/wslot/rslot=INFO）。
-- **下一步**：上电 → S0–S11 → 证据归档（`out/evidence_2026-10-18/`）→ 记录/AGENTS/工作清单/docs 镜像回填 → 提交 + CI。**本构建里程碑提交 `8ef6dbe`（CI PASS）**。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十。
+- **round2c 位流** `28921C6B` 过门限（+0.004）并上板：S0/S1/S3 PASS；随后发现 **lite_regs AXI 协议违例**（RVALID/BVALID 多拍→重复 R/B 握手）与固件读滞后，独立审计用单元仿真定位并给修复；写引擎 WAITGO 首拍缺陷由审计完整 TB 拦截（fix2 `c92c20c7`）。
+- **round2f 位流 `8A8FE378` 过门限（+0.004）**：AXI 楔死用"GO 后 1ms 间隔"规避；写/读数据面计数推进（ILA `wm/wr_frm/rd_frm=5/5/5`、`WR_DBG.last_commit_len=86`），但 **PC 仍无帧**（`r2_tx_probe`=NO_FRAME；R1 绿位流对照 'd' 后 ping **4/4** ⇒ 环境正常，问题在 R2 数据面）；固件 `'F'` 取证因 `dma_sink.s_tvalid` tie 0 不可用。
+- **round3**：合入 lite fix2 `d5d16d46` + top 探针 alias `6150212e` + `u_ila_5@ui` 写流探针（64/8/1/1/1）+ ILA0 写入口 9b（92→101）；综合 0 err/0 CW；place/route 最好 **WNS=-0.002 / WHS=+0.004**（差 0.002ns）⇒ **NO_BITSTREAM 未收口**；用户 22:3x 要求断电收尾，本轮未上板。
+- **下一步**：① 构建：ILA5 深 1024→512 / ILA3 2048→1024 后重掷（差 0.002ns）；② 板验：烧 round2f `8A8FE378` 或 round3b 位流 → `tools/r2_ila5_capture.tcl` 首拍触发抓 S2MM 写流（期望 beat0 `0xD555555555555555`、beat1 tkeep 低 22 lane/tlast=1）→ 对照 ILA0 `dbg_pfwd_data` 判层；③ 修数据面 → S0–S11 全序列。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十二–§十六。

@@ -622,6 +622,49 @@ else wd_wait_cnt <= wd_wait_cnt + 1;      // ← 同一拍也执行, 覆盖 arm 
 * 日志：`R2_sim_r2_wr_tb_round2f_{pos,neg_cursor,neg_tkeep,suite}_run.log`；fix2 源/diff：`R2_axi4_master_bridge_fix2.{v,diff}`。
 * 结论：**round2f TB 绿灯**；等 Lead 新 bit/ltx 做实物核对（期望 ltx 探针与 round2c/2d 完全一致：92/9/152、仅 2 核、裁剪项不出现），板验先最小序列确认 lite 修复 + 写路径，再 S0–S11。
 
+---
+
+## 17. round3 冻结（lite fix2 合入 + 探针扩容）核对与 bit/ltx 待办
+
+> Lead 2026-10-18 21:1x：round3 重综合已启动（r2j）。本节记录**已可核对事实**与 ltx 到达后的核对清单。
+
+### 17.1 四文件冻结（本机 `git hash-object` 实测）
+| 文件 | round2f | **round3 现状** | 变化 |
+|---|---|---|---|
+| `rtl/axi4_master_bridge.v` | `c92c20c7…` | `c92c20c7fb1884cb6238daf6e03dd69daa93f172` | 不变（fix2 写引擎） |
+| `rtl/frame_mem_if.v` | `96d5b136…` | `96d5b136305e81ee9d4cc716e60c5034581d027d` | 不变 |
+| `rtl/aurora_mem_bridge.v` | `1885225f…` | **`6150212e18ba76cf5ecba0b7aa7d1bb21903f021`** | **仅 +6 行 mark_debug alias（无逻辑）** |
+| `rtl/axi_lite_regs.v` | `d133b508…` | **`d5d16d46bd14c3f3c9f40f0d5e89815503046027`** | = 我的 `R2_axi_lite_regs_fix2.v` **逐字一致**（blob 实测相等） |
+
+* **top diff 复核 [L2]**：round3 top vs round2f 归档 top 全量 diff = **13 行（6 行新增 alias + 注释/上下文）**，新增内容仅：
+  `dbg_pfwd_data[7:0]=pump_fwd_data`、`dbg_pfwd_en=pump_fwd_en`、`dbg_s2mm_tdata64=s2mm_tdata[63:0]`、`dbg_s2mm_tkeep8=s2mm_tkeep[7:0]`、`dbg_s2mm_tlast_w=s2mm_tlast` ⇒ **探针专用，无功能改动**。
+* lite fix2 = 已仿真验证版（单读/单写 PASS；背靠背 2 写 2/2/2 PASS；见 §E.1/分析文件 E.1），合入无额外改动。
+
+### 17.2 构建脚本纸面核对（`build_synth_only.tcl` 与 `build_debug.tcl` 行号逐行一致）
+* ILA0 probe0：`nets0` = 93-104 行 = 16+16+16+1+9+16+16+1+1（旧 92b）+ `bus_nets dbg_pfwd_data 8`（:103）+ `dbg_pfwd_en`（:104）= **101b**；位偏移：追加段 **92..99 / 100**（与 §5.4.2 草案一致）。
+* ILA0 probe1 = 9b 不变；ILA3 probe0 = 152b 不变（:143-170）。
+* **u_ila_5（:177-203）**：@`$uiclk_net`（ui_clk）、`C_DATA_DEPTH 1024`、`C_INPUT_PIPE_STAGES 1`、probe0=64 `dbg_s2mm_tdata64`、probe1=8 `dbg_s2mm_tkeep8`、probe2=1 `dbg_s2mm_tvalid`、probe3=1 `dbg_s2mm_tready`、probe4=1 `dbg_s2mm_tlast_w` ⇒ **64/8/1/1/1=75b**。
+* 判读口径沿用 §E.2：**INDET_BTT=1（网表 GEN_INDET_BTT 生效）⇒ WSTRB 来自 TKEEP、TLAST 终止**；beat0 期望 `tdata=0xD555555555555555`/`tkeep=FF`；beat1 `tkeep` 低 22 lane（低 8 位=0x3F）、`tlast=1`。
+* 硬件触发（ILA5，逐 probe）：`probe2==1 && probe3==1 && probe4==0`（首拍）；或 `probe4==1`（尾拍）。深度 1024 窗口足够覆盖 2 拍。
+
+### 17.3 板验工具/判据口径同步（Lead 文件，草案已给）
+* `out/r2_ilacap.tcl:117` 的 `R2_EXPECT_PROBES` 最终建议值：
+  `dbg_s2mm_reqpend,dbg_wr_fault,dbg_s2mm_state,dbg_s2mm_tvalid,dbg_s2mm_tready,dbg_pfwd_data,dbg_pfwd_en,dbg_s2mm_tdata64,dbg_s2mm_tkeep8,dbg_s2mm_tlast_w`
+* `R2_ILA_MATCH_EXTRA = dbg_s2mm_tdata64`（脚本已支持该 env；不设置也能工作，只是不会自动匹配 ILA5）。
+* 注意：现有 `r2_ilacap` 抓取用 `-trigger_now` 快照；**ILA5 需要 probe 触发采集**（`set_property TRIGGER_COMPARE_VALUE`/`run_hw_ila` 路径），建议为 ILA5 单独加一条捕获流程或手工在 hw_manager 里设触发，别用 trigger_now 盲抓。
+* S 判据不受影响（`R2_EXPECT_PROBES` 仍 WARN-only）。
+
+### 17.4 TB 影响
+* `r2_wr_tb` 的 DUT 依赖 = async_fifo/dma_rd_shim_v2/axi4_master_bridge/frame_mem_if；**不含 lite_regs、不含 top** ⇒ round3 的 lite/top 变化**不影响 suite 语义**，bridge/fmi blob 未变 ⇒ suite 上轮 PASS 仍有效、守卫无需改（也无需重跑；如需档案新鲜可 3 分钟复跑）。
+* 若后续 board 验证显示 lite fix2 有效并去掉 busy_ms，不影响本 TB。
+
+### 17.5 新 bit/ltx 到位后的核对清单（§5.4.5 摘要）
+1. bit/ltx SHA 实测 vs Lead 通知；
+2. 归档 RTL 四副本 = **round3 集合**（bridge `c92c20c7`/fmi `96d5b136`/top `6150212e`/lite `d5d16d46`）做 bit↔RTL 绑定；
+3. ltx：**3 个 ILA 核**（u_ila_0/u_ila_3/u_ila_5，无 ILA1/2）；ILA0 probe0=**101**（bits 0..91 与 round2f 完全同、新 8+1b 在 92..100）、probe1=9；ILA3 probe0=152；ILA5 = **5 probe 64/8/1/1/1**；
+4. net 名按实际实现：`dbg_pfwd_data[i]`/`dbg_pfwd_en`/`dbg_s2mm_tdata64[i]`/`dbg_s2mm_tkeep8[i]`/`dbg_s2mm_tvalid`/`dbg_s2mm_tready`/`dbg_s2mm_tlast_w`（Vivado 可能加 `_1` 类后缀，按 ltx 实际为准）；
+5. 时序注意：ILA5@300MHz +75b 是下轮唯一实质时序风险；若 sweep 不过按约定降深度（ILA5 1024→512 → ILA3 2048→1024 → 不裁判据探针）。
+
 > **脚本编码说明（对任务书"bat 带 BOM"的落实）**：`run_r2_wr_tb.bat` 采用 **ASCII-only 注释 + CRLF、无 BOM**。
 > 理由：本仓库 9 个既有 `run_*.bat` 均为无 BOM；AGENTS.md #17/#18 的 BOM 要求针对 `.ps1`（PS 5.1 解析）；
 > 给 `.bat` 加 UTF-8 BOM 会使 cmd.exe 把首行 `@echo off` 当命令名解析（实测报错），破坏一键复现。
