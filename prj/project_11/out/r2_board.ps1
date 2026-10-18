@@ -39,16 +39,21 @@
 #   · 未收口 A[L1]: 高频 serve_any()(~143kHz Lite 读)后 MicroBlaze 楔死在 dread volatile load(lwi, g_dbg_addr=0x44A00034
 #     = lite_regs DMA_REQ 读); UART 静默, rst -processor 不恢复, 只能重配 FPGA; 1ms 限速有时存活但不确定 ⇒ 疑 lite_regs
 #     写命令(SET_WRGO)后紧接读的握手竞争。
-#   · 未收口 B: rd_frm 增长但 ping 0/4、NIC ReceivedBytes delta=0(eth 域 ILA 已裁掉, 需补探针)。
-#   · 触发式 ILA: r2_ilacap.tcl 支持 R2_TRIGGER_PROBE/R2_TRIGGER_COMPARE/R2_TRIGGER_TIMEOUT_S(见 README §4.5)。
+#   · 未收口 B: rd_frm 增长但 ping 0/4、NIC ReceivedBytes delta=0(eth 域 ILA 已裁掉, 需补探针); PC 侧 TX 判别用 out\r2_tx_probe.ps1。
+#   · 触发式 ILA: r2_ilacap.tcl 支持 R2_TRIGGER_PROBE/R2_TRIGGER_COMPARE/R2_TRIGGER_TIMEOUT_S/R2_TRIGGER_PROBE_FALLBACK(见 README §4.5)。
+#
+# 🔧 round2d 重建(2026-10-18 17:0x-17:1x, Lead): lite_regs 修复已合入 + round2d 冻结集合:
+#   · RTL blobs: bridge f43267db / fmi 96d5b136 / top 1885225f / lite d133b508; 综合 PASS(0 err/0 CW); place/route sweep 进行中(ExtraTimingOpt 先掷; WNS 余量仅 +0.004, 不收敛会先裁 ILA 再掷 ⇒ ltx 可能变, 届时需重钉探针期望)。
+#   · 候选 ELF = f8cf4022 (50,920 B; dread 3 读保留 + 去掉 1ms 限速=满速驻留服务); 旧候选 1e3a42db / 旧冻结 1bc8088d 均保留可识别但不建议。
+#   · TP 判别脚本: out\r2_tx_probe.ps1 (Get-NetAdapterStatistics + netstat -e 前后 delta; 三分类 NO_FRAME/BAD_FRAME/COUNTER_STATIC; 可选 npcap/pktmon 抓包提示)。
 #
 # 用法:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File r2_board.ps1            # DRY-RUN
 #   powershell ... -File r2_board.ps1 -Run `
 #       -Bit  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\aurora_mem_bridge_r2_28921C6B.bit `
-#       -Elf  D:\FPGA\prj\project_11\out\archive\<round2d 归档>\j3_soft_r2_1e3a42db.elf `
+#       -Elf  D:\FPGA\prj\project_11\out\archive\<round2d 归档>\j3_soft_r2_f8cf4022.elf `
 #       -BuildLog <R2 构建日志> `
-#       [-Port COM5] [-ExpectBitHash8 xxxxxxxx] [-ExpectElfHash8 1e3a42db] `
+#       [-Port COM5] [-ExpectBitHash8 xxxxxxxx] [-ExpectElfHash8 f8cf4022] `
 #       [-Xsa <xsa> -ExpectXsaHash8 xxxxxxxx] [-StrictS2sr] `
 #       [-IlaCapture -IlaLtx <归档 probes_r2_<bit8>.ltx>] [-RequireR2Probes] `
 #       [-SkipBurn] [-SkipS4] [-SkipS7] [-QuickS7] [-SkipS8] [-SkipS9] [-SkipS11] `
@@ -201,8 +206,14 @@ $script:Vivado = "D:\Xilinx\Vivado\2023.1\bin\vivado.bat"
 $script:KnownFullPathPy = "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe"
 $script:KnownR1BitHash8 = "c8cd3a32"
 $script:KnownR1ElfHash8 = "2961b585"
-$script:KnownR2ElfHash8 = "1e3a42db"     # round2d 候选固件(2026-10-18 修 serve_write_once dread 3 读; 50,944 B; 修复前 pending_seen 恒 0); 尚未归档, Lead 确认后冻结
-$script:KnownR2ElfPrevHash8 = "1bc8088d" # 旧冻结固件(50,896 B; round2c 构建/首轮板验用; 已知 Lite 读滞后缺陷: 紧循环交替地址 2 读仍滞后 ⇒ 固件看不到 pending)
+$script:KnownR2ElfHash8 = "f8cf4022"     # round2d 候选固件(2026-10-18: dread 3 读 + 去掉 1ms 限速=满速驻留服务; 50,920 B); 尚未归档, Lead 确认后冻结
+$script:KnownR2ElfPrevHash8 = "1e3a42db" # 上一候选(50,944 B; dread 3 读但仍有 1ms 限速)
+$script:KnownR2ElfOldHash8 = "1bc8088d"  # 旧冻结(50,896 B; Lite 读滞后缺陷: 紧循环交替地址 2 读仍滞后 ⇒ 固件看不到 pending)
+# round2d 冻结 RTL 集合(Lead 2026-10-18 17:1x): bridge / fmi / top / lite_regs 的 git blob
+$script:KnownR2BlobBridge = "f43267db82b84305cfeb519adcfa76f79443f6b3"
+$script:KnownR2BlobFmi    = "96d5b136"
+$script:KnownR2BlobTop    = "1885225f"
+$script:KnownR2BlobLite   = "d133b508"
 $script:KnownR2ElfPath = "D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf"
 $script:KnownR2XsaPath = Join-Path $script:OutRoot "mb_ctrl.xsa"
 # round2c 成功位流身份(2026-10-18, 归档 b31b_r2_2026-10-18; SHA256.txt 权威)
@@ -952,12 +963,12 @@ function Step-S0 {
         else { Write-Log ("Elf hash8 与期望不符: 实际 " + $elfHash.Substring(0, 8) + " ≠ 期望 " + $want) "Red"; $hashOk = $false }
     }
     if (-not $ExpectElfHash8) {
-        Write-Log ("提示: R2 候选固件 ELF 期望 hash8 = " + $script:KnownR2ElfHash8 + "（50,944 B, round2d 2026-10-18 修 dread 3 读; 旧冻结 " + $script:KnownR2ElfPrevHash8 + " 有 Lite 读滞后缺陷）; 路径 " + $script:KnownR2ElfPath + "; 建议 -ExpectElfHash8 " + $script:KnownR2ElfHash8 + " 钉死身份") "DarkYellow"
+        Write-Log ("提示: R2 候选固件 ELF 期望 hash8 = " + $script:KnownR2ElfHash8 + "（50,920 B, round2d 2026-10-18: dread 3 读 + 去掉 1ms 限速=满速驻留服务）; 路径 " + $script:KnownR2ElfPath + "; 建议 -ExpectElfHash8 " + $script:KnownR2ElfHash8 + " 钉死身份（旧候选 " + $script:KnownR2ElfPrevHash8 + " / 旧冻结 " + $script:KnownR2ElfOldHash8 + " 亦可识别但不建议）") "DarkYellow"
         if (Test-Path $script:KnownR2ElfPath) {
             Write-Log ("  当前该路径实算 hash8 = " + (Get-Hash8 $script:KnownR2ElfPath) + " size=" + (Get-Item -LiteralPath $script:KnownR2ElfPath).Length)
         }
-    } elseif (($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfHash8) -and ($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfPrevHash8)) {
-        Write-Log ("WARN: -ExpectElfHash8=" + $ExpectElfHash8 + " ≠ 已知 R2 固件(候选 " + $script:KnownR2ElfHash8 + " / 旧 " + $script:KnownR2ElfPrevHash8 + ")（若这是 dry-run fixture 场景=R1 归档 ELF, 属预期）") "Yellow"
+    } elseif (($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfHash8) -and ($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfPrevHash8) -and ($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfOldHash8)) {
+        Write-Log ("WARN: -ExpectElfHash8=" + $ExpectElfHash8 + " ≠ 已知 R2 固件(候选 " + $script:KnownR2ElfHash8 + " / 旧候选 " + $script:KnownR2ElfPrevHash8 + " / 旧冻结 " + $script:KnownR2ElfOldHash8 + ")（若这是 dry-run fixture 场景=R1 归档 ELF, 属预期）") "Yellow"
     }
 
     # ---- xsa 记录（新 xsa 含 S2MM; 可选钉死; 归档名 mb_ctrl_r2.xsa）----

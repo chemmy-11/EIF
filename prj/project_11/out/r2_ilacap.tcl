@@ -125,7 +125,9 @@ set expect_probes [split [envval R2_EXPECT_PROBES "dbg_s2mm_reqpend,dbg_wr_fault
 #   Behavior: PRE stays a trigger_now snapshot; the ILA that owns the trigger probe is ARMED before the
 #   stimulus, then stimulus runs, then we wait for trigger (or timeout) and upload that ILA as POST_T.
 #   The other ILA (if any) still gets a normal trigger_now POST snapshot.
+#   R2_TRIGGER_PROBE_FALLBACK : fallback probe if R2_TRIGGER_PROBE not present (default dbg_s2mm_reqpend)
 set trig_probe [envval R2_TRIGGER_PROBE ""]
+set trig_fallback [envval R2_TRIGGER_PROBE_FALLBACK "dbg_s2mm_reqpend"]
 set trig_cmp [envval R2_TRIGGER_COMPARE "eq1'b1"]
 set trig_timeout [envval R2_TRIGGER_TIMEOUT_S $waits]
 set trig_pos [envval R2_TRIGGER_POSITION 1024]
@@ -146,6 +148,7 @@ puts "R2CAP_MATCH_USER: $match_user"
 puts "R2CAP_MATCH_EXTRA: $match_extra"
 puts "R2CAP_EXPECT_PROBES: $expect_probes"
 puts "R2CAP_TRIGGER_PROBE: $trig_probe"
+puts "R2CAP_TRIGGER_PROBE_FALLBACK: $trig_fallback"
 puts "R2CAP_TRIGGER_COMPARE: $trig_cmp"
 puts "R2CAP_TRIGGER_TIMEOUT_S: $trig_timeout"
 puts "R2CAP_TRIGGER_POSITION: $trig_pos"
@@ -252,7 +255,13 @@ proc find_trigger_probe {pat} {
 }
 
 proc arm_trigger {pat cmp pos} {
+    global trig_fallback
     set hit [find_trigger_probe $pat]
+    if {[llength $hit] == 0 && $trig_fallback ne "" && $trig_fallback ne $pat} {
+        puts "R2CAP_TRIGGER_FALLBACK_PROBE: '$pat' not found; trying fallback '$trig_fallback'"
+        set hit [find_trigger_probe $trig_fallback]
+        if {[llength $hit] > 0} { puts "R2CAP_TRIGGER_FALLBACK_USED: $trig_fallback" }
+    }
     puts "R2CAP_TRIGGER_HITS: [expr {[llength $hit] > 0 ? "found" : "NONE"}]"
     if {[llength $hit] == 0} { return {} }
     set tila [lindex $hit 0]

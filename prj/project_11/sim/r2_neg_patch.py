@@ -21,6 +21,12 @@ RTL = os.path.join(PROJ, 'rtl', 'axi4_master_bridge.v')
 # Lead 冻结值（2026-10-18 14:0x round2c：新增 WD_ARM=7 一拍，拆 512 CE 关键路径）
 EXPECT_HASH = 'f43267db82b84305cfeb519adcfa76f79443f6b3'
 
+# 附加守卫（2026-10-18 round2d）：TB 的 DUT 例化 frame_mem_if（内部例化 bridge），
+# fmi 变化同样会改变仿真语义 -> 一并冻结。lite_regs/顶层不在本 TB 依赖内（TB 不编译），
+# 故它们的 hash 变化（如 round2d 的 d133b508 AXI 修复）不需要更新本守卫。
+RTL_FMI = os.path.join(PROJ, 'rtl', 'frame_mem_if.v')
+EXPECT_FMI_HASH = '96d5b136305e81ee9d4cc716e60c5034581d027d'
+
 
 def git_hash_object(path):
     out = subprocess.run(['git', '-C', 'D:/FPGA', 'hash-object', path],
@@ -37,6 +43,15 @@ def main():
     print('expected  hash  : %s' % EXPECT_HASH)
     if h != EXPECT_HASH:
         print('FATAL: rtl/axi4_master_bridge.v 与 Lead 冻结 hash 不符 -> 拒绝生成缺陷副本')
+        return 1
+    if not os.path.exists(RTL_FMI):
+        print('FATAL: rtl/frame_mem_if.v not found: %s' % RTL_FMI)
+        return 1
+    h_fmi = git_hash_object(RTL_FMI)
+    print('frozen fmi hash : %s' % h_fmi)
+    print('expected fmi    : %s' % EXPECT_FMI_HASH)
+    if h_fmi != EXPECT_FMI_HASH:
+        print('FATAL: rtl/frame_mem_if.v 与 Lead 冻结 hash 不符 -> 拒绝生成缺陷副本（TB DUT 语义已变）')
         return 1
 
     src = open(RTL, encoding='utf-8', errors='replace').read()

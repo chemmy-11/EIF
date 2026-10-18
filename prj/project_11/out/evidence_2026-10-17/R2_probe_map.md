@@ -6,6 +6,7 @@
 > **再更新（2026-10-18 14:0x，round2c 时序修复，RTL 新 blob `f43267db…`）**：新增 `WD_ARM=3'd7` 瞬态一拍（`WD_WAITGO` 完成→`WD_ARM` 清拼帧寄存器→`WD_STREAM`）；探针集与位宽**不变**（仍 ILA0 probe0=92/probe1=9/ILA3 probe0=152），但 **`dbg_s2mm_state` 编码新增 7=ARM（每帧瞬态 1 拍，板验/判据忽略；不等于 HALT=6）**。
 > 新 ltx 到位后仍按 §5 逐项核对；"探针都在"≠"位宽对"。
 > **实物核对已完成（2026-10-18 位流 `28921C6B…` / ltx `4AC25546…`）：§5 全部通过（宽度/位序/核数量/裁剪项缺失），发现 2 处非阻塞事实：`dbg_mem_rden` 在 probe0 bit48 被 Vivado 重命名为 `dbg_mem_rden_1`（同 net 双挂，功能同源）；ltx 不携带 ILA 时钟网名（时钟关联 `[待上板 hw_manager 确认]`，信号域归属已核）。详见 §5.1。**
+> **round2d 更新（2026-10-18 17:0x）**：`axi_lite_regs.v` 已合入 AXI 握手修复（blob `421df59c…`→**`d133b508…`**，见 `R2_rtl_audit §15`），**探针集合/位宽/位偏移全部不变**（裁剪后列表不含 lite_* 探针）；其余三文件 blob 不变；新 bit/ltx 到位后按 §5/§5.1 同清单核对，并确认归档 RTL 四副本 hash 集合含 `d133b508…`。
 
 ---
 
@@ -150,6 +151,12 @@
 1. `dbg_mem_rden` 在 ILA0 probe0 的 CSV/ltx 名为 **`dbg_mem_rden_1`**：若 `r2_counter_recon.py`/ILA 解析脚本按 `dbg_mem_rden` 精确匹配 probe0 列，会 miss 该位（当前 recon 未使用该列，风险低；建议匹配时兼容 `_1` 后缀）。
 2. ltx 无时钟网名 ⇒ 探针"核↔时钟域"只能靠 build 脚本+信号域或上板 hw_manager 确认；**不影响探针数据语义**（域归属已由 RTL 逐信号核对）。
 
+### 5.3 round2d（lite_regs AXI 修复后）核对补充
+* **冻结四文件集合（round2d）**：bridge `f43267db…` / fmi `96d5b136…` / top `1885225f…` / **lite `d133b508…`**。
+* **ltx 期望不变**：ILA0 probe0=92、probe1=9、ILA3 probe0=152；仅 `u_ila_0`/`u_ila_3` 两核；`dbg_mem_bresp/wslot/rslot` 不出现；末 5bit 顺序不变（`state[2:0]`/`tvalid`/`tready`）。
+* 新增核对项：归档 `rtl_axi_lite_regs.v` 的 `git hash-object` 必须 = `d133b508f80480bb8fa70a7f4a7953a07d8cb230`（bit↔RTL 绑定，旧 bit 28921C6B 对应 421df59c，勿混）。
+* `u_ila_5 @eth_rxc` **暂不加**（等 Lead PC 侧零成本判别结果）；`dbg_mem_rden_1` 命名注记与时钟网 `[待上板]` 项维持。
+
 ---
 
 ## 6. 资源/可观测性影响（round2b）
@@ -174,4 +181,4 @@
 * **判据口径需同步**：S10 的 bresp 项 → INFO/未取得（§6.2-1）；DESIGN §11 K1 若引用"ILA1 probe1"应更正为 **ILA0 probe1**（发射字节流探针）。
 * **round2c（`f43267db…`）**：探针位宽/偏移不变；`dbg_s2mm_state` 新增 7=ARM 瞬态（1 拍/帧，板验忽略）；`out/r2_counter_recon.py` 对未知状态值只作 INFO 打印（不参与硬判），无需改动；若需严格可把 7 加进其解码表（Lead 文件）。
 * `stat_wr_timeout` 仍不可观测（A17）：板验替代口径 `dbg_wr_fault`+`state==6(HALT)`+`WM_WR` 停滞；不得写"timeout 计数=0"。
-* 状态：**纸面核对 [L2] + 实物 ltx 核对已完成 [L2-构建产物直证]（2026-10-18，bit `28921C6B…`/ltx `4AC25546…`）**；仅 **时钟网关联** 与 **`dbg_mem_rden_1` 命名注记** 两项非阻塞遗留（前者 `[待上板 hw_manager 确认]`，后者工具匹配兼容即可）。
+* 状态：**纸面核对 [L2] + 实物 ltx 核对已完成 [L2-构建产物直证]（2026-10-18，bit `28921C6B…`/ltx `4AC25546…`；round2d 待新 bit/ltx 后同清单复核，见 §5.3）**；仅 **时钟网关联** 与 **`dbg_mem_rden_1` 命名注记** 两项非阻塞遗留（前者 `[待上板 hw_manager 确认]`，后者工具匹配兼容即可）。

@@ -520,6 +520,47 @@
 * ltx 探针布局与 `R2_probe_map.md` 期望**逐项一致**（含裁剪项缺失验证）；`R2_probe_map.md` 的 `[待核对]` 已升级为**实物直证**，仅"时钟网名"留 `[待上板 hw_manager 确认]`（非判据项）。
 * **可交板验**；唯一建议先修的文档项 = A19（`SHA256.txt` 头部过期 blob），不阻塞上板。
 
+---
+
+## 15. round2d：`axi_lite_regs` AXI 握手修复合入 + TB 冻结 hash 体系说明
+
+> 依据：Lead 2026-10-18 17:0x 通知（已合入我在 `R2_rtl_audit §13`/分析文件 `R2_rtl_lite_regs_wedge_analysis_20261018.md §0` 给出的 `R2_axi_lite_regs_fix.v`）。本节记录**可核对的 blob/守卫事实**与**新 bit/ltx 核对顺序**，不含板验结论（板证待新位流）。
+
+### 15.1 blob 事实（本机实测 `git hash-object`）
+| 文件 | 旧冻结（round2c，bit 28921C6B） | **round2d 现状** | 变化 |
+|---|---|---|---|
+| `rtl/axi4_master_bridge.v` | `f43267db…` | `f43267db82b84305cfeb519adcfa76f79443f6b3` | 不变 |
+| `rtl/frame_mem_if.v` | `96d5b136…` | `96d5b136305e81ee9d4cc716e60c5034581d027d` | 不变 |
+| `rtl/aurora_mem_bridge.v` | `1885225f…` | `1885225ffac800c71187aa428f3d4908f7e3f975` | 不变 |
+| `rtl/axi_lite_regs.v` | `421df59c…` | **`d133b508f80480bb8fa70a7f4a7953a07d8cb230`** | **= 我的 fix 副本 blob（逐字一致）** |
+* 交叉验证：`git hash-object out/evidence_2026-10-18/R2_axi_lite_regs_fix.v` = `d133b508…`（与合并后 `rtl/` 完全相同）⇒ **合入无额外改动** [L2]。
+* 固件候选终版：ELF **`f8cf4022`**（50,920 B；`dread` 保留 3 读作板验期防御、去掉 1ms 限速）。位流/ltx 待重建。
+
+### 15.2 TB 冻结 hash 体系（现状 + 本轮更新）
+1. **`sim/r2_neg_patch.py`（唯一的 hash 守卫处）**：
+   * 原有：`EXPECT_HASH = f43267db…`，对象 `rtl/axi4_master_bridge.v`，不符即 **FATAL 拒绝生成缺陷副本**；
+   * **本轮新增**：`EXPECT_FMI_HASH = 96d5b136…`，对象 `rtl/frame_mem_if.v`（TB 的 DUT 例化 fmi；fmi 变化同样改变仿真语义）→ 同样 FATAL；suite 日志现在打印 4 行（bridge/fmi 各 frozen+expected）。
+2. **`sim/r2_wr_tb.sv` / `run_r2_wr_tb.bat`：不含任何 hash 常量**（grep 已核；verdict 字符串里的 "expected" 不是 hash 校验）⇒ 守卫集中在 patch 脚本，单点可审计。
+3. **TB 的编译依赖**（bat 的 xvlog 列表）：`async_fifo.v`、`dma_rd_shim_v2.v`、`axi4_master_bridge.v`、`frame_mem_if.v`、`r2_wr_tb.sv` ——**不含 `axi_lite_regs.v`、不含顶层 `aurora_mem_bridge.v`**。
+4. ⇒ **round2d 的 lite_regs 合入不改变 TB 编译/仿真语义**；bridge/fmi 未变 ⇒ 正型/2 负向判据不变、suite 可原样复跑。已按新守卫复跑一次：**正型 PASS + 2 负向按设计 FAIL + SUITE PASS**（日志 `R2_sim_r2_wr_tb_round2d_*`，见 §15.4）。
+5. **更新规则（以后冻结变更时）**：
+   * bridge 或 fmi 变 → 更新 `EXPECT_HASH`/`EXPECT_FMI_HASH` → 复跑 suite → 归档新日志（负向副本会自动按新文件重新生成）；
+   * 顶层 `aurora_mem_bridge.v` 或 `axi_lite_regs.v` 变（如 round2d）→ **本 suite 无需改守卫/无需重跑**（不在依赖内）；但若顶层改动触及探针连线/实例化，需要更新 `R2_probe_map.md` 并重核 ltx；
+   * 可选残留：`dma_rd_shim_v2.v`、`async_fifo.v` 也是 TB 编译依赖，当前**未加 hash 守卫**（稳定少动；如要更严可再加两条）。
+
+### 15.3 新 bit/ltx 出来后的核对顺序（不阻断 Lead，仅列清单）
+1. bit/ltx SHA256 实测 vs Lead 通知；
+2. 归档 RTL 四副本 `git hash-object` = 上表 **round2d 四文件集合**（bit↔RTL 绑定，必须含 `d133b508`）；
+3. ltx 探针：**期望与 round2c 完全一致**（ILA0 probe0=92、probe1=9、ILA3 probe0=152、仅 2 核、裁剪项不出现）——lite_regs 修复不改变裁剪后探针列表（列表里没有 lite_* 探针）；
+4. 时钟网名仍需上板 `hw_manager` 一次性确认（ltx 不含时钟网）；`dbg_mem_rden_1` 命名注记仍适用；
+5. `u_ila_5 @eth_rxc` **先不加**：等 Lead PC 侧零成本判别（`Get-NetAdapterStatistics` ReceivedErrors/Discarded + 可选 pcap）决定 C（TX 无帧）是否需要 eth 探针，避免再一轮重建；
+6. 板端首要验证顺序：'U' 读滞后是否随 RTL 修复消失（2 读即可，3 读仅防御）→ 最小序列 'd'+1 ping 不楔死 → 再 S0–S11 / S4 86B 逐字节。
+
+### 15.4 本轮证据
+* `R2_sim_r2_wr_tb_round2d_{pos,neg_cursor,neg_tkeep,suite}_run.log`（新守卫下 suite 复跑结果：PASS/FAIL/FAIL + SUITE PASS）。
+* AXI 缺陷/修复证据：`R2_sim_lite_proto_{frozen,fix}_{r,w}.log`、`R2_axi_lite_regs_fix.{diff,v}`（见分析文件 §0）。
+* 状态：**AXI 楔死根因记 [L2]（RTL 缺陷：RVALID/BVALID 多拍 → 重复握手；读滞后同源）**；板证待 round2d 位流。修复后若仍有楔死，则按 §0.2 的次级窗口（arready 丢失 AR）/复位失配/互连行为继续二分。
+
 > **脚本编码说明（对任务书"bat 带 BOM"的落实）**：`run_r2_wr_tb.bat` 采用 **ASCII-only 注释 + CRLF、无 BOM**。
 > 理由：本仓库 9 个既有 `run_*.bat` 均为无 BOM；AGENTS.md #17/#18 的 BOM 要求针对 `.ps1`（PS 5.1 解析）；
 > 给 `.bat` 加 UTF-8 BOM 会使 cmd.exe 把首行 `@echo off` 当命令名解析（实测报错），破坏一键复现。
