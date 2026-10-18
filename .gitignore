@@ -113,3 +113,7 @@ iter_*_CongestedCLBsAndNets.txt
 # Python 编译缓存
 __pycache__/
 *.pyc
+
+# 临时仿真/检查目录
+tmp_r2_check*/
+tmp_*/
