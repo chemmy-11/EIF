@@ -1,0 +1,62 @@
+--- rtl axi_lite_regs d133b508
++++ proposed fix2 (single-cycle ready + write/read serialization)
+@@ -183,23 +183,30 @@
+             //   单次写会产生多次 B 握手（AXI4-Lite 协议违例, 会把互连的写跟踪弄乱）。
+             if (s_axi_bvalid && s_axi_bready) s_axi_bvalid <= 1'b0;
+             case (lwst)
+             LW_IDLE: begin
+-                // each ready reflects ONLY its own channel: after AW is
+-                // latched, wready must STAY HIGH for the late W (dropping
+-                // both deadlocks the split-timing case)
+-                s_axi_awready <= !aw_pending;
+-                s_axi_wready  <= !w_pending;
+-                // AW handshake: latch independently (whenever it occurs)
+-                if (s_axi_awvalid && s_axi_awready && !aw_pending) begin
+-                    aw_word     <= s_axi_awaddr[7:2];
+-                    aw_pending  <= 1'b1;
+-                end
+-                // W handshake: latch independently (whenever it occurs)
+-                if (s_axi_wvalid && s_axi_wready && !w_pending) begin
+-                    wd_byte     <= s_axi_wdata[7:0];
+-                    w_pending   <= 1'b1;
+-                end
++                // ★FIX2(2026-10-18): ready 单拍握手模式。
++                //   原实现 "s_axi_awready <= !aw_pending" 在握手后的下一拍
++                //   仍输出 1 (空间窗口) -> 若主端/互连连续推进第二笔 AW/W,
++                //   会被总线握手但 FSM 丢弃 -> 互连永等 B -> 后续读被阻塞/椰死。
++                //   现在: ready 只拉高到握手为止, 握手拍立即拉低。
++                //   另: 写响应 (bvalid) 未完成前不接受新写 (AXI 单笔 B 未消费不得再接新写)。
++                if (!aw_pending && !s_axi_bvalid) begin
++                    if (!s_axi_awready) s_axi_awready <= 1'b1;
++                    else if (s_axi_awvalid) begin
++                        s_axi_awready <= 1'b0;
++                        aw_word       <= s_axi_awaddr[7:2];
++                        aw_pending    <= 1'b1;
++                    end
++                end else s_axi_awready <= 1'b0;
++                if (!w_pending && !s_axi_bvalid) begin
++                    if (!s_axi_wready) s_axi_wready <= 1'b1;
++                    else if (s_axi_wvalid) begin
++                        s_axi_wready <= 1'b0;
++                        wd_byte      <= s_axi_wdata[7:0];
++                        w_pending    <= 1'b1;
++                    end
++                end else s_axi_wready <= 1'b0;
+                 // both captured -> decode and fire the mailbox
+                 if (aw_pending && w_pending) begin
+                     if (aw_word == 6'h00)
+                         a_data <= {OP_SET_MODE,  wd_byte};
+@@ -272,9 +279,12 @@
+                 // master would otherwise never see it high while arvalid is
+                 // held -> endless accepts; found by the bench, 2026-10-10).
+                 // ★FIX: 单拍 arready（先拉高一拍, 下一拍握手并立即撤销; 避免接受后
+                 //   多一拍 arready=1 导致流水主端的第二个 AR 被总线握手但被 FSM 丢弃）。
+-                if (!s_axi_rvalid && !r_ack_s[1] && !s_axi_arready) begin
++                // ★FIX2: 写事务未完全关闭 (FSM/待锁存/B) 前不接受新 AR：
++                //   消除 "写命令后紧接读" 的跨通道竞争窗口。
++                if (!s_axi_rvalid && !r_ack_s[1] && !s_axi_arready &&
++                    (lwst == LW_IDLE) && !aw_pending && !w_pending && !s_axi_bvalid) begin
+                     s_axi_arready <= 1'b1;
+                 end
+                 else if (s_axi_arready) begin
+                     if (s_axi_arvalid) begin

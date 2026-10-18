@@ -156,6 +156,53 @@ LR_IDLE:
 
 ---
 
+---
+
+## E. round2f 上板后更新（2026-10-18 21:0x）：A 残留竞争复核 + B(TX 无帧) 证据与探针方案
+
+### E.1 A：lite 修复后仍楔死（读 +0x40；busy_ms 规避）——新增候选补丁 fix2
+* 板端事实（Lead）：wedge 挂点 = `dread()` 读 lite_regs **+0x40**（PC 停 `lwi`，`g_dbg_addr=0x44A00040`）；在 S2MM `R_WRGO` 写后加 `busy_ms(1)` 即不再楔死 ⇒ 与"写后紧接读"强相关。
+* 代码再审视（当前 `axi_lite_regs.v`=`d133b508`）：写通道 `LW_IDLE` 仍是**寄存器 ready 尾窗**：
+  `s_axi_awready <= !aw_pending` / `s_axi_wready <= !w_pending` 在握手拍又对旧值赋值 ⇒ 握手后下一拍 ready 输出仍为 1，若互连/主端在此拍推进下一笔 AW/W，会**总线握手成功但 FSM 因 `!aw_pending` 门丢弃** ⇒ 互连永等该笔 B ⇒ 后续读被阻塞/`lwi` 卡死（[L1] 与"写后紧接读"吻合）。另：`bvalid` 未消费时可接新写、读 AR 与写事务无串行化，放大该窗口。
+* **候选补丁 fix2（已生成并仿真验证，未改 rtl/）**：
+  `sim/r2_tmp/axi_lite_regs_fix2.v` / `axi_lite_regs_fix2.diff`：① AW/W ready 改**单拍握手**（拉高到握手为止，握手拍拉低，消除尾窗）；② `bvalid` 未消费前不接受新写；③ 写事务（FSM/待锁存/B）完全关闭前不接受新 AR（串行化"写后紧接读"）。
+  验证（离线单元 TB）：单读/单写仍 PASS；**背靠背两笔写 → AW/W/B = 2/2/2 PASS**（当前版本同一 TB = 1/1/1 FAIL ⇒ 第二笔写无法完成）。TB：`sim/r2_tmp/r2_lite_pipe_wr_tb.sv`（新）。
+* 建议：A 项下一轮可合入 fix2（低风险，100MHz 域），同时保留固件 busy_ms 直到板证；若仍复现，再加"读/写邮箱超时→SLVERR + sticky"（把死机降级为可观测错误），并加 lite 域探针（见 E.2 资源讨论）。
+
+### E.2 B：TX 无帧——新证据 / 零重综合判别 / 探针方案复核 / 厂商判读口径
+**新证据（本机解析 round2f ILA）**
+* `R2_ila_emittrig_user_post.csv`（trigger=dbg_mem_rden 上升）：发射流恰为**一次 86 拍连续 rden=1**（长度正确=86），`mem_rd_data[7:0]` 采样 = **84 个 0xFF + 位置 73=0xEF + 位置 80=0xFD**（其余全 FF）⇒ 读出的 86 字节内容 ≈ 全 1，而非期望的 `55×7,D5 + 帧`。
+* 因此方向：rb FIFO（读侧字节 FIFO）内容≈0xFF ⇐ shim 从 MM2S 流拿到的就是 0xFF，或槽内容/MM2S 参数异常；结合 R1 同板同线 ping 4/4 ⇒ 链路/PHY/PC 正常，问题在 R2 数据面（写侧→DDR 槽内容，或 MM2S 读请求参数）。
+* **零重综合判别（优先做，最快）**：运行固件 `'F'` 命令（`sw/src_j3/main.c:735-768`）：对**最后提交槽** `SA-64/SA/SA+64` 各做一笔 MM2S 64B，回读 dma_sink q1=该笔流首拍 4 字节 LE。期望：
+  * `q1[0] = 0x55555555`（前导+SFD 前 4 字节 55 55 55 55）；`q1[-64]` = 上一槽尾部、`q1[+64]` = 下一槽开头（通常非 55 序列）；
+  * 若 `q1[0]=0xFFFFFFFF` ⇒ 槽内容全 1 / 未写；
+  * 若 `q1[-64]` 或 `q1[+64]` 才是 `0x55555555` ⇒ 写入地址偏移（±64B）；
+  * 若 `q1[0]` 为字节反序（如 `0xD5555555`）⇒ 首拍 lane 序/前导位置问题。
+  该命令不依赖写路径，可在现 bit+固件上直接跑 ⇒ **先做 'F' 再决定是否重建**。
+
+**探针方案复核（重要修正：域不匹配）**
+* **`m_axis_s2mm_*` 在 ui_clk（300MHz）域；ILA0 是 user_clk（151.5MHz）域 ⇒ 不能加到 ILA0**（跨域采样数据无意义）。
+* 可选方案：
+  1. **新建小 ILA `u_ila_5` @ui_clk**：推荐 `m_axis_s2mm_tdata[63:0]` + `tkeep[7:0]` + `tvalid/tready/tlast` = **75b**（C_DATA_DEPTH 1024，C_INPUT_PIPE_STAGES 1）。这是唯一能完整核对"首拍 55×7,D5"的方案；timing 风险中等（新核、探针在寄存器 Q 上），若 WNS 紧可先只 42b（tdata[31:0]+tkeep+tvalid/tready/tlast）但只能看到前 4 字节。
+  2. 加到 ILA3（152→227b @300MHz）：**不建议**（W6 教训：300MHz 加挂曾致 WNS −1.142）。
+  3. **低成本替代（user 域，可加 ILA0）**：`mem_wr_data[7:0]` + `mem_wr_en`（pump A→桥写入口，user_clk 域）9b——现有 ILA0=92b，**不必移走 mem2_u_***（101b 远低于历史 376b）；用于核对"进桥字节"是否 55…；配合 'F' 可把故障分层到"写入口 / S2MM / MM2S 读出"。
+  4. 触发建议（ui ILA）：`tvalid && tready && !tlast`（首拍触发，窗口含末拍）或 `tlast && tvalid && tready`（尾拍触发，窗口含首拍）；`R2_EXPECT_PROBES` 里加 `m_axis_s2mm_tdata`。
+* **位预算**：ILA0 加 9b 无需裁任何现有探针（92→101b）；ui 新 ILA 75b 属新增；若必须腾面积，优先降 ILA3 C_DATA_DEPTH（2048→1024）而不是再裁判据探针。
+
+**厂商判读口径（本机 Vivado 2023.1 数据直证）**
+* IP 配置（生成 wrapper）：`C_S_AXIS_S2MM_TDATA_WIDTH=512`、`C_M_AXI_S2MM_DATA_WIDTH=512`、`C_INCLUDE_S2MM_DRE=0`、`C_S2MM_BURST_SIZE=16`；`C_INCLUDE_S2MM_DRE` 仅在 stream width<128 时可选（`component.xml` 依赖）⇒ 512b 无 DRE，SA 必须对齐（4KB 槽基址 ✓）。
+* **生成网表含 `\GEN_INDET_BTT.*` / `\GEN_ENABLE_INDET_BTT.*` 层级、无 `sig_strt_strb_reg`** ⇒ 本实例 **C_ENABLE_INDET_BTT=1（Indeterminate BTT 生效）**：S2MM 的 **WSTRB 来自 stream TKEEP**（datamover `axi_datamover_v5_1_vh_rfs.vhd:16429-16437`），**TLAST 终止传输**。⇒ **尾拍 TKEEP/TLAST 是真判据（A9 风险为真，不是被 BTT 掩盖）**。
+* 数据 lane 映射：datamover 等宽路径 `sig_data2mmap_data <= s2mm_strm_wdata`（同文件 :15953）**无 lane 交换** ⇒ **TDATA lane k → 内存地址 +k**（AXI4-Stream 首字节在 TDATA[7:0]）。
+* **捕获判据（ui ILA）**：
+  * beat0：`tdata[63:0] = 0xD555555555555555`（byte0=0x55, byte7=0xD5）、`tkeep=0xFFFF_FFFF_FFFF_FFFF`；
+  * beat1（86B 帧）：`tdata[63:0]` 低 22 字节 = 帧字节 64..85，`tkeep = 0x0000_003F_FFFF`、`tlast=1`；
+  * 若 beat0 即 FF/0 ⇒ 写引擎/上游数据源问题；若 beat0 正确而 'F' 读槽为 FF ⇒ S2MM 写入参数/地址/MM2S 读出问题。
+
+### E.3 结论/下一步（供 Lead）
+1. **先跑 'F'**（零重建）判定槽内容；这决定 B 是"写侧内容错"还是"读侧参数错"。
+2. 若重建：按 E.2 方案 1 加 ui ILA（75b）或方案 3 加 ILA0 写入口 9b；probe map 需同步更新（届时我核对 ltx）。
+3. A 项 fix2 可随同一轮重建合入（验证证据在 E.1）；保留 busy_ms 直到板证。
+
 ## D. 建议的最小操作序列（**先合入 §0 补丁再跑**）（区分触发点，每步记录 `'U'` + ILA 触发）
 1. 仅 'U' ×20（无 'd'、无 ping）——基线 + 看读滞后形态；
 2. 'd' → 等 2s → 'U' ——只有 GO/read-service 初始化，无帧；
