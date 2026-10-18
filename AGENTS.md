@@ -10,8 +10,9 @@
 - [§一 角色与红线](#一角色与红线)（硬红线：代劳边界 / git 可追溯 / ASCII 路径）· [§二 事实源与第一性原则](#二事实源与第一性原则本工程最高规范)（可信度排序）· [§三 硬件事实卡](#三硬件事实卡实测定论勿凭记忆改写)（器件/引脚/时钟实测定论）
 - [§四 工程结构与脚本规范](#四工程结构与脚本规范)（目录约定 + Tcl 四件套）· [§五 RTL/设计规范](#五rtl设计规范)（CDC 三合法形式 / XDC 受限 Tcl）· [§六 调试方法论](#六调试方法论按代价升序)（判别实验→ILA→网表解剖→延迟扫描）
 - [§6a 结论依据等级](#6a-结论依据等级2026-10-16-增补源于退役桥②读引擎两轮误判复盘)（**L0–L4：归因结论必须标注依据等级，低于 L2 只能称假说**）
+- [§6b AI 技能与官方文档检索](#6b-ai-技能与官方文档检索2026-10-18-增补)（**项目级 skill 作用域 / 官方文档检索调用与引用纪律 / 官方文档在事实源中的位置**，2026-10-18 新增）
 - [§七 验证判据规范](#七验证判据规范)（链路/通路/数据三层判据）· [§八 git 与文档规范](#八git-与文档规范)（提交前缀 / 命名规范 / 两类文档分放）
-- [§九 坑账本 #1–#61](#九correction坑账本踩过的坑--规范的来源)（**踩坑实录 = 规范的来源，排障先查这里**）
+- [§九 坑账本 #1–#64](#九correction坑账本踩过的坑--规范的来源)（**踩坑实录 = 规范的来源，排障先查这里**）
 - [§十 当前工程状态](#十当前工程状态一屏速览内部详表见本节附录)（**一屏速览：现在做到哪、下一步是什么**）
 - [§十一 跨目录约定](#十一跨目录约定) · [§十二 CI 与远程仓库规范](#十二ci-与远程仓库规范)（**CI 五+1 项检查各防什么、本地怎么跑、新增文件自检清单**）
 
@@ -125,6 +126,29 @@ D:\FPGA\prj\project_N\
 5. **时基校准**：涉及延时/速率的代码（如 `busy_ms`）上线前必须用可观测事件（LED/串口时间戳/ILA）标定一次真实时长——10-16 实证 `busy_ms(1)` 实为 **≈0.15ms（比设计快 6.6×；早期「慢 25×」为未实测误判，已被 M-B 推翻，见坑 #51）**，所有依赖它标定的轮询周期/超时阈值按 6.6× 重标。
 6. **记录写法**：记录类文档的结论行必须带等级标注（如"`[L1-假设]`"），复核/复盘时按等级倒序清理——先审 L0/L1 是否伪装成了结论。
 
+### 6b. AI 技能与官方文档检索（2026-10-18 增补）
+
+**背景**：2026-10-18 接入 AMD 官方 Ross 技能包（Vivado：elaboration 日志分析 / RTL lint / 时序方法学 / 工程交接 / 仿真排错 / ILA·VIO 手册）与官方文档检索（hosted `amd-doc-search`）。二者是**知识与流程层**；执行层仍是本仓库 `vivado-mcp/`（32 工具）+ xsct + 自研脚本——**装了技能不等于多出 Vivado 工具**。
+
+| 资产 | 位置 | 作用域 | 现状 |
+|---|---|---|---|
+| 项目级 AI 技能（7 个：6 官方 + `amd-doc-search` 桥） | `<vault>\.dsh\skills\`（vault = `C:\Users\15266\Desktop\毕设\`） | **仅本工作区**（DSH `projectRoot/.dsh/skills`，rank 100） | 已生效（热加载）；全局技能根 `~/.agents/skills` **不放**任何 Vivado 技能（2026-10-18 用户定案，避免污染其他 Agent 上下文） |
+| 官方文档检索（原生 MCP） | `~/.dsh/profiles/web/cordis.patch.yml` 的 `mcp-amd-doc-search` 条目 | DSH **web profile 全局**（所有工作区；重启 `dsh web` 后生效） | 已配置；工具名 `mcp__amd_doc_search__vivado_doc_search` |
+| 官方文档检索（项目桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | 已生效：`py doc_search.py "<query>"`（stdlib 直连 MCP，无需重启） |
+| 服务端点 | `https://ross.amd.com/mcp/doc-search` | AMD 托管、免 key、英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+；**query 会发往 AMD**（官方称不存 query 文本）；NDA/EA/项目私有资料不在索引内 | — |
+
+**使用纪律**：
+
+1. **先检索再回答**：凡需 AMD/Xilinx 官方依据（Vivado Tcl 命令/属性、UG901/UG903/UG906/UG949、AXI/Aurora/MIG、ILA 等），先调文档检索；结论必须带 `docs.amd.com` / `adaptivesupport.amd.com` URL。检索不到就写"未检索到"，**禁止臆造**命令/参数/约束。
+2. **依据等级定位**：带 URL 的官方文档 = **官方文档层**——高于 AI 生成文档（§二 最低档），低于官方例程/已验证 prj；可作 L3/L4 结论的**旁证**，不能当唯一证据。项目私有事实仍以 `D:\FPGA\docs`、坑账本为准。
+3. **过滤参数是提示性、不是硬过滤**：`family`/`version` 参数不保证返回结果都被限定，必须逐条核对返回块里的 `family:`/`version:` 字段（坑 #64）。
+4. **技能步骤要映射工具**：官方 skill 正文写的是官方 MCP 工具名（`vivadoExecute`/`vivado_start`/`vivado_doc_search` 等）；本工程一律按技能顶部「本机适配注记」映射到 `run_tcl`/`start_session`/`mcp_ctl.py` CLI 桥，**不得假设官方 MCP 已装**。
+5. **只读分析不占 Vivado**：解析历史 `runme.log`/`vivado.log`、lint/时序报告等只读任务**不启动 Vivado、不抢全局串行锁**；要启 Vivado 的步骤仍受红线 #2 / 坑 #21 约束。原始日志一律**复制到 C: 侧副本**再解析，不写回 `D:\FPGA`。
+6. **版本基线**：官方基线 Vivado 2026.1，本工程 2023.1；技能内版本假设须先核对，2023.1 待实测项见下方细节文档。
+7. **外发边界**：hosted 检索逐次外发 query；涉密/未公开设计细节禁用；完全离线需 AMD entitlement 的本地 KB（当前不投入）。
+
+**细节文档**：[参考文档](docs/参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18.md)（技能清单、调用示例、兼容性矩阵、2023.1 待实测、排障与回滚）。
+
 ## 七、验证判据规范
 
 **三层证明力**（每层通过才算闭环）：
@@ -216,6 +240,9 @@ D:\FPGA\prj\project_N\
 | 59 | **1-deep 预取流水：fetch 使能必须含“满拍保持拍”门控** | 2026-10-18 实证（prj11 R2 round2）：字节捕获流水首版 `wd_fetch` 缺 `!wd_beat_full`，满拍保持拍（`byte_valid_q=1 && beat_full=1`）继续 fetch 覆盖跨拍预取的下一字节 ⇒ **每个非末拍 64B 边界丢 1 字节**；len≥66 帧尾拍永不满足 → 56ms 看门狗 HALT。证据 [L2]：T1 len=64（单拍无跨拍预取）PASS 对照 T2 len=70 未提交 / T3 idx=1 自 k=64 逐字节错位（`got[k]=exp[k+1]`）；修法 `wd_fetch` 加 `&& !wd_beat_full` 后全过。**纪律 = 流水/预取类改造必须构造“跨边界”用例（len=64±k、背靠背帧），单拍用例会漏**。 | 2026-10-18 |
 | 60 | **“清寄存器”挂在跨条件转移拍 ⇒ 完成条件（FIFO level 比较）被并入宽寄存器 CE** | 2026-10-18 实证（prj11 R2 round2b→2c）：30/30 最差路径 = `u_wr_bytes/wr_gray_s2`→gray2bin→`rd_level`(3×CARRY8)→`wd_data_r[*]/CE`；根因 = `WD_WAITGO` 完成条件 `wf_level>=wd_len` 同拍清 512 位 `wd_data_r/wd_keep_r`（clear-on-transition）⇒ level 比较锥并进 512 CE。修法 = 拆 `WD_ARM` 独立一拍，用**状态译码**清零，比较只驱动 `wdst`（3 FF；HALT 编码保持 6，每帧 +1 拍）：WNS **−0.127 → +0.004**。**纪律 = 转移拍不要清宽寄存器；CE 尽量只依赖状态译码（FF），完成条件只进状态寄存器**。 | 2026-10-18 |
 | 61 | **Vivado 安装盘文件偶发读失败（transient）——长构建要带自动重试** | 2026-10-18 实证（prj11 R2 白天）：同一综合脚本先后遇 `versal_hdmi_tx_ss/bd.tcl: invalid argument`、`tcllib1.11.1/yaml/yaml.tcl: no such file`、ddr4 IP `Failed to deliver file(s)`；文件实际存在、无残留进程、重试即过（本轮第 2/4 次成功）。**纪律 = 综合/实现批处理加自动重试包装（如 `out/r2_synth_retry.ps1`，最多 4 次并记录 try 次数），不要把瞬态误判为设计/脚本缺陷**。 | 2026-10-18 |
+| 62 | **官方 AI 技能附带的 Python 解析脚本在 Windows 跨盘时崩溃** | 2026-10-18 实证：AMD `vivado-rtl-elaboration-analysis` 的 `parse_elab_messages.py` 用 `os.path.relpath(filepath, output_dir)` 把源文件路径转成相对输出目录的路径；源日志在 `D:`、输出 CSV 在 `C:` 时**抛 `ValueError: path is on mount 'D:'`，整份报告中止**（本轮实测写成 3 行后崩溃；同目录 elab 日志 452 条本应全量输出）。**修法 = `try/except ValueError` 保留绝对路径**（`<vault>\.dsh\skills\vivado-rtl-elaboration-analysis\parse_elab_messages.py` 已打本机补丁，`install_skills.py` 可重放）。**纪律 = 跑官方脚本先做日志副本、输出落同盘或先打补丁，不在 prj 目录原地跑** | 2026-10-18 |
+| 63 | **项目专用 AI 技能装到全局技能根 = 所有工作区都看到，污染上下文** | 2026-10-18 实证：DSH 技能根按 rank 扫描——`<projectRoot>/.dsh/skills`(100) → `.agents/skills`(200) → custom(300) → `~/.dsh/skills`(400) → `~/.agents/skills`(500) → bundled(600)；`projectRoot` = 最近含 `.git` 的祖先，无 `.git` 用 cwd。曾把 6 个 Vivado 技能装进 `~/.agents/skills`（rank 500 全局用户根）⇒ 所有工作区会话技能目录都多出约 2 KB 描述。**修法 = 项目专用技能一律放 `<workspace>\.dsh\skills`（项目级、随 workspace 走、`watch:true` 热加载）；全局根只留跨项目通用技能** | 2026-10-18 |
+| 64 | **hosted 文档检索的 `family`/`version` 过滤是提示性的，不是硬过滤** | 2026-10-18 实测：按 `family=["Kintex UltraScale+"]`、`version=["2023.1"]` 查询，返回结果仍混有 `family: All` / `version: All` 的通用条目（ILA 手册、chipscopy、AR 等）。**纪律 = 不能凭"加了过滤参数"就声称结果已限定器件/版本；引用前逐条核对返回块的 `family:`/`version:` 字段**（§6a"判据未触发≠通过"的变体：过滤参数≠过滤结果） | 2026-10-18 |
 
 ## 十、当前工程状态（一屏速览；内部详表见本节附录）
 

@@ -19,7 +19,8 @@
 |---|---|
 | **工程规范全文**（权威） | `D:\FPGA\AGENTS.md`；文件头有「目录（30 秒导航）」，覆盖 §一～§十二 |
 | **结论依据等级制度**（L0–L4 + 6 条硬规则） | AGENTS.md **§6a**；速览表见本文件下文「结论依据等级制度」节 |
-| **坑账本**（#1–#58，踩过的坑与修法） | AGENTS.md **§九** |
+| **坑账本**（#1–#64，踩过的坑与修法） | AGENTS.md **§九** |
+| **外部 AI 技能 / 官方文档检索**（2026-10-18 新增） | 本文件「★ 外部 AI 技能与官方文档检索」节；细节 `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18`；AGENTS.md **§6b** |
 | **当前工程状态**（一屏速览） | AGENTS.md **§十** |
 | **CI 与远程仓库规范**（6 项检查 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
 | **文档索引与命名规范** | `D:\FPGA\docs\README.md`（全量索引，CI 第 6 项强制与磁盘一致） |
@@ -41,6 +42,7 @@
 | 条目 | 内容 |
 |---|---|
 | `追踪_cross_短期待办_2026-10-10.md` | 任务清单与里程碑（当前任务的水位线）|
+| `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18.md` | 官方 AI 技能与文档检索：接入、调用、2023.1 待实测（2026-10-18）|
 | `规划_cross_长期路线图_2026-09-04.md` | 长期路线与决策记录 |
 | `操作文档/` | **操作开发类**（照着做）：实操单 / 实施单 / 开工开发文档 / 前置清单 / 验证单 / 作战卡（命名 `[阶段]_prj标识_概要_日期`）；`操作文档/挂起/` 为挂起课题收纳区（状态轴）|
 | `调试记录/` | **调试记录类**（看结果）：调试记录 / 执行记录 / 测试报告 / 独立复核 / 复现记录。**两类分开存放，判据见 README「存放规则」** |
@@ -86,6 +88,16 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - JTAG：Digilent USB-JTAG（210512180081）；串口 COM7。
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
 - **配套工具 `vivado-mcp`（已随仓库入库）**：MCP 服务，**32 个工具**——会话/Tcl/工程/流程/报告/诊断/CDC/位流探针/IP/波形十类；其中 `parse_xpr`·`parse_bit_header`·`parse_ltx`·`xdc_lint` 为**离线工具**（不启 Vivado）。**上游 = [mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26（Apache-2.0，LICENSE 已随源码入库）**——本仓库副本**零代码改动**、仅目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 平铺入包内；逐字节比对 52 同 / 0 改）。上游基准 **Vivado 2019**，本项目 **2023.1**：离线工具与 Vivado 会话实测可用；**`compare_xci` 不可用**（上游按 XML 版 xci 设计，本项目 2023.1 的 xci 全为 JSON 版）。 仓库内为**可移植副本**（`D:\FPGA\vivado-mcp\`，零本机配置），安装与清单见 `vivado-mcp/README.md`。⚠️ **与下条「工具纪律」里的本机 CLI 壳是两回事**：那层壳是开发者本地设施、不入库。两条硬约束：安装路径必须**纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；Vivado 会话与综合/实现/仿真**全局串行**。
+- **AI 技能与官方文档检索（2026-10-18 新增）**：项目级技能 `毕设\.dsh\skills\`（7 个，**仅本工作区可见**；全局 `~/.agents/skills` 不放 Vivado 技能）；官方文档检索 hosted `amd-doc-search`（MCP 已配置在 DSH web profile，**重启 `dsh web` 后生效**；未重启时用项目桥 `py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>"`）。调用与引用纪律见下节。
+
+## ★ 外部 AI 技能与官方文档检索（2026-10-18 新增）
+
+- **技能（项目级，仅本工作区）**：`毕设\.dsh\skills\` 下 7 个——`vivado-rtl-elaboration-analysis`（综合日志分析 + **560 个** `[Synth 8-XXX]` 修复卡）· `vivado-rtl-lint`（20 个 lint 规则修复模板）· `vivado-revision-control`（工程导出/交接/重建）· `vivado-simulate-rtl`（XSim 排错/覆盖率/波形）· `hw-ila-debug` · `hw-vio-debug` · `amd-doc-search`（官方文档检索桥）。**全局技能根 `~/.agents/skills` 不放 Vivado 技能**（2026-10-18 定案，避免污染其他 Agent 上下文）。
+- **官方文档检索**：AMD hosted `amd-doc-search`（`https://ross.amd.com/mcp/doc-search`，免 key，英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+）。原生 MCP 已配置在 DSH web profile（**重启 `dsh web` 后**工具名 `mcp__amd_doc_search__vivado_doc_search`）；未重启时用项目桥：`py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>" --limit 5`。
+- **触发纪律**：AMD/Xilinx 官方依据类问题**先检索再回答**，结论带 `docs.amd.com` / `adaptivesupport.amd.com` URL；检索不到就写「未检索到」，**禁止臆造**命令/参数/约束。官方文档在事实源排序中 = **官方文档层**（高于 AI 生成文档、低于官方例程/已验证 prj，只作 L3/L4 旁证）。
+- **过滤要核对**：`family`/`version` 是提示性过滤，返回里仍可能混 `All` 条目，引用前逐条核对（坑 #64）。
+- **执行层不变**：技能只是知识与流程；官方 skill 里的 `vivadoExecute`/`vivado_start`/`vivado_doc_search` 按技能顶部「本机适配注记」映射到本工程 `run_tcl`/`start_session`/`mcp_ctl.py` CLI 桥。只读日志分析**不启动 Vivado、不占全局串行锁**；原始日志先复制到 C: 侧副本再解析。
+- **细节**：[[参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18]]；坑账本 #62–#64；2023.1 适配待实测项见该文档 §6。
 
 ## 当前状态（2026-10-16 更新；主线 = prj11 B3 数据面换层）
 
