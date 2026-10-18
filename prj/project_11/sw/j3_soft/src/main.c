@@ -354,6 +354,7 @@ static int serve_write_once(void)
     S2MM_LENGTH = len;                          /* 写 LENGTH = 启动传输 */
     g_wr_last_toggle = tog;
     R_WRGO = 1u;                                /* 翻 GO: 桥看到变化才放流 */
+    busy_ms(1);                                 /* 2026-10-18 板验: 写后间隔, 规避写后紧接读的 AXI 楔死 (待 RTL 根因收口后评估移除) */
     return 1;
 }
 
