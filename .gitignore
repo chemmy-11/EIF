@@ -102,3 +102,10 @@ prj/project_11/scripts/iter_*_CongestedCLBsAndNets.txt
 # ===== prj11 R2 负向对照生成物（由 sim/r2_neg_patch.py 从冻结 RTL 生成，可再生成）=====
 prj/project_11/sim/r2_neg_cursor/
 prj/project_11/sim/r2_neg_tkeep/
+
+# ===== prj11 R2 round2: 生成物 (审计 fix-check 副本 / Vivado 拥塞报告) =====
+prj/project_11/sim/r2_fix_check/
+prj/project_11/sim/r2_fix_neg_cursor/
+prj/project_11/sim/r2_fix_neg_tkeep/
+prj/project_11/sim/r2_tmp/
+iter_*_CongestedCLBsAndNets.txt

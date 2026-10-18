@@ -570,7 +570,13 @@ module axi4_master_bridge #(
     //       toggle 非电平: 帧到达是外部驱动, 连续请求可能在 2FF 窗口内无缝衔接。
     //=========================================================================
     localparam WD_IDLE=3'd0, WD_WAITGO=3'd1, WD_STREAM=3'd2, WD_PUSH=3'd3,
-               WD_WAITDONE=3'd4, WD_DRAIN=3'd5, WD_HALT=3'd6;
+               WD_WAITDONE=3'd4, WD_DRAIN=3'd5, WD_HALT=3'd6, WD_ARM=3'd7;
+    // ★WD_ARM=7 (2026-10-18 时序修复): 进入 STREAM 前独立一拍清拼帧寄存器.
+    //   失败轮实测: WAITGO 的完成条件 `wf_level >= wd_len` (12b 比较, 3x CARRY8)
+    //   被逻辑并进了 wd_data_r/wd_keep_r 的 512 CE (clear-on-transition), 使
+    //   gray 同步指针->level 比较->512 CE 成为 300MHz 关键路径 (slack -0.127)。
+    //   拆出 ARM 后: 清寄存器 CE = 状态译码 (FF), level 比较只驱动 wdst (3 FF)。
+    //   编码取 7 而非插入中间值, 保持既有 HALT=6 不变 (板验/判据工具文档口径)。
     reg [2:0]   wdst;
     // ★注意: 不得在本分支内再声明 wr_slot_ptr (会遮蔽模块级同名信号, 读 FSM 的
     //   c_clamp/c_in_rng/p_target_ok 用的是模块级副本 -> 静默断源)。本分支直接驱动模块级。
@@ -587,6 +593,13 @@ module axi4_master_bridge #(
     reg [23:0]  wd_done_cnt;
     reg [3:0]   wd_drain_wait;
     reg         wd_ack_seen;
+    // ★2026-10-18 (R2 构建失败轮 [L2] 关键路径修复): 字节捕获 1 级流水.
+    //   失败轮 25/30 最差路径 = u_wr_bytes/wr_gray_s2 (同步化写指针) -> gray 比较(3x CARRY8)
+    //   -> wd_fill -> 64:1 lane 译码 -> wd_data_r[*]/CE (512 CE, route 56.6%, slack -0.175ns).
+    //   加一级后: FIFO 读使能只驱动 8 FF (轻负载); 512 lane CE 由寄存器 byte_valid_q/byte_q 驱动.
+    //   吞吐仍 1 byte/cycle (取字节与消费字节流水并行).
+    reg  [7:0]  byte_q;
+    reg         byte_valid_q;
     reg [15:0]  wr_timeout_r;
     reg         wr_fault_r;
     reg [7:0]   wr_last_slot_r;
@@ -596,10 +609,16 @@ module axi4_master_bridge #(
     wire        wd_noroom_n  = full_bit_q[wd_slot_next];
     wire        wd_badlen_n  = (wd_data == 16'd0) || (wd_data > MAX_LEN);
     wire        wd_desc_av   = (wdst == WD_IDLE) && calib_ok && !wd_empty;
-    wire        wd_fill      = (wdst == WD_STREAM) && !wf_empty && !wd_beat_full;
+    // ★字节捕获流水 (2026-10-18): 取字节条件只含轻量锥 (FIFO 读使能 + 8 FF CE);
+    //   预取计数 = 已消费 wd_rxc + 流水内 1 字节, 严格不超过 wd_len (不预取下一帧).
+    //   ★审计复核必要门控 `!wd_beat_full`: 满拍保持拍 (beat 已满、等 PUSH) 不得再 fetch,
+    //   否则会覆盖尚未消费的跨拍预取字节 (每非末拍丢 1 字节; 审计 rtl-auditor 2026-10-18 抓到).
+    //   跨拍预取发生在"末字节消费当拍" (此时 wd_beat_full 旧值=0), 之后保持拍禁取 => 无吞吐损失.
+    wire        wd_fetch     = (wdst == WD_STREAM) && !wf_empty && !wd_beat_full &&
+                               ((wd_rxc + (byte_valid_q ? 16'd1 : 16'd0)) < wd_len);
     wire        wd_drain_pop = (wdst == WD_DRAIN) && !wf_empty && (wd_pop < wd_len);
     assign dma_wd_rd_en = wd_desc_av;
-    assign dma_wf_rd_en = wd_fill | wd_drain_pop;
+    assign dma_wf_rd_en = wd_fetch | wd_drain_pop;
 
     assign dma_wr_req_toggle  = wd_req_toggle;
     assign dma_wr_req_pending = wd_req_pending;
@@ -631,6 +650,7 @@ module axi4_master_bridge #(
             wd_len <= 16'd0; wd_pop <= 16'd0; wd_rxc <= 16'd0;
             wd_data_r <= 512'd0; wd_keep_r <= 64'd0;
             wd_beat_full <= 1'b0; wd_noroom <= 1'b0; wd_go_ok <= 1'b0;
+            byte_q <= 8'd0; byte_valid_q <= 1'b0;
             wd_go_seen <= 1'b0; wd_req_pending <= 1'b0; wd_req_toggle <= 1'b0;
             wd_req_slot_r <= 8'd0; wd_req_len_r <= 16'd0;
             wd_wait_cnt <= 24'd0; wd_stall_cnt <= 24'd0; wd_done_cnt <= 24'd0;
@@ -655,6 +675,7 @@ module axi4_master_bridge #(
             case (wdst)
             //-----------------------------------------------------------------
             WD_IDLE: begin
+                byte_valid_q <= 1'b0;      // 新帧清字节流水 (上一帧超时/拒收可能残留)
                 if (wd_desc_av) begin
                     wd_len       <= wd_data;
                     wd_slot      <= wd_slot_next;
@@ -697,14 +718,9 @@ module axi4_master_bridge #(
                     wd_go_ok   <= 1'b1;
                 end
                 if (wd_go_ok && (wf_level >= wd_len[12:0]) && !s2mm_introut) begin
-                    wd_beat      <= 8'd0;
-                    wd_bi        <= 8'd0;
-                    wd_rxc       <= 16'd0;
-                    wd_beat_full <= 1'b0;
-                    wd_data_r    <= 512'd0;
-                    wd_keep_r    <= 64'd0;
-                    wd_stall_cnt <= 24'd0;
-                    wdst <= WD_STREAM;
+                    // ★2026-10-18 时序修复: 本拍不再清 512 数据寄存器 (否则 level 比较锥
+                    //   被并入 512 CE 成为关键路径); 改入 WD_ARM 一拍由状态译码清零.
+                    wdst <= WD_ARM;
                 end else if (wd_wait_cnt == 24'hFFFFFF) begin
                     // 超时 (~56ms @300MHz): 软核未驻留/未编程 -> 整帧丢弃 (不停泊)
                     wr_timeout_r   <= wr_timeout_r + 16'd1;
@@ -717,28 +733,51 @@ module axi4_master_bridge #(
                 end
             end
             //-----------------------------------------------------------------
+            WD_ARM: begin      // ★2026-10-18: 独立一拍清拼帧寄存器 (CE 只依赖状态译码)
+                wd_beat      <= 8'd0;
+                wd_bi        <= 8'd0;
+                wd_rxc       <= 16'd0;
+                wd_beat_full <= 1'b0;
+                wd_data_r    <= 512'd0;
+                wd_keep_r    <= 64'd0;
+                wd_stall_cnt <= 24'd0;
+                byte_valid_q <= 1'b0;
+                wdst <= WD_STREAM;
+            end
+            //-----------------------------------------------------------------
             WD_STREAM: begin   // 逐字节攒拍 (尾拍 TKEEP 精确到字节, 与旧 WSTRB 等价)
-                if (wd_fill) begin
-                    wd_data_r[wd_bi*8 +: 8] <= wf_data;
+                // ★字节捕获 1 级流水 (2026-10-18 时序修复): 消费(寄存器->512 lane / 推进)
+                //   与取字节(FIFO->byte_q) 同拍并行 => 吞吐仍 1 byte/cycle。
+                if (byte_valid_q && !wd_beat_full) begin
+                    wd_data_r[wd_bi*8 +: 8] <= byte_q;
                     wd_keep_r[wd_bi]        <= 1'b1;
-                    wd_rxc <= wd_rxc + 16'd1;
-                    wd_stall_cnt <= 24'd0;
+                    wd_rxc                  <= wd_rxc + 16'd1;
+                    wd_stall_cnt            <= 24'd0;
+                    byte_valid_q            <= 1'b0;
                     if ((wd_bi == 8'd63) || ((wd_rxc + 16'd1) == wd_len)) begin
                         wd_beat_full <= 1'b1;
                     end else begin
                         wd_bi <= wd_bi + 8'd1;
                     end
-                end else if (wd_stall_cnt == 24'hFFFFFF) begin
-                    // ★fail-stop: 帧字节迟迟不到 (~56ms) -> 不提交、粘滞 fault、停泊 HALT
-                    wr_timeout_r   <= wr_timeout_r + 16'd1;
-                    wr_fault_r     <= 1'b1;
-                    wd_req_pending <= 1'b0;
-                    wd_ack_seen    <= dma_wr_ack;
-                    wdst <= WD_HALT;
-                end else begin
-                    wd_stall_cnt <= wd_stall_cnt + 24'd1;
                 end
-                if (wd_beat_full) wdst <= WD_PUSH;
+                if (wd_fetch) begin            // 取下一字节入流水 (预取不超过 wd_len)
+                    byte_q       <= wf_data;
+                    byte_valid_q <= 1'b1;
+                end
+                if (wd_beat_full) begin
+                    wdst <= WD_PUSH;
+                end else if (!wd_fetch && !(byte_valid_q && !wd_beat_full)) begin
+                    if (wd_stall_cnt == 24'hFFFFFF) begin
+                        // ★fail-stop: 帧字节迟迟不到 (~56ms) -> 不提交、粘滞 fault、停泊 HALT
+                        wr_timeout_r   <= wr_timeout_r + 16'd1;
+                        wr_fault_r     <= 1'b1;
+                        wd_req_pending <= 1'b0;
+                        wd_ack_seen    <= dma_wr_ack;
+                        wdst <= WD_HALT;
+                    end else begin
+                        wd_stall_cnt <= wd_stall_cnt + 24'd1;
+                    end
+                end
             end
             //-----------------------------------------------------------------
             WD_PUSH: begin     // AXI4-Stream 握手 (S_AXIS_S2MM)

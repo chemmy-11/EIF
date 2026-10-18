@@ -18,8 +18,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.abspath(os.path.join(HERE, '..'))
 RTL = os.path.join(PROJ, 'rtl', 'axi4_master_bridge.v')
 
-# Lead 冻结值（2026-10-17 22:2x，TB-WINDOW-OPEN 消息）
-EXPECT_HASH = '5f878644404fbb34ef1ada48bb9556ff8f401549'
+# Lead 冻结值（2026-10-18 14:0x round2c：新增 WD_ARM=7 一拍，拆 512 CE 关键路径）
+EXPECT_HASH = 'f43267db82b84305cfeb519adcfa76f79443f6b3'
 
 
 def git_hash_object(path):

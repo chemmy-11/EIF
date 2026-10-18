@@ -29,11 +29,16 @@ R2 把桥①(HAS_DMA=1, u_mem)的写路径从 axi4_master_bridge 硬件写 FSM �
   * --check-tcl PATH: Tcl 结构完整性检查(引号/花括号/方括号闭合 + 行尾 # 提示 + 非 ASCII 字节)。
        本机无 tclsh 时的替代自检; 权威判据仍是 CI 的 tclsh info-complete(AGENTS §十二)。
 
-R2 新探针布局(已与最终 build_synth_only.tcl / build_debug.tcl 机械对齐, Lead 2026-10-17 v1.2)
+R2 新探针布局(round2b 2026-10-18 ILA 探针集裁剪后; 已与 build_synth_only.tcl/build_debug.tcl 机械对齐)
 --------------------------------------------------------------------------------------------
-  ILA3 @ui_clk : dbg_s2mm_state[2:0] / dbg_s2mm_tvalid / dbg_s2mm_tready
-  ILA0 @user   : dbg_s2mm_reqpend / dbg_wr_fault
-  旧 dbg_mem_* / dbg_mem2_* 全部保留(桥计数仍在 ILA3@ui)。
+  本轮变动(round2b, 目的=省 300MHz 布线/资源余量, 不改 RTL):
+    * ILA1@eth_rxc / ILA2@user_clk_b **整核移除** —— R2 S0–S11 判据不使用, 本工具对缺失不报错。
+    * ILA0@user probe0 374→**92 bit**: dbg_mem_u_wr[16]/u_rd[16]/u_drop[16]/dbg_mem_rden(1)/
+      dbg_mem_ost_s[9]/dbg_mem2_u_wr[16]/dbg_mem2_u_rd[16]/dbg_s2mm_reqpend(1)/dbg_wr_fault(1);
+      probe1 发射字节流 9b 保留不变(S8c 判据用, 本工具不解析)。
+    * ILA3@ui probe0 184→**152 bit**: dbg_calib + mem wm/wr_frm/rd_frm/stall/len_err/ost +
+      mem2 wm/wr_frm/rd_frm/ost + dbg_s2mm_state[3]/tvalid/tready。
+    * **裁掉**: dbg_mem_bresp / dbg_mem_wslot / dbg_mem_rslot ⇒ 本轮不可观测(INFO/NOT_OBTAINED, 不判 FAIL)。
   dbg_wr_timeout 未挂 ILA(有意省 300MHz ILA3 余量; R1/W6 教训: 300MHz 域加 96b 曾 WNS -1.142);
   stat_wr_timeout 是桥内 16b 计数器且**无 Lite 读回路径** ⇒ 上板不可观测, 仅 INFO。
   可观测替代物: ILA3 dbg_s2mm_state(0=IDLE 1=WAITGO 2=STREAM 3=PUSH 4=WAITDONE 5=DRAIN 6=HALT)
@@ -95,6 +100,14 @@ BRIDGE_SEM = {
         "bresp":  ["dbg_mem2_bresp"],
     },
 }
+
+# round2b(2026-10-18) ILA 探针集裁剪(省 300MHz 布线/资源余量, 不改 RTL):
+#   ILA1@eth_rxc / ILA2@user_clk_b 整核移除(R2 S0–S11 判据不使用); ILA0 probe0 374→92b,
+#   ILA3 probe0 184→152b; 裁掉 dbg_mem_bresp / dbg_mem_wslot / dbg_mem_rslot。
+#   判据边界: 被裁探针列缺失 ⇒ INFO/NOT_OBTAINED(判据未取得≠失败, AGENTS §6a), 不判 FAIL。
+ROUND2B_TRIMMED = ["dbg_mem_bresp", "dbg_mem_wslot", "dbg_mem_rslot"]
+ROUND2B_NOTE = ("round2b ILA 裁剪: ILA1/ILA2 整核移除(判据不用, 缺失不报错); "
+                "dbg_mem_bresp/wslot/rslot 未挂 ⇒ INFO/NOT_OBTAINED, 不判 FAIL")
 
 # 全局 R2 新错误计数(与桥实例无关; 有探针就硬判 0, 没有则 INFO)
 #   Lead 2026-10-17 v1.2 终版: 错误硬判看 len_err/stall(桥①) 与 dbg_wr_fault(ILA0@user);
@@ -445,6 +458,7 @@ def judge_delta(ui_pre_cols, ui_post_cols, user_pre_cols=None, user_post_cols=No
 
     # ---- R2 S2MM 观测探针(仅打印, 供证据充分性判断) ----
     print("R2 S2MM 观测探针(INFO, 不参与硬判):")
+    print("  " + ROUND2B_NOTE)
     print("  " + S2MM_STATE_LEGEND)
     r2info_rows = []
     for field in R2_INFO_SEM.keys():
@@ -568,7 +582,9 @@ def judge_recon(ui_cols, user_cols=None, label="post", require_r2_probes=False):
                 bresp_txt = "无探针(INFO)"
                 info.append("mem2.bresp 无 ILA 探针(不可观测) —— 若需硬判需新增 dbg_mem2_bresp 探针")
             else:
-                missing.append("mem.bresp")
+                # round2b(2026-10-18) 裁掉 dbg_mem_bresp(S2MM 下恒 0, 只作 INFO) ⇒ 缺失记 INFO, 不判 NOT_OBTAINED
+                bresp_txt = "无探针(INFO/round2b 裁)"
+                info.append("mem.bresp 本轮 round2b ILA 裁剪未挂 dbg_mem_bresp(S2MM 下恒 0) ⇒ INFO, 不判 FAIL/NOT_OBTAINED")
         elif key == "mem2":
             bresp_txt = str(vals["bresp"])
             if vals["bresp"] != 0:
@@ -625,8 +641,10 @@ def judge_recon(ui_cols, user_cols=None, label="post", require_r2_probes=False):
             print("  %s(last) = %s" % (k, r2i[k]["last"]))
     print()
     print("观测能力说明(INFO, 不作判据):")
-    print("  - 桥① dbg_mem_bresp 在 S2MM 写路径恒 0(IP 内部 BRESP 不可见) ⇒ 仅 INFO")
+    print("  - " + ROUND2B_NOTE)
+    print("  - 桥① dbg_mem_bresp 在 S2MM 写路径恒 0(IP 内部 BRESP 不可见) ⇒ 仅 INFO; round2b 已裁该探针 ⇒ 缺失亦 INFO")
     print("  - 桥②(HAS_DMA=0, RTL 本轮未动) stall/len_err/bresp 无 ILA 探针 ⇒ 仅 INFO(不可观测)")
+    print("  - wslot/rslot(调试槽号) round2b 未挂 ILA ⇒ INFO(判据不使用)")
     print("  - timeout: dbg_wr_timeout 未挂 ILA 且 stat_wr_timeout 无 Lite 读回路径(+0x40/+0x44 不含) ⇒ 仅 INFO")
     print("  - 可观测替代: dbg_s2mm_state/dbg_wr_fault + 'U' 的 wreq/wdbg/s2sr + ro_wm 是否推进")
     print()

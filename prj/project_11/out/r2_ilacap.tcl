@@ -16,7 +16,7 @@
 #   env in (PowerShell: $env:R2_XXX=...):
 #     R2_LTX             archived probes ltx matching the burned bit
 #                        (default: <this dir>/scripts/probes.ltx)
-#     R2_OUT_DIR         output dir (default: <this dir>/evidence_2026-10-17)
+#     R2_OUT_DIR         output dir (default: <this dir>/evidence_<today yyyy-mm-dd>)
 #     R2_TAG             file tag (default: r2)
 #     R2_STIM_CMD        stimulus command executed between PRE and POST
 #                        (default: ping -n 4 -w 900 192.168.1.10)
@@ -40,18 +40,31 @@
 #   R2CAP_START / R2CAP_LTX / R2CAP_ILA_* / R2CAP_PROBE_* / R2CAP_GRAB_* /
 #   R2CAP_STIM / R2CAP_SNAPSHOT / R2CAP_EXPECT_PROBE_* / R2CAP_DONE
 #
-# PROBE LAYOUT (R2 v1.2, mechanically aligned with final build_synth_only.tcl /
-# build_debug.tcl, Lead 2026-10-17)
-#   ILA3 @ui_clk : dbg_s2mm_state[2:0] / dbg_s2mm_tvalid / dbg_s2mm_tready
-#                  + old bridge counters dbg_mem_* (wm/wr_frm/rd_frm/stall/
-#                    len_err/bresp/ost/wslot/rslot)
-#                  + old bridge counters dbg_mem2_* (wm/wr_frm/rd_frm/ost)
-#   ILA0 @user   : dbg_s2mm_reqpend / dbg_wr_fault
-#                  + old user-side probes dbg_mem_u_*/dbg_mem2_u_* etc.
+# PROBE LAYOUT (round2b 2026-10-18 ILA trim; mechanically aligned with current
+# build_synth_only.tcl / build_debug.tcl; RTL/firmware unchanged)
+#   Purpose of the trim: save 300MHz routing/resource margin (round2 place/route
+#   first try WNS -0.135, AggressiveExplore placer failed). R2 S0-S11 criteria
+#   do NOT use ILA1/ILA2, so their removal is not an error.
+#   ILA1 @eth_rxc      : ENTIRE CORE REMOVED (not used by R2 criteria)
+#   ILA2 @user_clk_b   : ENTIRE CORE REMOVED (not used by R2 criteria)
+#   ILA0 @user  probe0 : 374 -> 92 bit, retained:
+#       dbg_mem_u_wr[16] / dbg_mem_u_rd[16] / dbg_mem_u_drop[16] / dbg_mem_rden(1) /
+#       dbg_mem_ost_s[9] / dbg_mem2_u_wr[16] / dbg_mem2_u_rd[16] /
+#       dbg_s2mm_reqpend(1) / dbg_wr_fault(1)
+#       probe1 (emit byte stream, 9 bit, S8c) UNCHANGED (not parsed by this tool)
+#   ILA3 @ui_clk probe0: 184 -> 152 bit, retained:
+#       dbg_calib(1) + dbg_mem_wm[16]/wr_frm[16]/rd_frm[16]/stall[16]/len_err[16]/ost[9]
+#       + dbg_mem2_wm[16]/wr_frm[16]/rd_frm[16]/ost[9]
+#       + dbg_s2mm_state[2:0]/dbg_s2mm_tvalid/dbg_s2mm_tready
+#   TRIMMED OUT (unobservable this round => INFO/NOT_OBTAINED, never FAIL):
+#       dbg_mem_bresp / dbg_mem_wslot / dbg_mem_rslot
 #   dbg_wr_timeout is NOT on ILA on purpose (save 300MHz ILA3 margin; R1/W6 lesson:
 #   96b on the 300MHz domain once pushed WNS to -1.142). stat_wr_timeout is a 16b
 #   bridge counter with NO Lite readback path (not in +0x40/+0x44) => board-side
 #   timeout count is unobservable; r2_counter_recon.py reports it as INFO only.
+#   EXPECTED WIDTHS for R2_EXPECT_PROBES (presence check is WARN-only):
+#       dbg_s2mm_state 3 (ILA3), dbg_s2mm_tvalid 1 (ILA3), dbg_s2mm_tready 1 (ILA3),
+#       dbg_s2mm_reqpend 1 (ILA0), dbg_wr_fault 1 (ILA0)
 #   Observables usable for interpretation (still not hard criteria):
 #     ILA3 dbg_s2mm_state encode 0=IDLE 1=WAITGO 2=STREAM 3=PUSH 4=WAITDONE
 #                                5=DRAIN 6=HALT
@@ -91,7 +104,7 @@ proc envval {name defval} {
 
 set here [file dirname [file normalize [info script]]]
 set ltx [file normalize [envval R2_LTX [file join $here scripts probes.ltx]]]
-set outdir [file normalize [envval R2_OUT_DIR [file join $here evidence_2026-10-17]]]
+set outdir [file normalize [envval R2_OUT_DIR [file join $here "evidence_[clock format [clock seconds] -format %Y-%m-%d]"]]]
 set tag [envval R2_TAG r2]
 set stim [envval R2_STIM_CMD "ping -n 4 -w 900 192.168.1.10"]
 set settlems [envval R2_SETTLE_MS 2000]
@@ -291,6 +304,37 @@ if {[llength $miss] == 0} {
     puts "R2CAP_EXPECT_PROBE_MISSING: $miss"
     puts "R2CAP_EXPECT_PROBE_NOTE: missing probe means probes.ltx does not match the burned bitstream, or the build did not include it; old-probe reconciliation can still proceed"
 }
+
+# ---- round2b ILA trim check (2026-10-18): ILA1/ILA2 removed, three probes trimmed out ----
+#   Trim reason: save 300MHz routing/resource margin (round2 place/route WNS -0.135,
+#   AggressiveExplore placer failed). R2 S6/S10 criteria do not use ILA1/ILA2.
+#   Missing trimmed probes must be treated as INFO/NOT_OBTAINED, never as FAIL.
+set nila [llength [get_hw_ilas -quiet]]
+puts "R2CAP_ILA_TOTAL: $nila"
+if {$nila == 2} {
+    puts "R2CAP_ROUND2B: ILA1/ILA2 absent (expected after trim; not used by R2 criteria)"
+} else {
+    puts "R2CAP_ROUND2B_NOTE: ILA count=$nila (expected 2 in round2b; extra ILA harmless)"
+}
+set trimmed {dbg_mem_bresp dbg_mem_wslot dbg_mem_rslot}
+set trim_found {}
+foreach t $trimmed {
+    foreach p $allprobes {
+        if {[string match -nocase "*$t*" $p]} { lappend trim_found $t; break }
+    }
+}
+puts "R2CAP_TRIMMED_ABSENT: [expr {[llength $trim_found] == 0}]"
+if {[llength $trim_found] > 0} {
+    puts "R2CAP_TRIMMED_PRESENT: $trim_found"
+    puts "R2CAP_TRIMMED_NOTE: found trimmed probes (older ltx?); they are INFO-only in R2 criteria, do not hard-judge"
+} else {
+    puts "R2CAP_TRIMMED_NOTE: dbg_mem_bresp/wslot/rslot absent as expected in round2b; recon reports INFO/NOT_OBTAINED"
+}
+set r2all 0
+foreach p $allprobes {
+    if {[string match -nocase "*dbg_s2mm_*" $p] || [string match -nocase "*dbg_wr_fault*" $p]} { incr r2all }
+}
+puts "R2CAP_R2PROBE_ALL_COUNT: $r2all"
 
 # ---- snapshot capture ----
 set ui_pre [file join $outdir "R2_ila_${tag}_ui_pre.csv"]

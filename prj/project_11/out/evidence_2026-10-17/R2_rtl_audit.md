@@ -329,6 +329,197 @@
 * 总体等级：**[L1]（代码级只读审计，未上板；无 L2 对照实验条件）**。固件写服务与 RTL 协议的字段/顺序/恢复配对**未发现阻塞性缺陷**；3 条残余风险（7.5.1 TOCTOU、7.5.3 读饿死、7.5.5 退出 `'d'` 丢 1 帧）均需板上 S10 计数面兜底。
 
 > **只读声明**：本节仅阅读 `sw/src_j3/main.c`（blob `ee256c05`），未修改任何 `sw/` 文件；审计依据 = 该 blob + RTL 冻结 hash（5f8786…/96d5b1…），两者可复算。
+
+---
+
+## 11. R2 第二轮（时序修复 patch）复核 —— 发现并拦截"跨拍预取覆盖"功能回归
+
+> 本轮对象：`rtl/axi4_master_bridge.v` 的 `g_wr_dma` 字节捕获 1 级流水（构建失败轮 WNS 修复）。
+> hash 链：**round1 冻结 `5f878644…`（§1–§10 审计对象，TB PASS）** → **buggy round2 `740ab153…`（11:36 首版流水，TB 实测 FAIL）** → **fixed round2 `06e6bd72…`（Lead 采纳门控后重冻结，TB PASS）**。其余三文件 hash 全程不变（`96d5b136…` / `1885225f…` / `421df59c…`）。
+
+### 11.0 结论（一句话）
+**首版流水 patch（740ab153）存在阻塞性功能回归：每个非末拍 64B 边界丢 1 字节**（len≥66 的帧全部错位/无法完成）；我以"冻结版 TB FAIL + 机制对照 + 修复副本 PASS"三步定案 [L2]，Lead 采纳单门控修复后重冻结 `06e6bd72`；当前冻结版 **正型 PASS + 2 负向对照按设计 FAIL**，与第一场基线逐项一致（除每帧 +1 拍流水首拍，总计 +350.07 ns）。
+
+### 11.1 patch 范围复核（只读 rtl/；[L2]）
+* `git show HEAD:rtl/axi4_master_bridge.v`（HEAD=round1 冻结 `5f8786`）vs 工作区（fixed round2）：**diff 仅 95 行，全部落在 `g_wr_dma` 写路径**（新增 byte_q/byte_valid_q 声明、`wd_fill→wd_fetch`、WD_IDLE 清流水、WD_STREAM 消费/取字节重构 + 修复门控注释）。
+* `g_wr_hw`（HAS_DMA=0 旧写 FSM）块：**HEAD 187 行 vs 工作区 187 行，逐字相同**；读 FSM 段（`// 4. read FSM`→`// 10.`）**14,927 B 逐字相同**；其余三文件 hash 不变 ⇒ 坑 #55 边界纪律满足。
+* 负向 patch 文本锚点复核：游标锚（`wr_last_slot_r  <= wd_slot_next;` 后下一处 `wr_slot_ptr <= …+1`）仍唯一；TKEEP 锚正则 `wd_keep_r\[wd_bi\]\s*<=\s*1'b1;` 仍 1 命中 ⇒ 无需改动，`r2_neg_patch.py` 仅更新 `EXPECT_HASH` 为 `06e6bd72…`。
+
+### 11.2 发现：跨拍预取覆盖（A16，阻塞；已修复）
+**机制**（buggy 版 `740ab153`，[L2] 代码级+实测）：
+* `wd_fetch = (wdst==WD_STREAM) && !wf_empty && ((wd_rxc + (byte_valid_q?1:0)) < wd_len)`（buggy :608-609）**缺少"流水槽本拍末将空出"门控**。
+* 拍 N（offset 63 消费、`wd_bi==63`→`wd_beat_full<=1`）：同拍 `wd_fetch` 为真 → 把**下一拍首字节 offset 64** 取入 `byte_q`（跨拍预取，正确）。
+* 拍 N+1（`wd_beat_full=1` 保持拍）：consume 被 `byte_valid_q && !wd_beat_full` 正确拦住（offset64 仍在 `byte_q`）；**但 `wd_fetch` 此时仍为真**（`(64+1)<len`）→ 把 offset 65 再取入 `byte_q`，**覆盖未消费的 offset 64**。
+* ⇒ 每个非末拍丢 1 字节；`wd_rxc` 永远到不了 `wd_len` ⇒ **尾拍 TKEEP/TLAST 判据永不成立** ⇒ 该帧 56ms STREAM 看门狗后进 HALT（不提交）。len≤65 的帧不受影响（无跨拍预取），与实测一致。
+**实测证据**（冻结 buggy 版 740ab153 + 独立 TB，FAST 省 T6；日志 `R2_sim_r2_wr_tb_round2_frozenFail_run.log`）：
+* T1 len=64：PASS（单拍，无跨拍预取 —— 机制对照）；
+* T2 len=70：**未提交**（`[FAIL-TIMEOUT] commit target=2 got=1`）→ 丢字节→尾拍不完成→HALT；
+* T3 背靠背（96/130/64）：idx=1 len=70 **自 k=64 起逐字节错位** `got[k]=exp[k+1]`（k=64 exp=0xde got=0xc3；k=65 exp=0xc3 got=0xe4…），idx=2 整帧错位。
+**修复（Lead 采纳，已进 06e6bd72）**：`wd_fetch` 增加 `&& !wd_beat_full`（冻结版 `:611`）——保持拍不再 fetch；正常连续流**无吞吐损失**（beat 完成拍 `wd_beat_full` 旧值=0，仍可预取下一拍首字节；PUSH 后首拍即消费预取字节）。
+**修复验证**（`sim/r2_fix_check/` 副本 = 我提交给 Lead 的单门控修复，非 rtl/）：完整非 FAST TB（含 T6 真实 16.7M 拍）**PASS 0 errors**（`R2_sim_r2_wr_tb_round2_fixcheckFull_run.log`），T2/T3/T8 逐字节全对；同一副本上 2 负向对照仍按设计 FAIL（`…fixcheck_neg_cursor/_neg_tkeep`）。
+
+### 11.3 功能等价复核五项（对 fixed `06e6bd72`；[L2] = 机制+TB 对照，[L1] = 仅推理）
+1. **拍边界预取**：✅ 修复后严格正确——末字节消费当拍（`wd_beat_full` 旧值=0）预取下一拍首字节；保持拍禁取；PUSH 后下一拍 lane0 消费预取字节（T2/T3/T8 逐字节通过即证）。[L2]
+2. **帧尾**：✅ 预取计数 `rxc+(valid?1:0) < wd_len` 严格不越过帧长（不预取下一帧）；`(wd_bi==63)||((wd_rxc+1)==wd_len)` 与旧版逐位一致；keep 仅在消费有效字节时置位、每拍后清 0 ⇒ 尾拍 TKEEP=len%64（T2=6 lane、T8 16 个边界长度全过）。[L2]
+3. **超时/拒收/恢复**：✅ WAITGO→DRAIN 与流水无关（DRAIN 直接抽 FIFO）；STREAM 看门狗条件改为"既无 fetch 又无 consume"（保持拍会 +1 计数随后被 PUSH 清零，无害）；IDLE 每拍清 `byte_valid_q` ⇒ ACK 恢复/拒收后无残留（T4/T5/T9 通过）。[L2]
+   * 残留说明：STREAM/PUSH 中途 HALT 时 `byte_q` 里已出 FIFO 未消费的 1 字节会在 IDLE 清除（该帧整帧本就丢弃，可接受）；帧剩余字节仍留 FIFO 属**既有缺口 G2**（旧版同病，非本轮引入）。
+4. **吞吐**：✅ 稳态 1 B/cycle（消费与取字节同拍并行）；帧完成**拍数**不变（TB 逐帧 `beats==ceil(len/64)` 全过）；每帧多 1 拍 STREAM 入口填流水（总仿真时间 round1→round2 差 +350.07 ns，见 11.4）。[L2]
+5. **不改 rtl/**：✅ 本轮我未写 `rtl/`；修复由 Lead 落地（hash `06e6bd72`），我的验证副本在 `sim/r2_fix_check/`。[L2]
+
+### 11.4 冻结版（06e6bd72）TB 与负向结果 + 与第一场基线差异
+**正型**（完整非 FAST，含 T6 真实等待；`R2_sim_r2_wr_tb_round2_pos_run.log`）：
+* `=== R2 WR TB: PASS (0 errors) ===`，commits=101 / exp=101 / wm=101；
+* T6：`ui_cycles=16777221`、`sim_time=55935252000 ps`（≈55.94ms）——与 round1 **逐字相同**；
+* T8：cursor=320、cmt_total=100、refused=10、stall=11——与 round1 **完全一致**；
+* T9：timeout=2、HALT/fault/ACK 恢复+恢复后提交 OK。
+**负向对照**（`-d R2_FAST -d R2_NEG_*` 早停；判据不变）：
+* ①游标被拒不推进 → `FAIL (2 errors) [NEG-CURSOR early stop]` 且 `[FAIL-T4-CURSOR]`（请求槽号+提交超时指认）；
+* ②尾拍 TKEEP 满 lane → `FAIL (1 errors) [NEG-TKEEP early stop]` 且 `[FAIL-KEEP-MASK] sa=0x00101000 beat=1 off=64 exp=0x…3f got=0xffff…ffff`；
+* 套件：`=== R2 WR TB SUITE: PASS (positive PASS + 2 negative controls FAIL as designed) ===`（exit 0）。
+**与第一场基线（round1 5f8786）差异**：commit 数、每帧 beats、T6/T8/T9 计数全部逐字一致；唯一差异 = 总仿真结束时间 `56,683,676,135 ps` vs round1 `56,683,326,065 ps`，**差 +350.07 ns ≈ 105 ui 拍**，与"101 个提交帧 + 少量丢弃帧各多 1 拍流水首拍"的理论量级吻合（每帧 +1 拍，不影响功能/带宽判据）。**无功能差异证据**。
+
+### 11.5 遗留风险/板验承接（本轮不新增）
+* A9（TKEEP→WSTRB / IOC 退休时刻）仍 [L1]，必须板验 S4（尾拍 86B）→L3；
+* G2（STREAM/PUSH 中途 HALT 的 FIFO 残字节）、WAITGO 超时 TOCTOU（固件已二次确认）维持原判；
+* 新建构的 ILA 探针表（`r2_ilacap.tcl` 属 Lead 文件，我不越权修改）：**请把新 ltx 的 probes 发我/告知路径，我按冻结 RTL 信号名逐项对齐并出探针核对表**（新加 `wd_fetch/byte_valid_q/byte_q` 建议进 ui 域 ILA，控制位宽防坑 #47）。
+
+### 11.6 本轮证据文件（全部在 `out/evidence_2026-10-17/`）
+| 文件 | 内容 |
+|---|---|
+| `R2_sim_r2_wr_tb_round2_pos_run.log` | 冻结版 06e6bd72 完整正型 PASS |
+| `R2_sim_r2_wr_tb_round2_neg_cursor_run.log` / `…_neg_tkeep_run.log` | 2 负向对照 FAIL+判据行 |
+| `R2_sim_r2_wr_tb_round2_suite_run.log` | 一键套件汇总（SUITE PASS） |
+| `R2_sim_r2_wr_tb_round2_frozenFail_run.log` | **buggy 740ab153 的拦截证据**（T2 未提交、T3 k=64 起错位） |
+| `R2_sim_r2_wr_tb_round2_fixcheckFull_run.log` | 修复副本完整 PASS（修复验证） |
+| `R2_sim_r2_wr_tb_round2_fixcheck_neg_{cursor,tkeep}_run.log` | 修复副本上负向仍按设计 FAIL |
+| `R2_probe_map.md` | 探针↔RTL 信号↔域↔位宽 纸面核对表（ILA0 374→376 / ILA3 179→184）+ 新 ltx 核对清单 + 不可观测项（`stat_wr_timeout`） |
+
+---
+
+## 12. round2b 构建策略：ILA 探针裁剪复核（**RTL 不变，TB 无需重跑**）
+
+> 背景：round2 综合已过，但 place/route 首掷 `ExtraTimingOpt` 布后 WNS −0.147 → 尾判 **−0.135**（WHS +0.004）；失败轮 worst 路径族扩散（`gray→FSM state CE`：桥② 读/写状态、`u_mem2` 的 `pre_eff/r_len` 等 + 新写引擎 lane CE），route 占 57–77%，`AggressiveExplore` 布局失败 ⇒ Lead 判断主因为**拥塞/资源密度**（[L1]，Lead 归因；本报告只记录裁剪事实与其可核对影响）。
+> 决策：**不改 RTL**（仍冻结 `06e6bd72…`），只裁 ILA 探针集 → 重综合重掷。
+
+### 12.1 事实：裁剪后的探针集（来自 12:49:08 的 `build_synth_only.tcl` / `build_debug.tcl`，两文件 ILA 段逐行一致）
+| ILA/probe | 原（round2） | **现在（round2b）** | 保留/移除明细（脚本行号） |
+|---|---|---|---|
+| `u_ila_0/probe0` @user_clk | 376 bit | **92 bit** | 保留：`dbg_mem_u_wr/u_rd/u_drop`(16×3)+`dbg_mem_rden`(1)+`dbg_mem_ost_s`(9)+`dbg_mem2_u_wr/u_rd`(16×2)+**`dbg_s2mm_reqpend`+`dbg_wr_fault`**（:89-98）；其余 user 域探针（rx/up/pk/prev/ch/cmd/lite 等）全部移除 |
+| `u_ila_0/probe1` @user_clk | 9 bit | **9 bit（不变）** | `dbg_mem_rden` + `mem_rd_data[7:0]`（:100-107，S8c 发射字节流证据保留） |
+| `u_ila_1` @eth_rxc | 111 bit | **整核移除** | :109（仅注释） |
+| `u_ila_2` @user_clk_b | 101 bit | **整核移除** | :111（仅注释） |
+| `u_ila_3/probe0` @ui_clk | 184 bit | **152 bit** | 保留 `dbg_calib`+`mem wm/wr_frm/rd_frm/stall/len_err/ost`+`mem2 wm/wr_frm/rd_frm/ost`+**`dbg_s2mm_state[2:0]/tvalid/tready`**（:132-157）；drop `dbg_mem_bresp`(:139 注释)、`dbg_mem_wslot/rslot`(:141 注释) |
+
+* 位偏移（纸面，[L2]，详见 `out/evidence_2026-10-17/R2_probe_map.md`）：ILA0 probe0 新位 **90=`dbg_s2mm_reqpend`、91=`dbg_wr_fault`**；ILA3 probe0 新位 **149:147=`dbg_s2mm_state[2:0]`、150=`tvalid`、151=`tready`**。
+* 资源收益纸面：ILA0 −284 bit、ILA3 −32 bit、ILA1+ILA2 两整核（−212 bit + 2 套核/触发/时钟负载）。**裁 ILA ≠ 时序保证**，收敛以新一轮 place/route 实测为准。
+
+### 12.2 对 R2 判据口径的影响（[L2] 纸面逐条对 DESIGN §10）
+1. **S10 的 bresp 项不可观测（A18，需改判据措辞）**：DESIGN §10（`out/R2_S2MM_DESIGN.md:167`）要求"错误计数（bresp/len_err/stall 按语义）为 0"，但 `dbg_mem_bresp` 已从 ILA3 移除 ⇒ **bridge② 的 bresp_err 不可观测**（桥① 在 S2MM 下 bresp 本就不可见/无意义）。⇒ S10 改为："`len_err/stall`（及 wm/wr_frm/rd_frm/ost 对账）按语义为 0；**bresp 项改 INFO/判据未取得**"，不得写"错误计数全 0"（§6a 硬规则 3：判据未取得 ≠ 判据通过）。
+   * **交叉核对（独立读 Lead 工具，[L2]）**：`out/r2_counter_recon.py` 已按同一口径实现——bresp/wslot/rslot 归为 INFO/NOT_OBTAINED（该文件 :20-24 / :107-110 / :112-114）、错误硬判 = `len_err/stall`(桥①) + `dbg_wr_fault`；`out/r2_ilacap.tcl` :50-67 亦声明 ILA0 374→92 / ILA3 184→152 与期望探针宽度。⇒ **判据工具无需改**，仅需订正 DESIGN 两处文档（§10 S10 的 bresp 措辞、§11 K1 的 ILA1→ILA0 probe1）。
+2. **S6/S10 其余项保留**：桥② `rd_frm`（ping +4）、`ost=0`、桥① `wm/wr_frm/rd_frm/ost`、`len_err/stall` 均在新 ILA3 列表内 ✓。
+3. **S8c 发射字节流**：ILA0 probe1 9 bit 保留 ✓（不受影响）。
+4. **ILA1/ILA2 移除**：逐条核对 R2 S0–S11 **未引用**（S2/S3 用 'U'/ping/NIC；S6/S10 用 ILA3；S8c 用 ILA0 probe1）⇒ 判据无影响；但 R2 板场次失去 eth 域/B 域交叉观测，若 S4/S5 出物理层疑点需回烧 R1 位流或临时加 ILA（记入板验风险备注）。
+5. **文档订正（D9）**：DESIGN §11 K1（同文件 :177）缓解措施写"必要时用 **ILA1 probe1** 抓槽读回字节"——ILA1 本轮已移除，且"发射字节流"探针实为 **ILA0 probe1**（:100-107）⇒ 该处应更正为 ILA0 probe1。
+6. `dbg_wr_timeout` 仍不可观测（A17 维持）：`stat_wr_timeout` 无 ILA/无 Lite 读回；板验替代口径=`dbg_wr_fault`+`state==6(HALT)`+`WM_WR` 停滞。
+
+### 12.3 其他影响
+* **RTL 未变**（`06e6bd72…`，其余三文件 hash 亦未变）⇒ 独立 TB `r2_wr_tb` 无需重跑（其 DUT 只例化 `frame_mem_if`，不含 ILA；hash 守卫仍匹配）。最近一次 suite（11:42，RTL=06e6bd72）`SUITE: PASS` 仍有效。
+* 本轮改动在 `scripts/`（Lead 拥有），我不写；纸面核对表已按新口径更新：`R2_probe_map.md`（round2b 版，ILA0 92/probe1 9/ILA3 152，ILA1/2 移除，§5 新 ltx 核对清单保留）。
+* **若本轮 sweep 仍不过门限**（[L1] 候选，Lead 决策）：在 RTL 冻结前提下还可 (a) 继续裁 ILA3 桥②组 `dbg_mem2_wm/wr_frm/rd_frm/ost`（57 bit，S6/S10 需要 → 需先给替代判据）；(b) ILA 深度 2048→1024/512（省 BRAM/布线）；(c) 与 ILA 无关的结构性手段属 RTL 改动，不在本轮策略内。任何进一步裁剪都会扩大"判据未取得"清单，建议每裁一项同步更新 S 判据表。
+
+---
+
+## 13. round2c 时序修复（新增 `WD_ARM=7`，新 blob `f43267db…`）复核
+
+> round2b（裁 ILA）首掷仍 WNS −0.127/WHS +0.003；Lead 用 post-route dcp 逐级路径把根因定位到代码级 [L2 来源：Lead 的 `path_dbg.rpt` 逐级路径报告]：
+> `u_mem/u_wr_bytes/wr_gray_s2_reg[7]` → gray2bin → `rd_level_carry`(3×CARRY8) → `ub_rl[9]` → `wdst[2]` 次态 → LUT6 → `g_wr_dma.wd_data_r_reg[410]/CE`。
+> 机制：`WD_WAITGO` 完成条件 `wf_level >= wd_len[12:0]`（12b 比较）**同时**驱动"进入 STREAM 当拍清 512 位 `wd_data_r/wd_keep_r`"的使能 ⇒ level 比较锥进入 512 CE（30/30 最差路径同族）。
+> 修法：新增 **`WD_ARM=3'd7`** 一拍（保留 `WD_HALT=6` 编码不变）：WAITGO 完成只置 `wdst<=WD_ARM`；ARM 拍由状态译码清拼帧寄存器后进 STREAM。
+> **我未改 `rtl/`**；本节为独立复核。新 blob 实测 `git hash-object` = **`f43267db82b84305cfeb519adcfa76f79443f6b3`**（与 Lead 通知一致），其余三文件 hash 未变。
+
+### 13.1 patch 范围（可复核）
+* 基线重建（审计方法）：用上一轮 suite 生成的 `sim/r2_neg_cursor/axi4_master_bridge.v`（= `06e6bd72` + 已知 1 行游标缺陷）**回退该已知缺陷**重建 `06e6bd72` 原文，`git hash-object` = `06e6bd72…` 逐字命中 ⇒ 基线可信。
+* `06e6bd72` → `f43267db` 全量 diff = **60 行**，只涉及：`localparam` 加 `WD_ARM=3'd7` + 注释；`WD_WAITGO` 完成分支由"7 个清零赋值 + wdst<=STREAM"改为"wdst<=WD_ARM"；新增 `WD_ARM` 状态块（清 7+1 个寄存器后 `wdst<=WD_STREAM`）。**无其他改动**（ARM 块之外 0 删除/新增行）⇒ 与 Lead 描述一致。patch 原文归档：`out/evidence_2026-10-17/R2_round2c_patch.diff`。
+
+### 13.2 功能等价性复核（逐项，[L2] = 代码级+TB 对照；[L1] = 仅推理）
+
+1. **ARM 清零集合是否覆盖 WAITGO 原有全部清零项** — ✅ **完全覆盖**：
+   旧 `06e6bd72` WAITGO 完成拍清：`wd_beat, wd_bi, wd_rxc, wd_beat_full, wd_data_r, wd_keep_r, wd_stall_cnt`（7 项）+ `wdst` 转换；
+   新 `WD_ARM` 清上述 7 项 + `byte_valid_q`（第 8 项）。`byte_valid_q` 原本在 `WD_IDLE` 每拍清、进入 WAITGO 时已为 0 ⇒ ARM 再清是**冗余但安全**（防未来路径残留），无遗漏项。其余帧起始量（`wd_slot/wd_len/wd_beats/wd_pop/…`）原本就在 `WD_IDLE` 弹描述符时初始化，不属于 WAITGO 转换职责，未被改动。**逐项对照通过。**
+2. **+1 拍是否改变对外协议时序** — ✅ **无协议变化，只有设计内延迟**：
+   `m_axis_s2mm_tvalid = (wdst==WD_PUSH)` ⇒ WAITGO/ARM 期间流不 valid；`tdata/tkeep` 在进入 STREAM 前已清（ARM 拍末清零），STREAM 首拍行为与原版一致（ARM 清除 `byte_valid_q`，STREAM 首拍先 fetch 再消费，与此前 WAITGO 后首拍相同）；`pending/toggle/s2mm_introut/commit` 协议完全不变。**每帧 +1 个 ui 拍（≈3.33ns）延迟**，无时序/握手/顺序改变。
+3. **HALT/超时/恢复路径是否经过 ARM 产生副作用** — ✅ **不经过**：
+   WAITGO 超时仍直接 `wdst<=WD_DRAIN`（不进 ARM，保持"GO 缺失=良性丢帧不 halt"语义）；STREAM/PUSH/WAITDONE 看门狗仍进 `WD_HALT(6)`；HALT 出口仍为 `dma_wr_ack` 翻转→清 fault→IDLE。ARM 只能由 `wd_go_ok && wf_level>=wd_len && !s2mm_introut` 成功条件进入 ⇒ 与所有故障路径结构隔离，无副作用。
+4. **state=7 是否与现有 TB/探针断言冲突** — ✅ **无冲突**：
+   TB `r2_wr_tb.sv` 不含任何"wdst/ro_dbg_wr_state 只能是 0..6"的断言；它只判 `ro_dbg_wr_state==3'd4`(T9 等 WAITDONE)、`==3'd6`(T9 HALT-latch)、以及 T7 闸门对 `2/3` 的监视，`7=ARM` 仅瞬态 1 拍/帧不会被误判。探针/板验工具：`out/r2_counter_recon.py` 对未知状态值只作 INFO 打印（不参与硬判，其代码注释"未知值原样返回 ?<v>。仅用于 INFO 打印"）⇒ 板验工具安全；`R2_probe_map.md` 已更新 `dbg_s2mm_state` 解码为 **7=ARM 瞬态（板验忽略）**。
+   **建议（Lead 文件，非阻塞）**：若希望 ltx 抓到的 ARM 拍不打印 `?7`，可把 7 加入 `r2_counter_recon.py` 的状态解码表；不加也不影响 PASS/FAIL。
+5. **对带宽/帧完成拍数** — ✅ 与设计一致：+1 拍/帧（`dbg_wr_cycles` 亦 +1/帧，仅观测）；1538B 帧占约 25 拍 stream + 软件服务 µs 级 ⇒ 带宽影响 <0.1%，R2 吞吐本就服务延迟主导（R3 归因）。
+
+### 13.3 冻结版（f43267db）TB 与负向结果
+* **正型（完整非 FAST，含 T6 真实 16.7M 拍）**：`=== R2 WR TB: PASS (0 errors) ===`，commits=101/exp=101/wm=101；
+  * T6：`ui_cycles=16777221`（与上一基线**逐字相同**）、`sim_time=55935253000 ps`（上一基线 55935252000 ps；**ui 周期数一致**，1ns 差为 TB 采样粒度，无语义差异）；
+  * T7：`done cmt=10 timeout=1`（无重复提交）；T8：cursor=320 / cmt_total=100 / refused=10 / stall=11（与上一基线逐字相同）；T9：timeout=2、HALT/fault/恢复+恢复后提交 OK。
+* **2 负向对照**（`-d R2_FAST -d R2_NEG_*` 早停，判据不变）：
+  * ①游标被拒不推进 → `FAIL (2 errors) [NEG-CURSOR early stop]`，判据行 `[FAIL-T4-CURSOR]`；
+  * ②尾拍 TKEEP 满 64 → `FAIL (1 errors) [NEG-TKEEP early stop]`，判据行 `[FAIL-KEEP-MASK] sa=0x00101000 beat=1 off=64 exp=0x…3f got=0xffff…ffff`。
+  * 套件：`=== R2 WR TB SUITE: PASS (positive PASS + 2 negative controls FAIL as designed) ===`（exit 0）。
+* 负向 patch 文本锚点在新 blob 上仍唯一（游标锚/`wd_keep_r[wd_bi]<=1'b1` 锚各 1 命中），`r2_neg_patch.py` 的 `EXPECT_HASH` 已更新为 `f43267db…`（守卫在 RTL 变化时会硬失败）。
+* 日志归档：`R2_sim_r2_wr_tb_round2c_{pos,neg_cursor,neg_tkeep,suite}_run.log`。
+
+### 13.4 与上一冻结基线（06e6bd72）差异
+| 指标 | 06e6bd72（round2 修复版） | **f43267db（round2c）** | 判定 |
+|---|---|---|---|
+| commits / exp / wm | 101 / 101 / 101 | **101 / 101 / 101** | 一致 |
+| T6 WAITGO 看门狗 ui 周期 | 16,777,221 | **16,777,221** | 一致 |
+| T8 cursor / refused / stall | 320 / 10 / 11 | **320 / 10 / 11** | 一致 |
+| T9 timeout / HALT 恢复 | 2 / OK | **2 / OK** | 一致 |
+| TB 总仿真结束时间 | 56,683,676,135 ps | **56,684,046,209 ps** | **+370,074 ps ≈ +111.0 个 ui 拍** |
+| 帧完成拍数 | 基线 | **+1 拍/帧**（ARM） | 设计内延迟 |
+
+**+111 拍的解释（[L2] 实测+推理）**：ARM 进入次数 = 有流帧数 = 101 提交 + 1 例 T9 "流已发/intr 被扣"帧 = **102**（理论 +340.0ns）；实测 +370.07ns，多出 ≈9 拍，来源为 TB 喂帧相位与 STREAM 等字节时序的耦合抖动（TB 侧时序，非 RTL 语义；commit 数/TKEEP/beat 数/看门狗周期全部不变可佐证）。**结论：功能等价，仅设计内 +1 拍/帧延迟。**
+
+### 13.5 结论
+* `f43267db` 的 `WD_ARM` 修法**语义等价**（清零集合完整覆盖、故障路径结构隔离、对外协议不变、state=7 瞬态与现有 TB/板验工具不冲突）[L2]。
+* 独立 TB：**正型 PASS + 2 负向对照按设计 FAIL**；差异仅为设计的 +1 拍/帧延迟。[L2]
+* **TB 绿灯，可由 Lead 交板验**。板验注意：`dbg_s2mm_state` 若抓到 **7=ARM 属正常瞬态**（不判故障）；`6=HALT` 才是 fail-stop。
+
+---
+
+## 14. 构建产物实物核对（位流 `28921C6B…` + ltx `4AC25546…`）
+
+> 对象：`out/archive/b31b_r2_2026-10-18/`；对应冻结 RTL **`06e6bd72`→ round2c `f43267db…`**（详见 §13）。本节只写可复算事实。
+
+### 14.1 文件/哈希核对（[L2] 直证）
+| 项 | 实测 | 与 Lead 通知 |
+|---|---|---|
+| `aurora_mem_bridge_r2_28921C6B.bit` | 10,266,180 B，SHA256 `28921C6B38BE92447950B8C81405F278945529BB007E94461EC2CEEF0D324627` | ✅ 一致 |
+| `probes_r2_28921C6B.ltx` | 64,593 B，SHA256 `4AC2554667F94BC3E052E0A652FF2DE322E2CE51FEE2B47399A108DF9E6B7C33` | ✅ 一致 |
+| 别名/ canonical | `aurora_mem_bridge_r2.bit`、`out/aurora_mem_bridge.bit` 与上述 bit **同 hash**；`probes_r2.ltx` 与上述 ltx 同 hash | ✅ |
+| **bit↔RTL 绑定** | 归档 `rtl_axi4_master_bridge.v` `git hash-object` = `f43267db82b84305cfeb519adcfa76f79443f6b3`；另三文件 = `96d5b136…/1885225f…/421df59c…` | ✅ 与冻结 blob 逐一一致 |
+| 归档清单 `SHA256.txt` | 21 条文件行逐条复算 **21/21 OK** | ✅（但见 A19） |
+
+### 14.2 构建日志独立复核（不采信摘要，直接读 log/rpt）
+* `build_r2_sweep2_console.log` 尾判：**`V5_SWEEP2_OK: directive=ExtraTimingOpt wns=0.004 whs=0.004 bit=…`**（与 Lead 通知一致）。
+* `rpt2_ExtraTimingOpt.timing_summary.rpt`：**`All user specified timing constraints are met.`**；汇总 WNS=**0.042**、WHS=**0.004**（后布）。Lead 表述"后布 +0.042 → 尾判 +0.004"与两份来源一致（尾判值取 sweep 门限 marker）。
+* DRC：**0 Errors / 22 Warnings**（`INFO: [Vivado 12-3199]`），warning 均为 dbg_hub/BRAM advisory 等已知类；`write_bitstream completed successfully`。
+* ⇒ 构建产物与"过门限"声明 **独立复核成立 [L2]**。
+
+### 14.3 ltx 探针逐项核对（对应 `R2_probe_map.md §5/§5.1`）
+* **全部期望项通过**：仅 2 个 ILA 核（`u_ila_0`/`u_ila_3`）；ILA0 probe0=**92**（位序逐条一致）、probe1=**9**；ILA3 probe0=**152**（位序逐条一致）；末 5 bit=`state[2:0]`/`tvalid`/`tready` 且 state subnets=`[2],[1],[0]`；`dbg_mem_bresp/wslot/rslot`（及历史未挂 ill/nofrm/wbeats/rbeats）**均不出现**。
+* **非阻塞事实 1（命名）**：ILA0 probe0 bit48 的实际 net 名为 **`dbg_mem_rden_1`**（`dbg_mem_rden` 同时挂 probe0 与 probe1，Vivado 自动加 `_1`）；功能同源；若离线解析按精确名匹配 probe0 列需兼容 `_1`（当前 recon 未用该列）。
+* **非阻塞事实 2（时钟）**：ltx 不记录 ILA 时钟网名（全文仅 `dbg_hub.clk_input_freq_hz=74999998`；`user_clk/ui_clk/clock` 字串 0 次）⇒ **ltx 无法直证 ILA0@user/ILA3@ui 的时钟关联**。旁证链：build 脚本 :81-83（ILA0 clk←`user_clk`）/ :124-130（ILA3 clk←`ui_clk`）+ RTL 域归属逐信号核对（ILA0 全 user 域、ILA3 全 ui 域）⇒ 语义可用；**板端时钟关联建议在 S0/S3 用 hw_manager `get_hw_ilas` 侧确认一次**（一次性，不影响探针数据解读）。
+
+### 14.4 新发现：归档清单 `SHA256.txt` 头部 RTL blob 陈述过期（A19，[L2] 直证；建议修正）
+* 文件头写："RTL 冻结: axi4_master_bridge.v blob **`06e6bd72…`**；其余三文件同 round1"；生成时间 14:45:09。
+* 但归档 `rtl_axi4_master_bridge.v` 实际 hash = **`f43267db…`**（round2c），且 manifest 该文件行 SHA256 `B64300B4…` 与**实际 round2c 文件**一致（21/21 行复算无误）。
+* ⇒ **仅头部文字陈述过期**（归档脚本模板未按 round2c 更新），文件级哈希链是自洽的。**建议 Lead 修正 `SHA256.txt` 头部（或归档脚本模板）后再"钉 hash"**，否则后续板验记录/审计引用 manifest 头会与位流 RTL 配对矛盾。属**文档溯源缺陷，不影响位流功能**，但在板验归档前修掉最稳妥。
+* 同类检查：若 `out/r2_archive_round2.py` 等归档脚本内硬编码旧 blob，建议一并改为"从 `git hash-object rtl/…` 现算写入"（避免下次换版再漂移）。
+
+### 14.5 结论
+* 位流/ltx/归档 RTL 三者哈希链**自洽且与冻结 RTL 配对** [L2]；构建过门限声明经日志独立复核成立 [L2]。
+* ltx 探针布局与 `R2_probe_map.md` 期望**逐项一致**（含裁剪项缺失验证）；`R2_probe_map.md` 的 `[待核对]` 已升级为**实物直证**，仅"时钟网名"留 `[待上板 hw_manager 确认]`（非判据项）。
+* **可交板验**；唯一建议先修的文档项 = A19（`SHA256.txt` 头部过期 blob），不阻塞上板。
+
 > **脚本编码说明（对任务书"bat 带 BOM"的落实）**：`run_r2_wr_tb.bat` 采用 **ASCII-only 注释 + CRLF、无 BOM**。
 > 理由：本仓库 9 个既有 `run_*.bat` 均为无 BOM；AGENTS.md #17/#18 的 BOM 要求针对 `.ps1`（PS 5.1 解析）；
 > 给 `.bat` 加 UTF-8 BOM 会使 cmd.exe 把首行 `@echo off` 当命令名解析（实测报错），破坏一键复现。

@@ -239,3 +239,15 @@
 - **失败诊断 `[L2]`**（失败轮最差路径报告）：30 条最差路径中 25 条 = `u_mem/u_wr_bytes/wr_gray_s2` → `u_mem/u_bridge/g_wr_dma.wd_data_r_reg[*]/CE`（本设计新写引擎的**字节捕获锥**：gray 比较 8 级 → 64:1 lane 译码 → 512 CE，route 占 56.6%）；另 5 条 = 桥② 旧写 FSM 同族（未被 R2 改动）。
 - **修复建议（下次开工第一步）**：新写引擎字节捕获加 1 级流水（`byte_q`/`byte_valid_q`，CE 改由寄存器驱动；`wf_rd_en` 仍由 `!wf_empty` 控制；吞吐不变；不动 `HAS_DMA=0` 分支）。备选：裁 ILA3 低价值探针 ~48b / 换指令取方差 / `build_debug.tcl` 单掷。详见归档 `out/archive/b31b_r2_2026-10-17/BUILD_STATUS.md`。
 - 板验未执行（`NOT_OBTAINED`，用户要求收尾+断电；板卡未被触碰）。
+
+---
+
+## 16. 构建轮次 2（2026-10-18 上午，时序修复后重掷）
+
+- **时序修复（[L2] 离线，独立审计 A16 复现/复核）**：`g_wr_dma` 字节捕获改为 **1 级流水**（`byte_q`/`byte_valid_q`；`wd_fetch` 只在非满拍保持拍取字节）——把失败轮 25/30 的 `gray→lane 译码→512 CE` 8 级锥从关键路径移走，吞吐仍 1B/cycle。首版流水（blob `740ab153`）有"满拍保持拍重复 fetch 覆盖跨拍预取字节"缺陷（每非末拍丢 1 字节，len≥66 帧尾拍永不成立 → 56ms HALT），由独立 TB 在冻结 hash 上抓到（T1 len=64 PASS vs T2 len=70 不提交/T3 自 k=64 逐字节错位 = 机制对照）；修法 = `wd_fetch` 加 `&& !wd_beat_full`（beat 完成拍旧值=0 仍可跨拍预取，无吞吐损失）。
+- **冻结 RTL（round2c 最终）**：`axi4_master_bridge.v` blob **`f43267db82b84305cfeb519adcfa76f79443f6b3`**（在 round2b `06e6bd72` 基础上再加 `WD_ARM=3'd7` 一拍：把 WAITGO 完成条件 `wf_level>=wd_len` 的 12b 比较从 512 位数据/keep 寄存器的 CE 上移走，改为状态译码清零；HALT 仍=6；每帧 +1 拍）；其余三文件不变（`96d5b136`/`1885225f`/`421df59c`）；`g_wr_hw`（HAS_DMA=0 旧 FSM）与读 FSM 逐字节未动（坑 #55 边界 ✅）。
+- **离线复验（审计 `R2_rtl_audit.md` §13，59,552 B）**：完整非 FAST 正型 **PASS 0 errors（commits=101）**、T6 真实 16.7M 拍、T8/T9 全过；2 负向对照按设计 FAIL；基线差异仅帧完成 +1 拍/帧（设计预期）。
+- **ILA 裁剪（round2b）**：ILA1/ILA2 整核移除；ILA0 probe0 374→**92**、probe1 9；ILA3 probe0 184→**152**（裁 bresp/wslot/rslot）；审计 §12 复核 + `R2_probe_map.md §5.1` ltx 实物直证（仅 2 核、92/9/152、末 5bit 正确、裁剪项缺席）。
+- **place/route（round2c，`ExtraTimingOpt`）**：后布 WNS **+0.042** → phys_opt 后 **WNS +0.004 / WHS +0.004** ⇒ **过门限**；**DRC 0 Errors / 22 Warnings**；`V5_SWEEP2_OK`；`write_bitstream` 成功。
+- **构建产物（`out/archive/b31b_r2_2026-10-18/`，21 文件 + SHA256.txt）**：bit `aurora_mem_bridge_r2_28921C6B.bit`（10,266,180 B，SHA256 `28921C6B…324627`）；ltx `probes_r2_28921C6B.ltx`（64,593 B，SHA256 `4AC25546…6B7C33`）；xsa `16A4F01F…`；ELF `1bc8088d`（50,896 B）。
+- 板验：**进行中**（10-18 下午，用户上电后烧 R2 对 → S0–S11；S0 dry-run 已 PASS：WNS/WHS/DRC/hash 全过）。

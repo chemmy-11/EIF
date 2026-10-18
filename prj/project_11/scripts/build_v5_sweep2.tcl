@@ -7,7 +7,8 @@
 #   用法: vivado -mode batch -source scripts\build_v5_sweep2.tcl -notrace
 # =============================================================================
 set proj D:/FPGA/prj/project_11
-set dirs {ExtraPostPlacementOpt ExtraTimingOpt WLDrivenBlockPlacement Explore AltSpreadLogic_high}
+#   2026-10-18: R2 时序修复后重掷; 顺序按上一轮实测最优 (ExtraTimingOpt -0.098 > ExtraPostPlacementOpt -0.175)
+set dirs {ExtraTimingOpt ExtraPostPlacementOpt WLDrivenBlockPlacement Explore AltSpreadLogic_high}
 set ok 0
 
 foreach d $dirs {

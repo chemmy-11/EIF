@@ -13,11 +13,29 @@
 #   · 注意: out\aurora_mem_bridge.bit 仍是 R1 在库 c8cd3a32(10-17 21:28), out\mb_ctrl.xsa 仍是 R1 c9b52dd7;
 #     禁止把这两个当 R2 产物烧/钉。
 #
+# ⚠️ round2b 状态(2026-10-18 12:4x, Lead 通知; 以磁盘 build_synth_only.tcl/build_debug.tcl 为准):
+#   · round2 place/route 首掷 WNS 仍 -0.135(AggressiveExplore 布局失败); 采用"不改 RTL、裁 ILA 省资源"路线后重综合(进行中)。
+#   · 本轮位流 ILA 探针集裁剪: ILA1@eth_rxc / ILA2@user_clk_b **整核移除**(R2 S0-S11 判据不使用);
+#     ILA0@user probe0 374→92b; ILA3@ui probe0 184→152b。
+#   · 裁掉 dbg_mem_bresp / dbg_mem_wslot / dbg_mem_rslot ⇒ 本轮不可观测 = INFO/NOT_OBTAINED(§6a: 判据未取得≠失败),
+#     不硬判; S6 不因缺 ILA1/2 报错; S10 仍用 ui wm/wr_frm/rd_frm/stall/len_err/ost + mem2 ui 四计数 + user 侧 u_wr/u_rd/u_drop/ost_s/mem2_u_*。
+#   · R2_EXPECT_PROBES 仍为 5 个新探针: dbg_s2mm_reqpend/dbg_wr_fault(ILA0) + dbg_s2mm_state[2:0]/tvalid/tready(ILA3)。
+#
+# ✅ round2c 成功位流(2026-10-18 14:4x, Lead 通知; 归档 archive\b31b_r2_2026-10-18, 以 SHA256.txt 为准):
+#   · ExtraTimingOpt 过门限: V5_SWEEP2_OK WNS=0.004 WHS=0.004; DRC 0 Errors/22 Warnings; write_bitstream completed。
+#   · 身份: bit=aurora_mem_bridge_r2_28921C6B.bit (10,266,180 B, sha256 28921C6B...),
+#           ltx=probes_r2_28921C6B.ltx (64,593 B, 4AC25546...; round2b 裁剪版: ILA0 92+9 / ILA3 152 / 仅 u_ila_0,u_ila_3),
+#           xsa=mb_ctrl_r2.xsa (16A4F01F...), ELF=j3_soft_r2_1bc8088d.elf (1bc8088d), RTL bridge blob=f43267db... (ARM 时序修复版)。
+#   · 板验进行中: S1-S11 由 Lead 执行; S6/S10 用 ILA0+ILA3 保留项, 缺失 bresp/wslot/rslot 与无 ILA1/2 ⇒ INFO/判据未取得;
+#     S8c 用 ILA0 probe1(9b) 不变。
+#   · 典型 -Run 钉法(见下): -Bit ...28921C6B.bit -ExpectBitHash8 28921C6B -ExpectElfHash8 1BC8088D
+#     -Xsa ...mb_ctrl_r2.xsa -ExpectXsaHash8 16A4F01F -IlaLtx ...probes_r2_28921C6B.ltx -BuildLog ...build_r2_sweep2.log
+#
 # 用法:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File r2_board.ps1            # DRY-RUN
 #   powershell ... -File r2_board.ps1 -Run `
-#       -Bit  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-17\<r2>.bit `
-#       -Elf  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-17\<r2>.elf `
+#       -Bit  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\aurora_mem_bridge_r2_28921C6B.bit `
+#       -Elf  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\j3_soft_r2_1bc8088d.elf `
 #       -BuildLog <R2 构建日志> `
 #       [-Port COM5] [-ExpectBitHash8 xxxxxxxx] [-ExpectElfHash8 1bc8088d] `
 #       [-Xsa <xsa> -ExpectXsaHash8 xxxxxxxx] [-StrictS2sr] `
@@ -65,7 +83,8 @@
 #   S9 J3 四链(带 --dma): j3_fourchains.ps1 前置 'S'+槽表干净两拍, FOURCHAINS_RESULT: PASS;
 #      wr+255/收帧停摆/WAITWR-FAIL ⇒ 先看 WR_DBG.fault, 判据未取得+板卡需重烧; 失败不重试; J3 后不自动 ping。
 #   S10 双桥计数对账(J4 口径): 各桥 wm=wr_frm=rd_frm、ost=0; 桥① 错误硬判 len_err/stall +
-#      dbg_wr_fault(ILA0@user) 硬判 0; dbg_wr_timeout 未挂 ILA 且 stat_wr_timeout 无 Lite 读回路径 ⇒ INFO; 桥① bresp 恒 0 仅 INFO。
+#      dbg_wr_fault(ILA0@user) 硬判 0; dbg_wr_timeout 未挂 ILA 且 stat_wr_timeout 无 Lite 读回路径 ⇒ INFO;
+#      round2b 裁剪后 dbg_mem_bresp/wslot/rslot 未挂 ⇒ 该列缺失记 INFO/NOT_OBTAINED(不判 FAIL)。
 #   S11 收尾恢复: Set-EngineMode DMA(1) 并断言 mode=1 & bit24=1(可 -RestoreEngine 0)。
 #
 # DESIGN v1.2 文档对齐的其它口径(仅提示, 均不作新硬判):
@@ -139,7 +158,7 @@ $script:Version = "2026-10-17"
 $script:DryRun = -not $Run
 $script:OutRoot = $PSScriptRoot
 if (-not $script:OutRoot) { $script:OutRoot = Split-Path -Parent $MyInvocation.MyCommand.Path }
-$script:EvidDir = Join-Path $script:OutRoot "evidence_2026-10-17"
+$script:EvidDir = Join-Path $script:OutRoot ("evidence_" + (Get-Date -Format "yyyy-MM-dd"))
 $script:Stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $script:LogPath = Join-Path $script:EvidDir ("R2_" + $script:Stamp + ".log")
 $script:Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -172,8 +191,15 @@ $script:KnownR1ElfHash8 = "2961b585"
 $script:KnownR2ElfHash8 = "1bc8088d"     # 最终冻结固件(2026-10-17 22:4x Lead 最后一次更新; 50,896 B; blob ee256c05; fa38a8cd/67c0b73a 均已作废)
 $script:KnownR2ElfPath = "D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf"
 $script:KnownR2XsaPath = Join-Path $script:OutRoot "mb_ctrl.xsa"
+# round2c 成功位流身份(2026-10-18, 归档 b31b_r2_2026-10-18; SHA256.txt 权威)
+$script:KnownR2BitHash8 = "28921c6b"     # aurora_mem_bridge_r2_28921C6B.bit, 10,266,180 B
+$script:KnownR2XsaHash8 = "16a4f01f"     # mb_ctrl_r2.xsa, 2,606,995 B
+$script:KnownR2LtxHash8 = "4ac25546"     # probes_r2_28921C6B.ltx, 64,593 B (round2b 裁剪版)
+$script:KnownR2BitName  = "aurora_mem_bridge_r2_28921C6B.bit"
+$script:KnownR2LtxName  = "probes_r2_28921C6B.ltx"
+$script:KnownR2RtlBlob  = "f43267db82b84305cfeb519adcfa76f79443f6b3"   # git hash-object rtl_axi4_master_bridge.v (ARM 时序修复版)
 $script:FrameMaxLen = 1538           # frame_mem_if.v MAX_LEN
-$script:ExpectedArchiveDir = Join-Path $script:OutRoot "archive\b31b_r2_2026-10-17"
+$script:ExpectedArchiveDir = Join-Path $script:OutRoot "archive\b31b_r2_2026-10-18"
 $script:R1ArchiveDir = Join-Path $script:OutRoot "archive\b31b_rdfix_2026-10-17"
 $script:ProbeInconsistent = New-Object System.Collections.ArrayList
 $script:Guard = @{ Burn = 0; Uart = 0; Ping = 0; Vivado = 0; Python = 0 }
@@ -930,7 +956,7 @@ function Step-S0 {
     } else {
         Write-Log "xsa = 未找到 out\mb_ctrl.xsa（可 -Xsa 指定; 非 S0 硬判项）" "DarkYellow"
     }
-    Write-Log ("R2 归档命名约定(Lead 2026-10-17 最终): " + $script:ExpectedArchiveDir + "\aurora_mem_bridge_r2_<bit8>.bit / probes_r2_<bit8>.ltx / j3_soft_r2_" + $script:KnownR2ElfHash8 + ".elf / mb_ctrl_r2.xsa / build_r2_synth.log / build_r2_sweep.log / SHA256.txt") "DarkYellow"
+    Write-Log ("R2 归档命名约定(round2c 2026-10-18): " + $script:ExpectedArchiveDir + "\" + $script:KnownR2BitName + " / " + $script:KnownR2LtxName + " / j3_soft_r2_" + $script:KnownR2ElfHash8 + ".elf / mb_ctrl_r2.xsa / build_r2_synth.log / build_r2_sweep2.log / SHA256.txt (旧 round1 归档 b31b_r2_2026-10-17 保留作历史)") "DarkYellow"
 
     # ---- 构建日志定位（R2: out\r2_sweep.log / out\r2_synth.log；归档 build_r2_sweep.log / build_r2_synth.log；兜底 build_*.log）----
     $buildLogFull = Resolve-ArtifactPath $BuildLog
@@ -939,6 +965,7 @@ function Step-S0 {
             $logCands = @(
                 (Join-Path $script:OutRoot "r2_sweep.log"),
                 (Join-Path $script:OutRoot "r2_synth.log"),
+                (Join-Path $script:ExpectedArchiveDir "build_r2_sweep2.log"),
                 (Join-Path $script:ExpectedArchiveDir "build_r2_sweep.log"),
                 (Join-Path $script:ExpectedArchiveDir "build_r2_synth.log")
             )
@@ -971,13 +998,13 @@ function Step-S0 {
     foreach ($m in [regex]::Matches($text, "WHS_GATE:\s*(-?\d+(?:\.\d+)?)")) { [void]$whsList.Add([double]$m.Groups[1].Value) }
     foreach ($m in [regex]::Matches($text, "SWEEP2?_[A-Za-z]+:\s*WNS=(-?\d+(?:\.\d+)?)")) { [void]$wnsList.Add([double]$m.Groups[1].Value) }
     foreach ($m in [regex]::Matches($text, "SWEEP2?_[A-Za-z]+:\s*WNS=-?\d+(?:\.\d+)?\s+WHS=(-?\d+(?:\.\d+)?)")) { [void]$whsList.Add([double]$m.Groups[1].Value) }
-    $okMarker = ($text -match "V5_SWEEP_OK|W5_BUILD_OK|DBG_BUILD_DONE")
+    $okMarker = ($text -match "V5_SWEEP2_OK|V5_SWEEP_OK|W5_BUILD_OK|DBG_BUILD_DONE")
     $failMarker = ($text -match "V5_SWEEP_ALL_FAIL|V5_SWEEP2_ALL_FAIL|W5_BUILD_TIMING_FAIL|NO_BITSTREAM")
     $wns = $null; $whs = $null
     if ($wnsList.Count -gt 0) { $wns = $wnsList[$wnsList.Count - 1] }
     if ($whsList.Count -gt 0) { $whs = $whsList[$whsList.Count - 1] }
     $bitInLog = ""
-    $mBit = [regex]::Match($text, "(?:V5_SWEEP_OK|DBG_BUILD_DONE)[^\r\n]*bit=([^\s]+)")
+    $mBit = [regex]::Match($text, "(?:V5_SWEEP2_OK|V5_SWEEP_OK|DBG_BUILD_DONE)[^\r\n]*bit=([^\s]+)")
     if ($mBit.Success) { $bitInLog = $mBit.Groups[1].Value }
     # ---- 本轮场次专项: 构建 NO_BITSTREAM(无 R2 位流)时的 S0 依赖项口径 ----
     #   仅当未提供 -Bit 且日志显示失败轮(ALL_FAIL/NO_BITSTREAM/负 WNS 扫描)时触发; 不改变成功位流后的判据。
@@ -990,8 +1017,9 @@ function Step-S0 {
     }
     Write-Log ("WNS(last) = " + $wns) $(if ($null -ne $wns -and $wns -ge 0) { "Green" } else { "Red" })
     Write-Log ("WHS(last) = " + $whs) $(if ($null -ne $whs -and $whs -ge 0) { "Green" } else { "Red" })
-    Write-Log ("成功标记(V5_SWEEP_OK|W5_BUILD_OK|DBG_BUILD_DONE) = " + $okMarker)
+    Write-Log ("成功标记(V5_SWEEP2_OK|V5_SWEEP_OK|W5_BUILD_OK|DBG_BUILD_DONE) = " + $okMarker)
     Write-Log ("失败标记(V5_SWEEP_ALL_FAIL|V5_SWEEP2_ALL_FAIL|W5_BUILD_TIMING_FAIL|NO_BITSTREAM) = " + $failMarker)
+    # 成功标记含 V5_SWEEP2_OK(round2c 实测行: "V5_SWEEP2_OK: directive=ExtraTimingOpt wns=0.004 whs=0.004 bit=...")
     if ($bitInLog) { Write-Log ("构建日志内位流路径 = " + $bitInLog) }
     if ($bitInLog -and $bitFull) {
         $logLeaf = Split-Path -Leaf ($bitInLog -replace "/", "\")
@@ -1571,7 +1599,8 @@ function Step-S6 {
         $plan += "  B) Lead 手工抓: 用同一 tcl, 或直接用 -IlacapUiPre/-IlacapUiPost 给定 CSV"
         $plan += ("判据: 桥② dbg_mem2_rd_frm 前后 +" + $IlaExpectPing + "(=ping 数) 且 dbg_mem2_ost 前后均 0;")
         $plan += ("      桥① dbg_mem_wm/wr_frm/rd_frm 各 +" + $IlaExpectPing + " 且 dbg_mem_ost 前后均 0;")
-        $plan += "      R2 新计数(已与最终 build_synth_only.tcl/build_debug.tcl 对齐): ILA3@ui dbg_s2mm_state[2:0]/tvalid/tready; ILA0@user dbg_s2mm_reqpend/dbg_wr_fault"
+        $plan += "      R2 新计数(round2b 裁剪后口径): ILA3@ui dbg_s2mm_state[2:0]/tvalid/tready; ILA0@user dbg_s2mm_reqpend/dbg_wr_fault"
+        $plan += "      round2b 裁剪: ILA1@eth_rxc/ILA2@user_clk_b 整核移除(判据不用, 缺失不报错); 裁掉 dbg_mem_bresp/wslot/rslot ⇒ 本轮不可观测, 记 INFO/NOT_OBTAINED, 不判 FAIL"
         $plan += "      注: dbg_wr_timeout 未挂 ILA 且 stat_wr_timeout 无 Lite 读回路径(+0x40/+0x44 不含) ⇒ 上板不可观测, 仅 INFO, 不硬判"
         $plan += "      可观测替代(INFO): dbg_s2mm_state 编码 0=IDLE 1=WAITGO 2=STREAM 3=PUSH 4=WAITDONE 5=DRAIN 6=HALT"
         $plan += "      （窗口内 dbg_wr_fault 应为 0; 探针缺失则 WARN 不硬判; 可选列见 r2_counter_recon.py）"
@@ -1789,7 +1818,8 @@ function Step-S10 {
         $plan += "  或显式: -IlacapUiPost <csv> [-IlacapUserPost <csv>]"
         $plan += ("py " + $script:ReconPyPath + " --mode recon --ui-post <post.csv>" + $(if ($RequireR2Probes) { " --require-r2-probes" } else { "" }))
         $plan += "判据: 每桥 wm==wr_frm==rd_frm; ost=0; 错误计数 stall/len_err 0;"
-        $plan += "      桥① 错误硬判 len_err/stall; dbg_wr_fault(ILA0@user) 硬判 0; timeout 未挂 ILA 且无 Lite 读回路径(+0x40/+0x44 不含) ⇒ INFO; 桥① bresp 恒 0 仅 INFO(S2MM 下不可见)"
+        $plan += "      桥① 错误硬判 len_err/stall(round2b 保留); dbg_wr_fault(ILA0@user) 硬判 0; timeout 未挂 ILA 且无 Lite 读回路径(+0x40/+0x44 不含) ⇒ INFO"
+        $plan += "      round2b 裁剪: dbg_mem_bresp/wslot/rslot 未挂 ⇒ 这些列缺失记 INFO/NOT_OBTAINED(判据未取得≠失败), 不判 FAIL; ILA1/ILA2 整核移除与 S10 无关"
         $plan += "      桥② 若无 stall/len_err/bresp 探针则记 INFO(不可观测); R2 新探针 dbg_s2mm_* 作可选列"
         $plan += "J4 口径: 两桥分别判, 不得用一桥的相等掩盖另一桥的失配"
         Write-Plan -Lines $plan

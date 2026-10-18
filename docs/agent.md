@@ -172,9 +172,11 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - **NIC 口径**：静态 ARP ⇒ 板自发帧广播 dst ⇒ 主判据 = `ReceivedBytes`（单帧 ≥74、4 帧 ≥296），`ReceivedUnicast` 恒 0。
 - **下一步**：R2（B3-2 桥①写侧换层 S2MM，DMA 描述符驱动写槽，判据 = 四档 + 10MB 100%+SHA + 双桥计数对账）。
 
-## ★ 10-17 晚～10-18 凌晨：R2 写侧 S2MM —— 离线/审计全过，**构建时序未收口、板验未执行**
+## ★ 10-18：R2 写侧 S2MM —— 位流已出（WNS/WHS +0.004），板验待上电
 
-- **结论（[L2] 离线）**：R2 设计与实现落地（写槽规则号 1 逐字等价、`HAS_DMA` 参数化：桥① 写换 DMA S2MM 新写引擎/桥② 写读硬件 FSM 原样）；独立审计 A1–A13（**A1 真阻塞缺陷已修**：写槽游标 generate 内同名遮蔽→读 FSM 断源，xvlog/综合均不报错，见坑 #57）；**独立 TB PASS 0 errors（101 commits）+ 2 负向对照按设计 FAIL + 三回归 PASS + 综合 0 errors/0 CW**。设计 v1.2：`prj/project_11/out/R2_S2MM_DESIGN.md`；审计：`out/evidence_2026-10-17/R2_rtl_audit.md`；固件 **ELF `1bc8088d`**。
-- **构建（未收口，NO_BITSTREAM）**：place/route 5 掷全部被时序门限拒（最好 `ExtraTimingOpt` 尾判 WNS **−0.098**；其余 MIG 瞬态/布局失败/−0.225/−0.175），失败轮不写位流、不覆盖在库产物；现役仍是 R1 修复版 `c8cd3a32` + ELF `2961b585`。**失败轮最差路径已定位 `[L2]`**：30 条中 25 条 = `u_mem/u_wr_bytes/wr_gray_s2`（user→ui FIFO 同步化写指针）→ `u_mem/u_bridge/g_wr_dma.wd_data_r_reg[*]/CE`（新写引擎 512b 数据寄存器逐字节使能；8 级 gray→decode 锥驱动 512 CE，route 56.6%），另 5 条 = 桥② 旧写 FSM 同族（未被 R2 改动）。**主修方向 = 新写引擎字节捕获加 1 级流水**（`byte_q/byte_valid_q`，`wf_rd_en` 仍由 `!wf_empty` 控制；吞吐不变；不动 `HAS_DMA=0` 分支）；次选裁 ILA3 低价值探针/换 place 指令。诊断与复现命令见 `prj/project_11/out/archive/b31b_r2_2026-10-17/BUILD_STATUS.md`。
-- **板验未执行（`NOT_OBTAINED`）**：10-18 00:2x 用户要求收尾+断电，板卡未被本次 R2 工作触碰（未烧录/未开串口/JTAG/未 ping）。
-- **下次开工**：① **先修时序再重建**：按 `BUILD_STATUS.md` §3 给新写引擎字节捕获加 1 级流水（`byte_q/byte_valid_q`）→ `build_synth_only.tcl`（~10min）→ `build_v5_sweep2.tcl`（~35min/掷，stdout 文件重定向，坑 #58）；备选裁 ILA3 低价值探针/换指令；② 位流归档 + 钉 hash 后 `out/r2_board.ps1 -Run` 跑 S0–S11（工具 dry-run 7/7 PASS；串口默认 COM5；NIC 主判据 `ReceivedBytes`；J3 带 `--dma` 不重试）；③ **S4 单帧 86B=64+22 尾拍逐字节 + 记 S2MM DMASR** 是 TKEEP→WSTRB 从 `[L1]` 升 `[L3]` 的唯一途径。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md`（§九=下次开工要点）。**本轮收尾提交 `1c1a1b7`（push master，本地 CI PASS）**。
+- **结论（[L2] 离线 + 构建产物直证）**：R2 设计与实现同前（写槽规则号 1 逐字等价、HAS_DMA 参数化、桥② 写读零改动）；独立审计 **A1–A19 全闭环**；**round2c 位流过时序门限**：`ExtraTimingOpt` 后布 WNS +0.042 → 尾判 **+0.004 / WHS +0.004**、DRC **0 Errors/22 Warnings**、`V5_SWEEP2_OK`。
+- **关键修复链**：① 字节捕获 1 级流水（审计抓到首版“满拍保持拍重复 fetch 覆盖跨拍预取”缺陷并修复，坑 #59）；② `WD_ARM` 拆拍——把 `wf_level>=wd_len`（3×CARRY8）从 512 位数据寄存器 CE 上移走（WNS −0.127→+0.004，坑 #60）；③ ILA 裁剪（ILA1/2 整核移除、ILA0 374→92、ILA3 184→152，缺失探针列=INFO）。
+- **产物**：bit **`28921C6B…`**（10,266,180 B）/ ltx `4AC25546…`（审计 ltx 实物核对通过：仅 2 核、92/9/152、末 5bit 正确）/ xsa `16A4F01F…` / ELF `1bc8088d`；归档 `prj/project_11/out/archive/b31b_r2_2026-10-18/`（21 文件 + SHA256）；RTL 冻结 blob **`f43267db`**。
+- **S0 已钉**：`r2_board.ps1` dry-run **S0 PASS**（WNS/WHS/DRC/hash 全过；判据工具链 7/7 PASS）。
+- **板验待用户上电**：烧归档 bit+ELF → S0–S11（S4 单帧 86B 尾拍逐字节 + S2MM DMASR；`dbg_s2mm_state` 7=ARM 正常/6=HALT fail-stop；`fault` 全程 0；S10 bresp/wslot/rslot=INFO）。
+- **下一步**：上电 → S0–S11 → 证据归档（`out/evidence_2026-10-18/`）→ 记录/AGENTS/工作清单/docs 镜像回填 → 提交 + CI。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十。

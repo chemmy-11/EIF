@@ -87,53 +87,16 @@ puts "ILA0_CLK_NET: $uclk_net"
 connect_debug_port u_ila_0/clk $uclk_net
 
 set nets0 {}
-# ★W6(2026-10-09): 裁掉 Aurora RX 原始字节流(74 bit)腾布线余量给 W5 命令通道探针。
-#   理由: 该字节流是 prj9 链路调试期遗留, 链路已由 ch_up/lane_up/err 计数证实可用;
-#   实测代价: 完整探针版 WNS -0.078, 需腾 ~0.08ns。
-# foreach n [bus_nets dbg_rx_tdata    64] { lappend nets0 $n }
-# foreach n [bus_nets dbg_rx_tkeep     8] { lappend nets0 $n }
-lappend nets0 [one_net dbg_rx_tvalid]
-lappend nets0 [one_net dbg_rx_tlast ]
-foreach n [bus_nets dbg_up_frames   16] { lappend nets0 $n }
-foreach n [bus_nets dbg_up_bytes    16] { lappend nets0 $n }
-lappend nets0 [one_net dbg_up_ovf  ]
-foreach n [bus_nets dbg_up_stall    16] { lappend nets0 $n }
-foreach n [bus_nets dbg_pk_frames   16] { lappend nets0 $n }
-lappend nets0 [one_net dbg_pk_ovf  ]
-foreach n [bus_nets dbg_prev_wr     16] { lappend nets0 $n }
-foreach n [bus_nets dbg_prev_drop   16] { lappend nets0 $n }
-lappend nets0 [one_net dbg_ch_up   ]
-lappend nets0 [one_net dbg_lane_up ]
-lappend nets0 [one_net dbg_hard_err]
-lappend nets0 [one_net dbg_soft_err]
-foreach n [bus_nets dbg_pk_ovf_cnt     16] { lappend nets0 $n }
-foreach n [bus_nets dbg_pfwd_rd        16] { lappend nets0 $n }
-foreach n [bus_nets dbg_hard_err_cnt   16] { lappend nets0 $n }
-foreach n [bus_nets dbg_soft_err_cnt   16] { lappend nets0 $n }
-foreach n [bus_nets dbg_ch_up_evt      16] { lappend nets0 $n }
-foreach n [bus_nets dbg_pfwd_stuck_cnt 16] { lappend nets0 $n }
-lappend nets0 [one_net dbg_pfwd_stuck]
-# ---- prj10: 桥用户侧计数 + 读侧发射使能(帧连续性观测) ----
+# ★2026-10-18 (R2 round2 时序攻坚): ILA0 只保留 R2 板验判据必需项 (省资源/布线余量)
+#   S6/S10(user 侧): 桥① u_wr/u_rd/u_drop/rden/ost_s + 桥② u_wr/u_rd;
+#   S2MM 写引擎: reqpend/fault;   probe1 发射字节流 (S8c) 保留不变.
 foreach n [bus_nets dbg_mem_u_wr   16] { lappend nets0 $n }
 foreach n [bus_nets dbg_mem_u_rd   16] { lappend nets0 $n }
 foreach n [bus_nets dbg_mem_u_drop 16] { lappend nets0 $n }
 lappend nets0 [one_net dbg_mem_rden]
 foreach n [bus_nets dbg_mem_ost_s   9] { lappend nets0 $n }
-# ---- W4: 桥② user 域观测 ----
 foreach n [bus_nets dbg_mem2_u_wr  16] { lappend nets0 $n }
 foreach n [bus_nets dbg_mem2_u_rd  16] { lappend nets0 $n }
-# ---- W5: 命令通道 user 域观测（模式/读槽号/执行数/触发数）----
-lappend nets0 [one_net dbg_cmd_mode]
-foreach n [bus_nets dbg_cmd_slot   8] { lappend nets0 $n }
-foreach n [bus_nets dbg_cmd_exec  16] { lappend nets0 $n }
-foreach n [bus_nets dbg_cmd_trig  16] { lappend nets0 $n }
-# ---- prj11 B1: soft-core control plane (user domain, J_B1-③ register readback) ----
-lappend nets0 [one_net dbg_lite_owner]
-lappend nets0 [one_net dbg_lite_mode ]
-foreach n [bus_nets dbg_lite_slot  8] { lappend nets0 $n }
-foreach n [bus_nets dbg_lite_trig 16] { lappend nets0 $n }
-foreach n [bus_nets dbg_lite_exec 16] { lappend nets0 $n }
-# ---- B3-2: DMA 写引擎 (S2MM) user 域观测 (请求 pending / fault 粘滞) ----
 lappend nets0 [one_net dbg_s2mm_reqpend]
 lappend nets0 [one_net dbg_wr_fault]
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
@@ -150,75 +113,9 @@ set_property port_width [llength $nets_rd] [get_debug_ports u_ila_0/probe1]
 connect_debug_port u_ila_0/probe1 $nets_rd
 puts "ILA0_PROBE1_EMIT_BYTES: [llength $nets_rd] nets"
 
-# ============ ILA1 @ eth_rxc (gmii_rx_clk) —— prj9 原样 ============
-create_debug_core u_ila_1 ila
-set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_1]
-set_property C_TRIGIN_EN false [get_debug_cores u_ila_1]
-set_property C_TRIGOUT_EN false [get_debug_cores u_ila_1]
-set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_1]
-set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_1]
-set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_1]
-set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_1]
-set_property port_width 1 [get_debug_ports u_ila_1/clk]
-set wr_clk_net [get_nets -quiet -of_objects [get_pins -quiet {u_pump_fwd/wr_dv_d_reg/C}]]
-if {[llength $wr_clk_net] == 0} {
-    set wr_clk_net [get_nets -quiet [list gmii_rx_clk]]
-}
-if {[llength $wr_clk_net] == 0} { error "pump wr clock net not found (u_pump_fwd/wr_dv_d_reg/C)" }
-puts "ILA1_CLK_NET: $wr_clk_net"
-connect_debug_port u_ila_1/clk $wr_clk_net
+# ★2026-10-18 (R2 round2): ILA1@eth_rxc 整核移除 (R2 S0–S11 判据不使用, 省资源/布线; 原 prj9 eth 域探针仅 prj9 判据用)
 
-set nets1 {}
-foreach n [bus_nets dbg_pfwd_wr   16] { lappend nets1 $n }
-foreach n [bus_nets dbg_pfwd_drop 16] { lappend nets1 $n }
-lappend nets1 [one_net dbg_stack_txen]
-lappend nets1 [one_net dbg_gmii_rx_dv   ]
-foreach n [bus_nets dbg_gmii_rxd     8] { lappend nets1 $n }
-lappend nets1 [one_net dbg_arp_rx_done ]
-lappend nets1 [one_net dbg_arp_rx_type ]
-lappend nets1 [one_net dbg_udp_rec_done]
-lappend nets1 [one_net dbg_icmp_rec_done]
-foreach n [bus_nets dbg_rec_byte_num 16] { lappend nets1 $n }
-foreach n [bus_nets dbg_udp_src_port 16] { lappend nets1 $n }
-# ---- W5: 命令通道 eth 域观测（收命令数/错帧数/响应占用）----
-foreach n [bus_nets dbg_cmd_rx   16] { lappend nets1 $n }
-foreach n [bus_nets dbg_cmd_err  16] { lappend nets1 $n }
-lappend nets1 [one_net dbg_cmd_respbsy]
-set_property port_width [llength $nets1] [get_debug_ports u_ila_1/probe0]
-connect_debug_port u_ila_1/probe0 $nets1
-
-# ============ ILA2 @ user_clk_b (B 通道) —— prj9 原样 ============
-create_debug_core u_ila_2 ila
-set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_2]
-set_property C_TRIGIN_EN false [get_debug_cores u_ila_2]
-set_property C_TRIGOUT_EN false [get_debug_cores u_ila_2]
-set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_2]
-set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_2]
-set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_2]
-set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_2]
-set_property port_width 1 [get_debug_ports u_ila_2/clk]
-set bclk_net [get_nets -quiet [list user_clk_b]]
-if {[llength $bclk_net] == 0} {
-    set bclk_net [get_nets -quiet -of_objects [get_pins -quiet {u_pack_b/frame_active_reg/C}]]
-}
-if {[llength $bclk_net] == 0} { error "user_clk_b net not found (nor via u_pack_b/frame_active_reg/C)" }
-puts "ILA2_CLK_NET: $bclk_net"
-connect_debug_port u_ila_2/clk $bclk_net
-
-set nets2 {}
-foreach n [bus_nets dbg_echo_b_rx      16] { lappend nets2 $n }
-foreach n [bus_nets dbg_echo_b_tx      16] { lappend nets2 $n }
-foreach n [bus_nets dbg_echo_b_ovf_cnt 16] { lappend nets2 $n }
-foreach n [bus_nets dbg_hard_err_b_cnt 16] { lappend nets2 $n }
-foreach n [bus_nets dbg_soft_err_b_cnt 16] { lappend nets2 $n }
-foreach n [bus_nets dbg_ch_up_b_evt    16] { lappend nets2 $n }
-lappend nets2 [one_net dbg_ch_up_b    ]
-lappend nets2 [one_net dbg_lane_up_b  ]
-lappend nets2 [one_net dbg_echo_b_ovf ]
-lappend nets2 [one_net dbg_b_rx_tvalid]
-lappend nets2 [one_net dbg_b_tx_tvalid]
-set_property port_width [llength $nets2] [get_debug_ports u_ila_2/probe0]
-connect_debug_port u_ila_2/probe0 $nets2
+# ★2026-10-18 (R2 round2): ILA2@user_clk_b 整核移除 (B 通道; R2 S0–S11 判据不使用)
 
 # ============ ILA3 @ ui_clk (MIG ~300MHz) —— prj10 新增 ============
 #   ui 域信号严禁挂 ILA0/1/2; 桥的 ui 侧计数器全部在此观测
@@ -246,10 +143,9 @@ foreach n [bus_nets dbg_mem_wr_frm  16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem_rd_frm  16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem_stall   16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem_len_err 16] { lappend nets3 $n }
-foreach n [bus_nets dbg_mem_bresp   16] { lappend nets3 $n }
+# ★2026-10-18 round2 裁: dbg_mem_bresp (S2MM 下恒 0, INFO) 不挂
 foreach n [bus_nets dbg_mem_ost      9] { lappend nets3 $n }
-foreach n [bus_nets dbg_mem_wslot    8] { lappend nets3 $n }
-foreach n [bus_nets dbg_mem_rslot    8] { lappend nets3 $n }
+# ★2026-10-18 round2 裁: wslot/rslot (调试用) 不挂
 # ---- W5: 非法读/无帧计数 + 读写突发数（J5 对账与可观测性）----
 # ⚠️ 2026-10-07 实测: 这 96 bit 加在 300MHz 的 ILA3 上会把 ui 域推向拥塞
 #    （WNS -0.041 → -1.142, 4040 端点失败, 平均缺口仅 0.27ns = 典型拥塞特征）。

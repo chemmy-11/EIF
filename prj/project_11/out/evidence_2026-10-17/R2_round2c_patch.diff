@@ -1,0 +1,60 @@
+--- 06e6bd72
++++ f43267db
+@@ -569,9 +569,15 @@
+     //       软核编程 S2MM (SA/LENGTH) 后翻 GO (ui 域 2FF); 完成后 s2mm_introut 退休。
+     //       toggle 非电平: 帧到达是外部驱动, 连续请求可能在 2FF 窗口内无缝衔接。
+     //=========================================================================
+     localparam WD_IDLE=3'd0, WD_WAITGO=3'd1, WD_STREAM=3'd2, WD_PUSH=3'd3,
+-               WD_WAITDONE=3'd4, WD_DRAIN=3'd5, WD_HALT=3'd6;
++               WD_WAITDONE=3'd4, WD_DRAIN=3'd5, WD_HALT=3'd6, WD_ARM=3'd7;
++    // ★WD_ARM=7 (2026-10-18 时序修复): 进入 STREAM 前独立一拍清拼帧寄存器.
++    //   失败轮实测: WAITGO 的完成条件 `wf_level >= wd_len` (12b 比较, 3x CARRY8)
++    //   被逻辑并进了 wd_data_r/wd_keep_r 的 512 CE (clear-on-transition), 使
++    //   gray 同步指针->level 比较->512 CE 成为 300MHz 关键路径 (slack -0.127)。
++    //   拆出 ARM 后: 清寄存器 CE = 状态译码 (FF), level 比较只驱动 wdst (3 FF)。
++    //   编码取 7 而非插入中间值, 保持既有 HALT=6 不变 (板验/判据工具文档口径)。
+     reg [2:0]   wdst;
+     // ★注意: 不得在本分支内再声明 wr_slot_ptr (会遮蔽模块级同名信号, 读 FSM 的
+     //   c_clamp/c_in_rng/p_target_ok 用的是模块级副本 -> 静默断源)。本分支直接驱动模块级。
+     reg [7:0]   wd_slot, wd_beats, wd_beat, wd_bi;
+@@ -711,16 +717,11 @@
+                     wd_go_seen <= dma_wr_go;
+                     wd_go_ok   <= 1'b1;
+                 end
+                 if (wd_go_ok && (wf_level >= wd_len[12:0]) && !s2mm_introut) begin
+-                    wd_beat      <= 8'd0;
+-                    wd_bi        <= 8'd0;
+-                    wd_rxc       <= 16'd0;
+-                    wd_beat_full <= 1'b0;
+-                    wd_data_r    <= 512'd0;
+-                    wd_keep_r    <= 64'd0;
+-                    wd_stall_cnt <= 24'd0;
+-                    wdst <= WD_STREAM;
++                    // ★2026-10-18 时序修复: 本拍不再清 512 数据寄存器 (否则 level 比较锥
++                    //   被并入 512 CE 成为关键路径); 改入 WD_ARM 一拍由状态译码清零.
++                    wdst <= WD_ARM;
+                 end else if (wd_wait_cnt == 24'hFFFFFF) begin
+                     // 超时 (~56ms @300MHz): 软核未驻留/未编程 -> 整帧丢弃 (不停泊)
+                     wr_timeout_r   <= wr_timeout_r + 16'd1;
+                     wd_req_pending <= 1'b0;
+@@ -729,8 +730,20 @@
+                     wdst <= WD_DRAIN;
+                 end else begin
+                     wd_wait_cnt <= wd_wait_cnt + 24'd1;
+                 end
++            end
++            //-----------------------------------------------------------------
++            WD_ARM: begin      // ★2026-10-18: 独立一拍清拼帧寄存器 (CE 只依赖状态译码)
++                wd_beat      <= 8'd0;
++                wd_bi        <= 8'd0;
++                wd_rxc       <= 16'd0;
++                wd_beat_full <= 1'b0;
++                wd_data_r    <= 512'd0;
++                wd_keep_r    <= 64'd0;
++                wd_stall_cnt <= 24'd0;
++                byte_valid_q <= 1'b0;
++                wdst <= WD_STREAM;
+             end
+             //-----------------------------------------------------------------
+             WD_STREAM: begin   // 逐字节攒拍 (尾拍 TKEEP 精确到字节, 与旧 WSTRB 等价)
+                 // ★字节捕获 1 级流水 (2026-10-18 时序修复): 消费(寄存器->512 lane / 推进)
