@@ -115,6 +115,21 @@ set match_ui [envval R2_ILA_MATCH_UI "dbg_mem2_rd_frm"]
 set match_user [envval R2_ILA_MATCH_USER "dbg_mem2_u_wr"]
 set match_extra [envval R2_ILA_MATCH_EXTRA ""]
 set expect_probes [split [envval R2_EXPECT_PROBES "dbg_s2mm_reqpend,dbg_wr_fault,dbg_s2mm_state,dbg_s2mm_tvalid,dbg_s2mm_tready"] ","]
+# ---- round2d (2026-10-18): optional TRIGGERED capture for AXI-wedge / handshake diagnosis ----
+#   R2_TRIGGER_PROBE     : probe name substring to trigger on (e.g. dbg_lite_arvalid, dbg_s2mm_reqpend,
+#                          dbg_s2mm_state, dbg_wr_fault, dbg_lite_hang_st). Empty = old trigger_now behavior.
+#   R2_TRIGGER_COMPARE   : Vivado TRIGGER_COMPARE_VALUE expression (default eq1'b1; bus example eq3'b001)
+#   R2_TRIGGER_TIMEOUT_S : seconds to wait for trigger (default = R2_WAIT_S)
+#   R2_TRIGGER_POSITION  : trigger position within the 2048-sample window (default 1024 = half pre/post)
+#   R2_TRIGGER_ARM_MS    : settle ms after arming before stimulus (default 300)
+#   Behavior: PRE stays a trigger_now snapshot; the ILA that owns the trigger probe is ARMED before the
+#   stimulus, then stimulus runs, then we wait for trigger (or timeout) and upload that ILA as POST_T.
+#   The other ILA (if any) still gets a normal trigger_now POST snapshot.
+set trig_probe [envval R2_TRIGGER_PROBE ""]
+set trig_cmp [envval R2_TRIGGER_COMPARE "eq1'b1"]
+set trig_timeout [envval R2_TRIGGER_TIMEOUT_S $waits]
+set trig_pos [envval R2_TRIGGER_POSITION 1024]
+set trig_arm_ms [envval R2_TRIGGER_ARM_MS 300]
 
 puts "R2CAP_START tag=$tag"
 puts "R2CAP_HOST [info hostname]"
@@ -130,6 +145,10 @@ puts "R2CAP_MATCH_UI: $match_ui"
 puts "R2CAP_MATCH_USER: $match_user"
 puts "R2CAP_MATCH_EXTRA: $match_extra"
 puts "R2CAP_EXPECT_PROBES: $expect_probes"
+puts "R2CAP_TRIGGER_PROBE: $trig_probe"
+puts "R2CAP_TRIGGER_COMPARE: $trig_cmp"
+puts "R2CAP_TRIGGER_TIMEOUT_S: $trig_timeout"
+puts "R2CAP_TRIGGER_POSITION: $trig_pos"
 
 if {![file exists $ltx]} {
     puts "R2CAP_RESULT: FAIL ltx not found: $ltx (set R2_LTX to the ARCHIVED probes ltx matching the burned bit)"
@@ -214,6 +233,67 @@ proc grab {ila csv label} {
     }
     set n [csv_rows $csv]
     puts "R2CAP_GRAB_$label: OK $csv rows=$n"
+    return 1
+}
+
+# ---- round2d triggered-capture helpers (AXI wedge / handshake race) ----
+proc find_trigger_probe {pat} {
+    set hits {}
+    foreach c [get_hw_ilas -quiet] {
+        set cand [get_hw_probes -quiet -of_objects $c "*$pat*"]
+        foreach p $cand { lappend hits [list $c $p] }
+    }
+    if {[llength $hits] == 0} { return {} }
+    # prefer exact-name match (avoid matching a bus bit slice when the full bus probe exists)
+    foreach h $hits {
+        if {[string match -nocase $pat [lindex $h 1]]} { return $h }
+    }
+    return [lindex $hits 0]
+}
+
+proc arm_trigger {pat cmp pos} {
+    set hit [find_trigger_probe $pat]
+    puts "R2CAP_TRIGGER_HITS: [expr {[llength $hit] > 0 ? "found" : "NONE"}]"
+    if {[llength $hit] == 0} { return {} }
+    set tila [lindex $hit 0]
+    set tpr  [lindex $hit 1]
+    puts "R2CAP_TRIGGER_PROBE_HIT: $tpr @ $tila"
+    catch {reset_hw_ila $tila} e0
+    if {$e0 ne ""} { puts "R2CAP_TRIGGER_RESET_NOTE: $e0" }
+    after 300
+    if {[catch {set_property TRIGGER_COMPARE_VALUE $cmp $tpr} e1]} {
+        puts "R2CAP_TRIGGER_SETFAIL: $e1"
+        return {}
+    }
+    catch {set_property CONTROL.TRIGGER_POSITION $pos $tila} e2
+    if {[catch {run_hw_ila $tila} e3]} {
+        puts "R2CAP_TRIGGER_ARMFAIL: $e3"
+        return {}
+    }
+    puts "R2CAP_TRIGGER_ARMED: $tila probe=$tpr cmp=$cmp pos=$pos"
+    return [list $tila $tpr]
+}
+
+proc grab_armed {tila csv label timeout} {
+    set trig "-"
+    if {[catch {wait_on_hw_ila -timeout $timeout $tila} e1]} {
+        puts "R2CAP_TRIGGER_WAIT_NOTE($label): $e1"
+        set trig "TIMEOUT_OR_ERROR"
+    } else {
+        set trig "TRIGGERED"
+    }
+    catch {set trig [get_property IS_TRIGGERED $tila]} e2
+    puts "R2CAP_TRIGGER_STATUS($label): $trig"
+    if {[catch {set d [upload_hw_ila_data $tila]} e3]} {
+        puts "R2CAP_GRAB_FAIL($label): upload_hw_ila_data: $e3"
+        return 0
+    }
+    if {[catch {write_hw_ila_data -force -csv_file $csv $d} e4]} {
+        puts "R2CAP_GRAB_FAIL($label): write_hw_ila_data: $e4"
+        return 0
+    }
+    set n [csv_rows $csv]
+    puts "R2CAP_GRAB_$label: OK $csv rows=$n (trigger=$trig)"
     return 1
 }
 
@@ -350,6 +430,19 @@ set ok_user_post 0
 set ok_ui_pre [grab $ila_ui $ui_pre PRE_UI]
 if {$ila_user ne ""} { set ok_user_pre [grab $ila_user $user_pre PRE_USER] }
 
+# round2d: optional triggered POST on the ILA that owns R2_TRIGGER_PROBE (armed BEFORE stimulus).
+set armed {}
+set armed_ila ""
+if {$trig_probe ne "" && $snapshot_only ne "1"} {
+    set armed [arm_trigger $trig_probe $trig_cmp $trig_pos]
+    if {[llength $armed] > 0} {
+        set armed_ila [lindex $armed 0]
+        after $trig_arm_ms
+    } else {
+        puts "R2CAP_TRIGGER_FALLBACK: trigger probe '$trig_probe' not found/settable; POST falls back to trigger_now"
+    }
+}
+
 if {$snapshot_only eq "1"} {
     puts "R2CAP_SNAPSHOT: only PRE captured (R2_SNAPSHOT_ONLY=1); no stimulus executed"
     set ok_ui_post $ok_ui_pre
@@ -360,10 +453,20 @@ if {$snapshot_only eq "1"} {
     } else {
         puts "R2CAP_STIM_OK"
     }
-    after $settlems
-    puts "R2CAP_SETTLE_DONE: $settlems ms"
-    set ok_ui_post [grab $ila_ui $ui_post POST_UI]
-    if {$ila_user ne ""} { set ok_user_post [grab $ila_user $user_post POST_USER] }
+    if {[llength $armed] > 0} {
+        if {[string equal $armed_ila $ila_ui]} {
+            set ok_ui_post [grab_armed $armed_ila $ui_post POST_UI $trig_timeout]
+            if {$ila_user ne ""} { set ok_user_post [grab $ila_user $user_post POST_USER] }
+        } else {
+            set ok_user_post [grab_armed $armed_ila $user_post POST_USER $trig_timeout]
+            set ok_ui_post [grab $ila_ui $ui_post POST_UI]
+        }
+    } else {
+        after $settlems
+        puts "R2CAP_SETTLE_DONE: $settlems ms"
+        set ok_ui_post [grab $ila_ui $ui_post POST_UI]
+        if {$ila_user ne ""} { set ok_user_post [grab $ila_user $user_post POST_USER] }
+    }
 }
 
 if {$ila_extra ne ""} {
@@ -403,5 +506,6 @@ if {$snapshot_only eq "1"} {
         puts "R2CAP_RESULT: FAIL ui pre/post capture incomplete (pre=$ok_ui_pre post=$ok_ui_post)"
     }
 }
+puts "R2CAP_TRIGGER_SUMMARY: probe=$trig_probe cmp=$trig_cmp armed_ila=$armed_ila"
 puts "R2CAP_DONE"
 exit

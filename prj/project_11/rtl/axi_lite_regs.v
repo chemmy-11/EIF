@@ -178,10 +178,12 @@ module axi_lite_regs (
             wd_byte       <= 8'd0;
         end
         else begin
+            // ★FIX(2026-10-18): AXI 要求握手后下一拍立即撤销 VALID。
+            //   原实现只在 LW_IDLE 清 -> LW_EXEC/LW_CLOSE 期间 BVALID 多拍为高,
+            //   单次写会产生多次 B 握手（AXI4-Lite 协议违例, 会把互连的写跟踪弄乱）。
+            if (s_axi_bvalid && s_axi_bready) s_axi_bvalid <= 1'b0;
             case (lwst)
             LW_IDLE: begin
-                // single-driver discipline: bvalid cleared ONLY here
-                if (s_axi_bvalid && s_axi_bready) s_axi_bvalid <= 1'b0;
                 // each ready reflects ONLY its own channel: after AW is
                 // latched, wready must STAY HIGH for the late W (dropping
                 // both deadlocks the split-timing case)
@@ -218,6 +220,8 @@ module axi_lite_regs (
                 end
             end
             LW_EXEC: begin
+                s_axi_awready <= 1'b0;   // ★FIX: 非 IDLE 态不得让 ready 保持上一拍的 1
+                s_axi_wready  <= 1'b0;
                 if (a_ack_s[1]) begin
                     a_req        <= 1'b0;             // user has the command
                     s_axi_bvalid <= 1'b1;
@@ -225,6 +229,8 @@ module axi_lite_regs (
                 end
             end
             LW_CLOSE: begin
+                s_axi_awready <= 1'b0;
+                s_axi_wready  <= 1'b0;
                 // full 4-phase close: wait ack deasserted before next write
                 if (!a_ack_s[1]) lwst <= LW_IDLE;
             end
@@ -253,19 +259,26 @@ module axi_lite_regs (
         end
         else begin
             d_ack <= d_ack;                             // default hold
+            // ★FIX(2026-10-18): 同 BVALID: RVALID 必须在握手后立即撤销。
+            //   原实现只在 LR_IDLE 清 -> LR_DACK 期间 RVALID 多拍为高, rready 常高
+            //   时单次读会产生多次 R 握手（实测 1 AR -> 5 R）, 互连读跟踪错位/楔死。
+            if (s_axi_rvalid && s_axi_rready) s_axi_rvalid <= 1'b0;
             case (lrst)
             LR_IDLE: begin
-                // single-driver discipline: rvalid cleared ONLY here
-                if (s_axi_rvalid && s_axi_rready) s_axi_rvalid <= 1'b0;
                 // strictly serialized reads: never accept a new AR while the
                 // previous rvalid is still pending (a pending rvalid makes a
                 // naive master sample the OLD rdata -> stale reads).
                 // arready STAYS HIGH through the accept (a level-polling
                 // master would otherwise never see it high while arvalid is
                 // held -> endless accepts; found by the bench, 2026-10-10).
-                if (!s_axi_rvalid && !r_ack_s[1]) begin
+                // ★FIX: 单拍 arready（先拉高一拍, 下一拍握手并立即撤销; 避免接受后
+                //   多一拍 arready=1 导致流水主端的第二个 AR 被总线握手但被 FSM 丢弃）。
+                if (!s_axi_rvalid && !r_ack_s[1] && !s_axi_arready) begin
                     s_axi_arready <= 1'b1;
+                end
+                else if (s_axi_arready) begin
                     if (s_axi_arvalid) begin
+                        s_axi_arready <= 1'b0;
                         r_addr        <= s_axi_araddr[7:2];
                         r_req         <= 1'b1;
                         lrst          <= LR_RACK;

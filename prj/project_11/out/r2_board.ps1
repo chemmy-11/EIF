@@ -31,13 +31,24 @@
 #   · 典型 -Run 钉法(见下): -Bit ...28921C6B.bit -ExpectBitHash8 28921C6B -ExpectElfHash8 1BC8088D
 #     -Xsa ...mb_ctrl_r2.xsa -ExpectXsaHash8 16A4F01F -IlaLtx ...probes_r2_28921C6B.ltx -BuildLog ...build_r2_sweep2.log
 #
+# ⚠️ round2d 板验初场(2026-10-18 16:3x-16:5x; 证据 evidence_2026-10-18\R2_board_session_20261018.md):
+#   · S0/S1/S3 PASS; 端到端未建立(S2/S3b 判据口径已按本轮板证修正, 见上 S2/S3b 注释)。
+#   · 固件阻塞缺陷(已修): serve_write_once 的 dread 2 读在紧循环交替地址(0x44/0x40)仍滞后>1笔 ⇒ 固件看不到 pending
+#     (JTAG 实证 pending_seen=0/arm_cnt=0); 改 3 读后 pending_seen=1/arm_cnt=1/WRREQ=0x80010056。候选 ELF=1e3a42db(50,944 B)。
+#   · 修后写引擎可被服务: 'I'=wr6/rd3; ILA dbg_mem_wm=5/rd_frm=5/WR_DBG.last_commit_len=86。
+#   · 未收口 A[L1]: 高频 serve_any()(~143kHz Lite 读)后 MicroBlaze 楔死在 dread volatile load(lwi, g_dbg_addr=0x44A00034
+#     = lite_regs DMA_REQ 读); UART 静默, rst -processor 不恢复, 只能重配 FPGA; 1ms 限速有时存活但不确定 ⇒ 疑 lite_regs
+#     写命令(SET_WRGO)后紧接读的握手竞争。
+#   · 未收口 B: rd_frm 增长但 ping 0/4、NIC ReceivedBytes delta=0(eth 域 ILA 已裁掉, 需补探针)。
+#   · 触发式 ILA: r2_ilacap.tcl 支持 R2_TRIGGER_PROBE/R2_TRIGGER_COMPARE/R2_TRIGGER_TIMEOUT_S(见 README §4.5)。
+#
 # 用法:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File r2_board.ps1            # DRY-RUN
 #   powershell ... -File r2_board.ps1 -Run `
 #       -Bit  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\aurora_mem_bridge_r2_28921C6B.bit `
-#       -Elf  D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\j3_soft_r2_1bc8088d.elf `
+#       -Elf  D:\FPGA\prj\project_11\out\archive\<round2d 归档>\j3_soft_r2_1e3a42db.elf `
 #       -BuildLog <R2 构建日志> `
-#       [-Port COM5] [-ExpectBitHash8 xxxxxxxx] [-ExpectElfHash8 1bc8088d] `
+#       [-Port COM5] [-ExpectBitHash8 xxxxxxxx] [-ExpectElfHash8 1e3a42db] `
 #       [-Xsa <xsa> -ExpectXsaHash8 xxxxxxxx] [-StrictS2sr] `
 #       [-IlaCapture -IlaLtx <归档 probes_r2_<bit8>.ltx>] [-RequireR2Probes] `
 #       [-SkipBurn] [-SkipS4] [-SkipS7] [-QuickS7] [-SkipS8] [-SkipS9] [-SkipS11] `
@@ -56,17 +67,19 @@
 #      · WAITGO 超时 = 良性丢帧(丢帧/pending=0/stat_wr_timeout++/**不置 fault 不停泊**; S2 身份判据依赖该行为)
 #      · STREAM/PUSH/WAITDONE 超时 = fail-stop(fault=1, 停泊 WD_HALT(6), 不 commit)
 #      · fault 恢复(唯一出口) = 软核 S2MM_DMACR=0x4(reset)→等 Halted→0x1001(RS+IOC)→清 IOC→写 +0x4C(opcode 0x06) 翻 ACK
-#   S0 工件身份: bit/ELF SHA256(可 -Expect*Hash8 钉死; 最终冻结 ELF 1bc8088d, 50,896 B, blob ee256c05)
-#      + 构建日志 WNS/WHS>=0 + 成功/失败标记 + DRC 0 Errors (+可选 xsa hash)。
+#   S0 工件身份: bit/ELF SHA256(可 -Expect*Hash8 钉死; round2d 候选 ELF 1e3a42db, 50,944 B; 旧冻结 1bc8088d
+#      50,896 B 有 Lite 读滞后缺陷) + 构建日志 WNS/WHS>=0 + 成功/失败标记 + DRC 0 Errors (+可选 xsa hash)。
 #   S1 在位配置记录(不烧绿基线): 离线记录 R1 在位对(c8cd3a32+2961b585) + -Run 时只读
 #      'U'/'L'/邻居/ping1 快照, 之后 S2 烧 R2 对 = 唯一变量。
-#   S2 身份(烧 R2 对后【不发 'd'】): ping 必须 0/1 + NIC ReceivedBytes delta=0 +
-#      wmwr delta=0 三项硬判; WR_REQ.pending 仅 INFO(WAITGO 超时约 56ms 后会良性丢帧 ⇒ ping 后隔久读到
-#      pending=0 属预期; pending=1 只在 ~56ms 窗口内可见, 均不硬判)。
+#   S2 身份(烧 R2 对后【不发 'd'】; round2d 口径修正 2026-10-18): ping 必须 0/1 + NIC ReceivedBytes delta=0 +
+#      **WR_DBG.last_commit_len==0**(未提交) + fault==0 硬判; wmwr(+0x08=u_wr_frame) 是**收帧接受计数**
+#      (frame_mem_if 帧一被接受就+1, 早于 commit), R2 无服务阶段每来一帧都会+1 且被 WAITGO 良性丢帧 ⇒ 仅 INFO;
+#      WR_REQ.pending 仅 INFO(pending=1 只在 ~56ms 窗口内可见, ping 后隔久读到 0 属预期)。
 #   S3 'd' 后 'U' 双确认: mode=1 & req.bit24=1 硬判; WR_DBG.fault==1 ⇒ FAIL(打印 wdbg/wreq/s2sr);
 #      settle 2s 后 WR_REQ.pending 仍=1 仅 WARN; s2sr 默认 WARN(-StrictS2sr 时 Halted=0&错误位=0 硬判);
 #      slot<256/len∈[0,1538] 仅 WARN。fault 恢复 = 软核写 +0x4C opcode 0x06 ACK(本脚本只读不写, 只提示)。
-#   S3b 静默窗: wmwr==wmrd 且 req.bit25=0 连续两拍(清 S2 残留帧, 建 S4/S5 干净基线)。
+#   S3b 静默窗(round2d 口径修正 2026-10-18): **WR_REQ.pending==0 且 WR_DBG.fault==0 (且 req.bit25=0) 连续两拍**;
+#      wmwr==wmrd 不再作判据(良性丢帧使 u_wr_frame 永久多计 ⇒ R2 下不可达), wmwr/wmrd/backlog 仅 INFO。
 #   S4 单帧: ping 1/1 + NIC ReceivedBytes>=74 + WM_WR+1 & WM_RD+1; 打印 s2sr 原始值
 #      (S2MM 是否报错/长度异常) + emit 解码(len/slot/byte0; ping32B 期望 len_tab=86 ⇒ 86%64=22
 #      天然覆盖尾拍 TKEEP→WSTRB 风险)。若 ping 通但后续字节级判据失败 ⇒ 日志标 TKEEP_SUSPECT。
@@ -188,7 +201,8 @@ $script:Vivado = "D:\Xilinx\Vivado\2023.1\bin\vivado.bat"
 $script:KnownFullPathPy = "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe"
 $script:KnownR1BitHash8 = "c8cd3a32"
 $script:KnownR1ElfHash8 = "2961b585"
-$script:KnownR2ElfHash8 = "1bc8088d"     # 最终冻结固件(2026-10-17 22:4x Lead 最后一次更新; 50,896 B; blob ee256c05; fa38a8cd/67c0b73a 均已作废)
+$script:KnownR2ElfHash8 = "1e3a42db"     # round2d 候选固件(2026-10-18 修 serve_write_once dread 3 读; 50,944 B; 修复前 pending_seen 恒 0); 尚未归档, Lead 确认后冻结
+$script:KnownR2ElfPrevHash8 = "1bc8088d" # 旧冻结固件(50,896 B; round2c 构建/首轮板验用; 已知 Lite 读滞后缺陷: 紧循环交替地址 2 读仍滞后 ⇒ 固件看不到 pending)
 $script:KnownR2ElfPath = "D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf"
 $script:KnownR2XsaPath = Join-Path $script:OutRoot "mb_ctrl.xsa"
 # round2c 成功位流身份(2026-10-18, 归档 b31b_r2_2026-10-18; SHA256.txt 权威)
@@ -672,42 +686,55 @@ function Set-EngineMode {
 }
 
 function Wait-QReadQuiesce {
-    # 静默窗: wmwr==wmrd 且 req.bit25(sticky)=0 连续两拍 —— 保证 S4/S5 差分基线干净。
-    # 注: 本函数只读('U'), 不发 'd'/'S'; 是否处于 DMA 由调用方断言(R2 下 S3 后 engine=1)。
+    # 静默窗(round2d 新口径, 2026-10-18 板证依据):
+    #   连续两拍 WR_REQ.pending==0 且 WR_DBG.fault==0 (且 req.bit25=0) ⇒ S4/S5 差分基线可信。
+    #   ⚠ 不再要求 wmwr==wmrd: 'U' 的 wmwr(+0x08)=u_wr_frame 是**收帧接受计数**(frame_mem_if 在帧被接受时即+1,
+    #     早于提交); R2 在未服务阶段由 WAITGO 良性丢帧清 pending, 这些帧永远不会被读/回 ⇒
+    #     u_wr_frame 永久大于 u_rd_frame, R2 下 wmwr==wmrd 不可达(旧判据会把正常板判成读出侧停摆)。
+    #   wmwr/wmrd/backlog 仅打印 INFO; 本函数只读('U'), 不发 'd'/'S'; 是否处于 DMA 由调用方断言。
     param([int]$MaxPolls = 10, [switch]$RequireEngine)
     $trace = New-Object System.Collections.ArrayList
-    $prev = $null
+    $consec = 0
+    $lastBacklog = $null
     for ($i = 0; $i -lt $MaxPolls; $i++) {
         $u = Get-UState -Title ("静默窗回读 #" + ($i + 1)) -Wait 1.6 -Drain 0.15
         if ($null -eq $u -or -not $u.ParseOk) {
             [void]$trace.Add(("U#{0}: 解析失败" -f $i))
+            $consec = 0
             Start-Sleep -Milliseconds 300
             continue
         }
         $wr = Get-WmWr16 $u
         $rd = Get-WmRd16 $u
         $backlog = (($wr - $rd) % 65536 + 65536) % 65536
+        $lastBacklog = $backlog
         $sticky = Get-ReqStickyBit $u
-        [void]$trace.Add(("U#{0}: mode={1} bit24={2} wmwr={3} wmrd={4} backlog={5} sticky={6}" -f `
-            $i, $u.Mode, [int](Get-ReqEngineBit $u), $wr, $rd, $backlog, [int]$sticky))
+        $pend = Get-WrReqPending $u
+        $fault = Get-WrDbgFault $u
+        $faultTxt = $(if ($null -eq $fault) { "n/a" } else { [int]$fault })
+        [void]$trace.Add(("U#{0}: mode={1} bit24={2} pending={3} fault={4} sticky={5} | INFO: wmwr={6} wmrd={7} backlog={8}(接受计数差, 不作判据)" -f `
+            $i, $u.Mode, [int](Get-ReqEngineBit $u), $(if ($null -eq $pend) { "n/a" } else { [int]$pend }), $faultTxt, [int]$sticky, $wr, $rd, $backlog))
         if ($RequireEngine -and ($u.Mode -ne 1 -or -not (Get-ReqEngineBit $u))) {
             [void]$trace.Add("engine 不是 DMA(mode=1 & bit24=1) —— 停止轮询")
-            return [pscustomobject]@{ Ok = $false; Trace = ($trace -join "`n"); State = $u; Backlog = $backlog }
+            return [pscustomobject]@{ Ok = $false; Trace = ($trace -join "`n"); State = $u; Backlog = $backlog; Consec = $consec }
         }
-        if ((-not $sticky) -and ($wr -eq $rd)) {
-            if ($null -ne $prev -and $prev.Wr -eq $wr -and $prev.Rd -eq $rd) {
-                return [pscustomobject]@{ Ok = $true; Trace = ($trace -join "`n"); State = $u; Backlog = 0 }
+        if ($null -eq $pend -or $null -eq $fault) {
+            [void]$trace.Add("WARN: wreq.pending 或 wdbg.fault 字段缺失 ⇒ 静默判据未取得(不按 backlog 猜)")
+            $consec = 0
+        } elseif (($pend -eq $false) -and ($fault -eq $false) -and (-not $sticky)) {
+            $consec++
+            if ($consec -ge 2) {
+                return [pscustomobject]@{ Ok = $true; Trace = ($trace -join "`n"); State = $u; Backlog = $backlog; Consec = $consec }
             }
-            $prev = [pscustomobject]@{ Wr = $wr; Rd = $rd }
         } else {
-            $prev = $null
+            $consec = 0
         }
         Start-Sleep -Milliseconds 300
     }
     $last = $script:LastU
-    $bl = 0
-    if ($null -ne $last -and $last.ParseOk) { $bl = ((((Get-WmWr16 $last) - (Get-WmRd16 $last)) % 65536) + 65536) % 65536 }
-    return [pscustomobject]@{ Ok = $false; Trace = ($trace -join "`n"); State = $last; Backlog = $bl }
+    $bl = $lastBacklog
+    if ($null -eq $bl -and $null -ne $last -and $last.ParseOk) { $bl = ((((Get-WmWr16 $last) - (Get-WmRd16 $last)) % 65536) + 65536) % 65536 }
+    return [pscustomobject]@{ Ok = $false; Trace = ($trace -join "`n"); State = $last; Backlog = $bl; Consec = $consec }
 }
 
 function Wait-BoardAliveR2 {
@@ -925,12 +952,12 @@ function Step-S0 {
         else { Write-Log ("Elf hash8 与期望不符: 实际 " + $elfHash.Substring(0, 8) + " ≠ 期望 " + $want) "Red"; $hashOk = $false }
     }
     if (-not $ExpectElfHash8) {
-        Write-Log ("提示: R2 最终冻结固件 ELF 期望 hash8 = " + $script:KnownR2ElfHash8 + "（50,896 B, blob ee256c05, Lead 2026-10-17 最后一次更新; 路径 " + $script:KnownR2ElfPath + "）; 建议 -ExpectElfHash8 " + $script:KnownR2ElfHash8 + " 钉死身份") "DarkYellow"
+        Write-Log ("提示: R2 候选固件 ELF 期望 hash8 = " + $script:KnownR2ElfHash8 + "（50,944 B, round2d 2026-10-18 修 dread 3 读; 旧冻结 " + $script:KnownR2ElfPrevHash8 + " 有 Lite 读滞后缺陷）; 路径 " + $script:KnownR2ElfPath + "; 建议 -ExpectElfHash8 " + $script:KnownR2ElfHash8 + " 钉死身份") "DarkYellow"
         if (Test-Path $script:KnownR2ElfPath) {
             Write-Log ("  当前该路径实算 hash8 = " + (Get-Hash8 $script:KnownR2ElfPath) + " size=" + (Get-Item -LiteralPath $script:KnownR2ElfPath).Length)
         }
-    } elseif ($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfHash8) {
-        Write-Log ("WARN: -ExpectElfHash8=" + $ExpectElfHash8 + " ≠ 已知 R2 冻结固件 " + $script:KnownR2ElfHash8 + "（若这是 dry-run fixture 场景=R1 归档 ELF, 属预期; -Run 请用 -ExpectElfHash8 " + $script:KnownR2ElfHash8 + "）") "Yellow"
+    } elseif (($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfHash8) -and ($ExpectElfHash8.ToLower() -ne $script:KnownR2ElfPrevHash8)) {
+        Write-Log ("WARN: -ExpectElfHash8=" + $ExpectElfHash8 + " ≠ 已知 R2 固件(候选 " + $script:KnownR2ElfHash8 + " / 旧 " + $script:KnownR2ElfPrevHash8 + ")（若这是 dry-run fixture 场景=R1 归档 ELF, 属预期）") "Yellow"
     }
 
     # ---- xsa 记录（新 xsa 含 S2MM; 可选钉死; 归档名 mb_ctrl_r2.xsa）----
@@ -1157,7 +1184,7 @@ function Step-S2 {
             "本次场次无 R2 位流(构建 NO_BITSTREAM) ⇒ S2 判 NOT_OBTAINED(板验未执行), S3-S11 全部 SKIP; 等下一次成功位流对",
             "xsct D:/FPGA/prj/project_11/out/jb31b_burn_pair.tcl <Bit> <Elf>  (归档绝对路径, 先核 SHA256)",
             "等 boot: 'L' 出现 [B2] LAT w=.. 或 'U' 解析成功（'d' 一律不发）",
-            "身份判据(三项硬判): ping -n 1 → 必须 0 回包; NIC ReceivedBytes delta=0; 'U' wmwr delta=0",
+            "身份判据(round2d 硬判): ping -n 1 → 必须 0 回包; NIC ReceivedBytes delta=0; WR_DBG.last_commit_len==0(未提交) & fault==0; wmwr(+0x08=u_wr_frame 收帧接受计数) delta 仅 INFO",
             "  (R2 位流: 写路径=S2MM 需软核服务, 未发 'd' 时服务未启动 ⇒ 写不提交/读出零启动 ⇒ 不回包)",
             "INFO/WARN: 'U' wreq.pending==1 = 首帧已挂起且未服务（DESIGN §10 S2 期望）; 静态 ARP 下可能无帧触发, 故不硬判",
             "S2a 位置记录: 烧写前在位对 hash8 → 烧写后 'U' hash 不适用(软核无位流 hash), 以 S0 -Expect*Hash8 钉死"
@@ -1218,6 +1245,9 @@ function Step-S2 {
     if (Test-WrFaultFromU $u0) { Set-StepResult -Step "S2" -Verdict "FAIL" -Detail "烧录后立即观测到 WR_DBG.fault=1（写路径故障）"; return }
     $wr0 = Get-WmWr16 $u0
     $rd0 = Get-WmRd16 $u0
+    $commit0 = $null
+    if ($null -ne $u0.Wdbg) { $commit0 = Get-WrDbgLen $u0 }
+    Write-Log ("S2 前置: WR_DBG.last_commit_len=" + $(if ($null -ne $commit0) { $commit0 } else { "n/a(无wdbg)" }) + "; wmwr=" + $wr0 + " 属收帧接受计数(u_wr_frame), 不是提交计数 —— 仅 INFO") "Gray"
     $sres = Send-UartCmd -Cmd "S" -Wait 1.5 -Title "S2 恢复 SEQ('S')"
     Start-Sleep -Milliseconds 400
     $nb = Get-NicSnapshot
@@ -1228,7 +1258,13 @@ function Step-S2 {
     $u1 = Get-UState -Title "S2 身份后置 'U'"
     $wrDelta = $null
     if ($null -ne $u1 -and $u1.ParseOk) { $wrDelta = ((Get-WmWr16 $u1) - $wr0) % 65536 }
-    Write-Log ("S2 观测: ping=" + $p.Replies + "/1; NIC " + (Get-NicDeltaText $d) + "; wmwr " + $wr0 + "->" + $(if ($null -ne $u1 -and $u1.ParseOk) { Get-WmWr16 $u1 } else { "n/a" }) + " (delta=" + $wrDelta + "); mode=" + $(if ($null -ne $u1) { $u1.Mode } else { "n/a" }) + " bit24=" + [int](Get-ReqEngineBit $u1))
+    $commit1 = $null
+    if ($null -ne $u1 -and $u1.ParseOk -and $null -ne $u1.Wdbg) { $commit1 = Get-WrDbgLen $u1 }
+    Write-Log ("S2 观测: ping=" + $p.Replies + "/1; NIC " + (Get-NicDeltaText $d) + "; wmwr " + $wr0 + "->" + $(if ($null -ne $u1 -and $u1.ParseOk) { Get-WmWr16 $u1 } else { "n/a" }) + " (delta=" + $wrDelta + " ⇒ u_wr_frame 收帧接受计数, 非提交; 仅 INFO); last_commit_len=" + $(if ($null -ne $commit1) { $commit1 } else { "n/a" }) + "; mode=" + $(if ($null -ne $u1) { $u1.Mode } else { "n/a" }) + " bit24=" + [int](Get-ReqEngineBit $u1))
+    if ($null -ne $u1 -and $u1.ParseOk -and $null -ne $wrDelta -and $wrDelta -ne 0) {
+        Write-Log ("S2 INFO: wmwr +" + $wrDelta + " = 帧被接受进描述符 FIFO(u_wr_frame+), WAITGO 良性丢帧后 pending 回落 ⇒ 设计内行为, 不再作为 FAIL 判据") "Gray"
+        Write-Note ("S2: wmwr delta=+" + $wrDelta + " 属收帧接受计数(INFO), 身份硬判改用 WR_DBG.last_commit_len==0")
+    }
     if ($null -ne $u1 -and $u1.ParseOk) {
         if ($null -ne $u1.Wreq) {
             $pend = Get-WrReqPending $u1
@@ -1246,16 +1282,16 @@ function Step-S2 {
         Set-StepResult -Step "S2" -Verdict "NOT_OBTAINED" -Detail "NIC 统计不可用, 无法确认'线上 0 帧'"
         return
     }
-    if ($null -eq $wrDelta) {
-        Set-StepResult -Step "S2" -Verdict "NOT_OBTAINED" -Detail "后置 'U' 无应答/解析失败, wmwr delta 不可判"
+    if ($null -eq $commit1) {
+        Set-StepResult -Step "S2" -Verdict "NOT_OBTAINED" -Detail "后置 'U' 无 WR_DBG(wdbg) ⇒ 无法用 last_commit_len 判'未提交'; 身份判据未取得(需固件含 wdbg)"
         return
     }
     if ($p.Replies -ge 1) {
         Set-StepResult -Step "S2" -Verdict "FAIL" -Detail ("未发 'd' 却收到 ping 回包 " + $p.Replies + "/1 ⇒ 板上不是 R2 位流(或引擎位已=1): 烧错/烧旧位流")
         return
     }
-    if ($wrDelta -ne 0) {
-        Set-StepResult -Step "S2" -Verdict "FAIL" -Detail ("未发 'd' 但 wmwr +" + $wrDelta + " ⇒ 写路径在无服务下仍提交帧, 与 R2 身份矛盾(烧错位流?)")
+    if ($commit1 -ne 0) {
+        Set-StepResult -Step "S2" -Verdict "FAIL" -Detail ("未发 'd' 但 WR_DBG.last_commit_len=" + $commit1 + " ≠ 0 ⇒ 写路径在无服务下仍完成提交, 与 R2 身份矛盾(烧错位流?)")
         return
     }
     if ($d.Bytes -ne 0) {
@@ -1263,7 +1299,7 @@ function Step-S2 {
         Write-Note ("S2 期间 NIC ReceivedBytes delta=" + $d.Bytes)
         return
     }
-    Set-StepResult -Step "S2" -Verdict "PASS" -Detail ("未发 'd': ping 0/1 + NIC ReceivedBytes delta=0 + wmwr delta=0 ⇒ 写/读路径均未启动(R2 身份) ✓")
+    Set-StepResult -Step "S2" -Verdict "PASS" -Detail ("未发 'd': ping 0/1 + NIC ReceivedBytes delta=0 + WR_DBG.last_commit_len=0 ⇒ 写路径未提交/读出未启动(R2 身份) ✓; wmwr delta=+" + $wrDelta + " 为收帧接受计数(INFO)")
 }
 
 function Step-S3 {
@@ -1277,7 +1313,7 @@ function Step-S3 {
         $plan += "硬判: WR_DBG.fault==1 ⇒ FAIL（打印 wdbg/wreq/s2sr; fault=1=fail-stop 进 WD_HALT(6); 唯一出口=软核 DMACR reset→RS+IOC→清 IOC→写 +0x4C(opcode 0x06) 翻 ACK; 本脚本只读不写/不重试）"
         $plan += "INFO/WARN: settle 后 WR_REQ.pending 仍=1 只 WARN; slot<256 / len∈[0,1538] 只做合法性 WARN(len=0 允许为'无请求'残值)"
         $plan += "s2sr(S2MM_DMASR): 默认 WARN(Halted=1 或 errbits!=0 记录); -StrictS2sr 时 Halted=0 且 errbits=0 硬判"
-        $plan += "S3b 静默窗: 轮询 'U' 直到 wmwr==wmrd 且 req.bit25=0 连续两拍（清 S2 残留帧, 建 S4/S5 干净基线）"
+        $plan += "S3b 静默窗(round2d 新口径): 轮询 'U' 直到 WR_REQ.pending==0 且 WR_DBG.fault==0 (且 req.bit25=0) 连续两拍; wmwr/wmrd 仅 INFO、不再要求相等(良性丢帧使 u_wr_frame 永久多计, R2 下 wmwr==wmrd 不可达)"
         Write-Plan -Lines $plan
         Set-StepResult -Step "S3" -Verdict "SKIP" -Detail "dry-run 计划"
         Set-StepResult -Step "S3b" -Verdict "SKIP" -Detail "dry-run 计划"
@@ -1374,11 +1410,11 @@ function Step-S3 {
     Write-Log $q.Trace
     if ($q.Ok) {
         $script:QuiesceOk = $true
-        Set-StepResult -Step "S3b" -Verdict "PASS" -Detail "wmwr==wmrd & sticky=0 连续两拍 ⇒ S4/S5 差分基线干净"
+        Set-StepResult -Step "S3b" -Verdict "PASS" -Detail "pending==0 & fault==0 (& bit25=0) 连续两拍 ⇒ S4/S5 差分基线可信; (wmwr/wmrd/backlog 仅 INFO)"
     } else {
         $script:QuiesceOk = $false
-        Set-StepResult -Step "S3b" -Verdict "FAIL" -Detail ("静默窗未建立(backlog=" + $q.Backlog + ") ⇒ 读出侧未排空; 后面 S4/S5 自动降级 NOT_OBTAINED")
-        Write-Note ("S3b 静默窗失败: backlog=" + $q.Backlog + "（读出侧停摆/服务未运行, 与 R1 H4/H6 同形）")
+        Set-StepResult -Step "S3b" -Verdict "FAIL" -Detail ("静默窗未建立(pending/fault 未稳定; INFO: backlog=" + $q.Backlog + ") ⇒ 后面 S4/S5 自动降级 NOT_OBTAINED")
+        Write-Note ("S3b 静默窗失败: pending/fault 未连续两拍稳定(consec=" + $q.Consec + ", INFO backlog=" + $q.Backlog + "); backlog 大不再是判据(u_wr_frame 为收帧接受计数)")
     }
 }
 # =============================================================================
@@ -1752,7 +1788,7 @@ function Step-S9 {
     if ($SkipS9) { Set-StepResult -Step "S9" -Verdict "SKIP" -Detail "已用 -SkipS9 关闭"; return }
     if ($script:DryRun) {
         $plan = @()
-        $plan += "前置: 发 'S' → 轮询 'U' 直到 wmwr==wmrd 且 req.bit25=0 连续两拍（只读, 不发 'd'; 由本脚本先做）"
+        $plan += "前置: 发 'S' → 只读轮询 'U' 直到 pending==0 & fault==0 (& bit25=0) 连续两拍（round2d 新口径; wmwr/wmrd 仅 INFO, 不再要求相等; 不发 'd'）"
         $plan += "  若前置不干净 ⇒ NOT_OBTAINED + 板卡需重烧, 不跑 J3（避免槽满级联假 FAIL）"
         $plan += ("powershell -NoProfile -File " + $script:J3ScriptPath + " -Run -Port " + $script:Port + " -Bitstream " + $J3Bitstream)
         $plan += "  该脚本内部带 --dma 跑 M/A/B 逐轮; nslots 默认 256; 任一轮 FAIL 即停不重试"
@@ -1773,7 +1809,7 @@ function Step-S9 {
         Set-StepResult -Step "S9" -Verdict "NOT_OBTAINED" -Detail ("J3 前置槽表不干净(backlog=" + $q.Backlog + ") ⇒ 判据未取得; 板卡需重烧后再跑（不重试）")
         return
     }
-    Write-Log "J3 前置清槽检查通过 ✓（wmwr==wmrd & bit25=0 连续两拍）" "Green"
+    Write-Log "J3 前置清槽检查通过 ✓（pending==0 & fault==0 & bit25=0 连续两拍, round2d 新口径; wmwr/wmrd 仅 INFO）" "Green"
     $psArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $script:J3ScriptPath, "-Run", "-Port", $script:Port, "-Bitstream", $J3Bitstream)
     if ($script:PyExe) { $psArgs += @("-Python", $script:PyExe) }
     $res = Invoke-Native -Exe $script:PowerShell51 -ArgList $psArgs

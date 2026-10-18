@@ -1,7 +1,8 @@
-# R2 证据索引（prj11 路线 B / B3-2 桥①写侧换层 S2MM）— **round2c 位流已出 + S0 离线 PASS；板验（S1–S11）进行中**
+# R2 证据索引（prj11 路线 B / B3-2 桥①写侧换层 S2MM）— **round2c 位流已出/S0 PASS；round2d 板验初场：S1/S3 PASS、端到端未建立（未收口）**
 
 - **状态（2026-10-18 14:5x，以磁盘为准）**：**round2c 成功位流已产出并钉 S0**。`ExtraTimingOpt` 过门限：**`V5_SWEEP2_OK` WNS=0.004 / WHS=0.004；DRC 0 Errors/22 Warnings；write_bitstream completed**。归档 `out\archive\b31b_r2_2026-10-18\`（**27 项清单 + `SHA256.txt`（28 文件）**，2026-10-18 14:53 升级版）：bit `aurora_mem_bridge_r2_28921C6B.bit`（10,266,180 B、`28921C6B…`）、ltx `probes_r2_28921C6B.ltx`（64,593 B、`4AC25546…`）、xsa `16A4F01F…`、ELF `1bc8088d`、RTL bridge blob `f43267db…`。**S0 离线 PASS**（`[JUDGE] S0 PASS: WNS=0.004 WHS=0.004 DRC=0; bit8=28921c6b elf8=1bc8088d okMarker=有`；xsa hash8 一致；日志 `evidence_2026-10-18\R2_20261018_144715.log`）。**板验 S1–S11 进行中（Lead 执行），本文件仍无板上结论。**
 - **round2b/round2c ILA 裁剪判据边界**：ILA1@eth_rxc / ILA2@user_clk_b 整核移除；ILA0 probe0 374→92 bit（+probe1 9b 发射字节流不变）、ILA3 probe0 184→152 bit；裁掉 `dbg_mem_bresp/wslot/rslot` ⇒ **不可观测 = INFO/NOT_OBTAINED（判据未取得≠失败）**；S6/S10 不因缺 ILA1/2 报错；S8c 用 ILA0 probe1（9b）不变。详见 `R2_tools_README.md` §4.4。
+- **round2d 板验初场（2026-10-18 16:3x–16:5x，未收口）**：board 实测 **S0/S1/S3 PASS**；S2/S3b 旧口径 FAIL 已定位为**判据建模错误**（`'U' wmwr`(+0x08)=`u_wr_frame` 收帧接受计数、非提交；良性丢帧使 `wmwr==wmrd` 在 R2 不可达）→ 工具已修正（新 S2=commit_len/fault；新 S3b=pending/fault 两拍）。**固件 `dread` 2读→3读修复**（候选 ELF `1e3a42db` 50,944 B）；修后 `'I'`=wr6/rd3、ILA `dbg_mem_wm=5/rd_frm=5/commit_len=86` ⇒ 写引擎可被服务 [L3]。**未收口 A[L1]**：高频 serve_any(~143kHz Lite 读)后 MB 挂死 `dread` lwi（`g_dbg_addr=0x44A00034`=lite_regs DMA_REQ 读），UART 静默/`rst -processor` 不恢复/只能重配 FPGA，1ms 限速非确定性 ⇒ 疑 SET_WRGO 写后紧接读竞争。**未收口 B**：`rd_frm` 增长但 ping 0/4、NIC `ReceivedBytes` delta=0（eth ILA 已裁，需补探针）。S4–S11 仍 PENDING；S6/S10 本轮 CSV 仅格式验证不入判据。触发式 ILA + 最小探针清单见 `R2_tools_README.md` §4.5/§4.6；会话记录 `evidence_2026-10-18\R2_board_session_20261018.md`。
 - **等级边界**：S0 PASS 为**离线判据（`[L2]`）**；板验结论待 S1–S11（`[L3]/[L4]` 未取得）。归因性描述按 §6a 标等级。
 - **用途**：R2 判决序列（S0–S11）的**唯一证据台账**——每条结论/判据指向哪个原始文件、SHA256 指纹、依据等级。模板仿 `evidence_2026-10-17\R1_evidence_index.md`。
 - **写权限边界**：本文件只登记证据与状态，不产生结论；结论只在对应判据取得板上实测日志后填入并把等级从 `[待测]` 升到 `[L3]/[L4]`。本目录（`out\evidence_2026-10-17\`）为证据落盘区；**当轮日志目录按日期动态（`out\evidence_<yyyy-MM-dd>\`，round2c = `evidence_2026-10-18\`）**。
@@ -39,9 +40,10 @@
 | **round2（2026-10-18）** | 综合后 place/route **首掷 WNS 仍 −0.135**（拥塞/资源密度主因；`AggressiveExplore` 布局失败）。原始日志：`out\r2b_synth*.log`/`out\r2c_synth*.log`/`out\r2c_sweep2*`（以磁盘为准），`out\r2c_sweep2_console.log` 12:49。 | **[L2]**（Lead 通知 + 日志） |
 | **round2b（2026-10-18 12:5x）** | **不改 RTL、裁 ILA 探针省资源**后重综合。裁剪（以 `build_synth_only.tcl`/`build_debug.tcl` 12:49 版为准）：ILA1@eth_rxc/ILA2@user_clk_b **整核移除**；ILA0 probe0 374→**92 bit**（probe1 9b 保留）；ILA3 probe0 184→**152 bit**；裁掉 `dbg_mem_bresp/wslot/rslot`。**判据边界=缺失探针列 INFO/NOT_OBTAINED**。 | **[L2]** |
 | **round2c 构建（2026-10-18 14:4x，通过）** | **过门限**：`SWEEP2_ExtraTimingOpt: WNS=0.004 WHS=0.004`（`build_r2_sweep2.log` L2659）+ `V5_SWEEP2_OK: directive=ExtraTimingOpt wns=0.004 whs=0.004 bit=...`（L2764）；DRC `0 Errors, 22 Warnings`；`write_bitstream completed successfully`。综合 `Synthesis finished with 0 errors, 1 critical warnings and 718 warnings`（1 critical = `Synth 8-3321 create_generated_clock` aurora IP 既有族）。归档 `out\archive\b31b_r2_2026-10-18\`（**27 项清单 + SHA256.txt（28 文件）**，14:53 升级版）；时序摘要 `rpt2_ExtraTimingOpt.timing_summary.rpt` 另见 WNS 0.042/WHS 0.004（报告口径；门限行以 `V5_SWEEP2_OK` 的 0.004 为准）。 | **[L2]** |
+| **round2d 板验初场（2026-10-18 16:3x，未收口）** | S0/S1/S3 PASS；固件缺陷修复（dread 3 读，候选 ELF `1e3a42db`）；修后服务证据 `'I'`=wr6/rd3 + ILA wm=5/rd_frm=5/commit_len=86；未收口 A（AXI 楔死 [L1]，高频 serve 后 MB 挂 dread lwi `g_dbg_addr=0x44A00034`）/B（TX 无帧：rd_frm 增但 ping 0/4、NIC delta=0）；证据 `evidence_2026-10-18\R2_board_session_20261018.md`、`r2_board_run2_20261018.log`、`R2_ila_r2_20261018_163530_*.csv` | **[L2]/[L3]**（含 [L1] 假说） |
 | **round2c 身份（已核）** | bit `aurora_mem_bridge_r2_28921C6B.bit` 10,266,180 B / `28921C6B38BE92447950B8C81405F278945529BB007E94461EC2CEEF0D324627`（bit8 `28921c6b`）；ltx `probes_r2_28921C6B.ltx` 64,593 B / `4AC2554667F94BC3E052E0A652FF2DE322E2CE51FEE2B47399A108DF9E6B7C33`（实测仅 `u_ila_0`/`u_ila_3`；ILA0 92+9b、ILA3 152b；bresp/wslot/rslot 不存在）；xsa `mb_ctrl_r2.xsa` 2,606,995 B / `16A4F01F51AF9665B4C79686812FEAA353C3CF8C27C8BC3C47DA1EC7D28EC59E`；ELF `1bc8088d` 50,896 B；RTL bridge blob 实测 `f43267db82b84305cfeb519adcfa76f79443f6b3`（ARM 时序修复版，升级版清单头已更正）；**归档清单 14:53 升级为 27 项（3,243 B、`73fb1aae…`，新增 BUILD_STATUS/congestion_iter_3/4/diag_arm_path_probe）**。 | **[L2]** |
 | **S0 离线判据（已取得）** | `r2_board.ps1` dry-run（未碰板）：`[JUDGE] S0 PASS: WNS=0.004 WHS=0.004 DRC=0; bit8=28921c6b elf8=1bc8088d okMarker=有`；xsa hash8 `16a4f01f` 与期望一致 ✓；ILA ltx exists=True；GUARD 全 0；`R2_RESULT: SKIP (dry-run)`。日志：`evidence_2026-10-18\R2_20261018_144715.log`（19,977 B、`ef05a653…`）。**关键修复**：`r2_board.ps1` okMarker 曾不识别 `V5_SWEEP2_OK`（会误判 S0 FAIL），Lead 已修；script-tools 复验 BOM+ParseFile 并补 round2c 常量（新 hash 见 §5）。 | **[L2]** |
-| **板验（进行中）** | S1–S11 由 Lead 执行（板卡已上电）；S6/S10 用 ILA0+ILA3 保留项、缺失 bresp/wslot/rslot 与无 ILA1/2 ⇒ INFO/判据未取得；S8c 用 ILA0 probe1（9b）不变。**本文件暂无板上结论。** | **PENDING** |
+| **板验 round2d 初场（2026-10-18 16:3x–16:5x，未收口）** | board 实测 **S0 PASS、S1 PASS、S3 PASS**；S2/S3b 旧口径 FAIL 属判据建模错误（已修）；固件 `dread` 2→3 读修复（候选 ELF `1e3a42db` 50,944 B），修后 `'I'`=wr6/rd3、ILA `dbg_mem_wm=5/rd_frm=5/commit_len=86` ⇒ 写引擎可被服务 [L3]。**A（AXI 楔死）[L1]**：高频 serve_any 后 MB 挂死 `dread` lwi（`g_dbg_addr=0x44A00034`），UART 静默/rst-processor 不恢复/只能重配 FPGA；**B（TX 无帧）**：`rd_frm` 增长但 ping 0/4、NIC delta=0（eth ILA 已裁需补探针）。S4–S11 PENDING；本轮 CSV 仅格式验证。 | **PENDING（未收口）** |
 
 ---
 
@@ -52,9 +54,9 @@
 | # | 判据 | 支撑证据（预期落点） | 等级 | 取值状态 |
 |---|---|---|---|---|
 | **C0** | S0 工件身份：R2 位流/ELF SHA256、构建日志 WNS/WHS≥0、DRC 0、xsa hash | `R2_<ts>.log` S0 段；`out\archive\b31b_r2_2026-10-17\{aurora_mem_bridge_r2_<bit8>.bit, j3_soft_r2_1bc8088d.elf, build_r2_sweep.log, build_r2_synth.log, mb_ctrl_r2.xsa, probes_r2_<bit8>.ltx, SHA256.txt}` | **[L2]** | **已取得 [L2]（S0 离线 PASS）**：`WNS=0.004 WHS=0.004 DRC=0; bit8=28921c6b elf8=1bc8088d okMarker=有`；xsa hash8 `16a4f01f` 一致；日志 `evidence_2026-10-18\R2_20261018_144715.log`（详见 §0.1） |
-| **C1** | S1 在位配置记录（R1 修复版在位对 + 只读快照） | `R2_<ts>.log` S1 段（`c8cd3a32`+`2961b585` 在位记录、`'U'/'L'`/邻居/ping1 只读快照） | **[待测]** | **PENDING**：板验进行中（S1 待执行） |
-| **C2** | S2 位流身份原位判据：未发 `'d'` 时 ping 0/1 + NIC `ReceivedBytes` delta=0 + `wmwr` delta=0（+`WR_REQ.pending` INFO） | `R2_<ts>.log` S2 段（`[JUDGE] S2 PASS`、`[B2] U req/wreq/mode` 原始行、NIC 前后读数） | **[待测]** | **PENDING**：板验进行中（S2 待执行） |
-| **C3** | S3 DMA 服务+写路径启动：mode=1 & `req.bit24=1`、`WR_DBG.fault=0`、s2sr 现场值；S3b 静默窗建立 | `R2_<ts>.log` S3/S3b 段（`[JUDGE]`、`'U'` 整段原始行含 wreq/wdbg/s2sr） | **[待测]** | **PENDING**：板验进行中（S3/S3b 待执行） |
+| **C1** | S1 在位配置记录（R1 修复版在位对 + 只读快照） | `R2_<ts>.log` S1 段（在位记录、`'U'`/`'L'`/邻居/ping1 只读快照） | **[L3]** | **已取得（S1 PASS）**：run2 只读记录完成（mode=0/req=0/wmwr=7，邻居 Permanent，ping 0/1 仅记录） |
+| **C2** | S2 位流身份原位判据（round2d 新口径）：未发 `'d'` 时 ping 0/1 + NIC `ReceivedBytes` delta=0 + **`WR_DBG.last_commit_len==0`** + fault=0（wmwr delta 仅 INFO） | `R2_<ts>.log` S2 段（`[JUDGE] S2 PASS`、`[B2] U req/wreq/wdbg/s2sr` 原始行、NIC 前后读数） | **[待测]** | **PENDING**：旧口径作废（判据建模错误已修正）；待候选 ELF+新口径复跑 |
+| **C3** | S3 DMA 服务+写路径启动：mode=1 & `req.bit24=1`、`WR_DBG.fault=0`、s2sr 现场值；S3b 静默窗（round2d 新口径：pending==0 & fault==0 两拍） | `R2_<ts>.log` S3/S3b 段 | **[L3]/[待测]** | **S3 已取得 [L3]**（run2 PASS：mode=1 & bit24=1）；**S3b 待新口径复跑** |
 | **C4** | S4 单帧端到端：ping 1/1 + `ReceivedBytes`≥74 + `WM_WR+1` & `WM_RD+1`；s2sr/emit(len_tab=86) 现场 | `R2_<ts>.log` S4 段（`[JUDGE] S4`、s2sr、emit 解码、NIC 读数） | **[待测]** | **PENDING**：板验进行中（S4 待执行） |
 | **C5** | S5 ping×4：4/4 + `ReceivedBytes`≥296 + `WM_WR/WM_RD` 各 +4 | `R2_<ts>.log` S5 段 | **[待测]** | **PENDING**：板验进行中（S5 待执行） |
 | **C6** | S6 桥级 ILA：桥② `dbg_mem2_rd_frm` +4 且 `ost` 前后 0；桥① `wm/wr_frm/rd_frm` 各 +4 且 `ost` 前后 0 | `R2_ila_<tag>_{ui,user}_{pre,post}.csv` + `R2_ilacap_vivado_<ts>.log` + `r2_counter_recon.py --mode delta` 输出（`R2_ILA_DELTA:` 行） | **[待测]** | **PENDING**：板验进行中（S6 待执行；round2c ltx 已归档、裁剪后口径） |
@@ -106,13 +108,14 @@
 | **R2 位流（成功）** | `archive\b31b_r2_2026-10-18\aurora_mem_bridge_r2_28921C6B.bit` | **10,266,180 B** | **`28921c6b`** | `28921c6b38be92447950b8c81405f278945529bb007e94461ec2ceef0d324627` | **PASS（过门限）**：`V5_SWEEP2_OK wns=0.004 whs=0.004`；DRC 0E/22W；write_bitstream 成功；`-ExpectBitHash8 28921C6B` |
 | **R2 探针 ltx** | `archive\b31b_r2_2026-10-18\probes_r2_28921C6B.ltx` | **64,593 B** | **`4ac25546`** | `4ac2554667f94bc3e052e0a652ff2de322e2ce51fee2b47399a108df9e6b7c33` | round2b 裁剪版；实测仅 `u_ila_0`/`u_ila_3`；ILA0 probe0 92b + probe1 9b；ILA3 152b；`-IlaLtx` 用此文件 |
 | **R2 xsa** | `archive\b31b_r2_2026-10-18\mb_ctrl_r2.xsa` | **2,606,995 B** | **`16a4f01f`** | `16a4f01f51af9665b4c79686812feaa353c3cf8c27c8bc3c47da1ec7d28ec59e` | `-ExpectXsaHash8 16A4F01F`；S0 dry-run 已核对一致 |
-| ELF（最终冻结） | `archive\b31b_r2_2026-10-18\j3_soft_r2_1bc8088d.elf` | **50,896 B** | **`1bc8088d`** | `1bc8088dc48d42bbf40aec76fdfb69b96ce9b187cfaf6dbd022e285b921bd42a` | **最终冻结**；blob `ee256c05`；`-ExpectElfHash8 1BC8088D`；round2c 未变 |
+| ELF（最终冻结） | `archive\b31b_r2_2026-10-18\j3_soft_r2_1bc8088d.elf` | **50,896 B** | **`1bc8088d`** | `1bc8088dc48d42bbf40aec76fdfb69b96ce9b187cfaf6dbd022e285b921bd42a` | **最终冻结**；blob `ee256c05`；`-ExpectElfHash8 1BC8088D`；round2c 未变 | **round2d 候选 ELF `1e3a42db`（50,944 B，修 dread 3 读）尚未归档；旧 `1bc8088d` 有 Lite 读滞后缺陷，仅历史。** |
 | RTL blob（round2c） | `archive\...\rtl_axi4_master_bridge.v` | **68,296 B** | `b64300b4`（文件 SHA256） | `b64300b416c8f50c88a8726fc80953377a9c9c9375abfcd4632ec19976be6897` | **git blob 实测 `f43267db82b84305cfeb519adcfa76f79443f6b3`**（ARM 时序修复版；**升级版清单头已更正为 `f43267db`**，笔误已修） |
 | 综合日志（round2c） | `archive\...\build_r2_synth.log` / `_console.log` | 181,651 B / 182,976 B | `14f1dd74` / `142fef6c` | `14f1dd74d0a9a2fab12f3e545b46f6d4d16af1146277269b525d72aeae357020` / `142fef6c9c7cdE6D688645A5403843E6494B819F661B6108B0E2FE5CE694CB78` | `0 errors, 1 critical warnings, 718 warnings` + `SYNTH_ONLY_DONE`（1 critical = `Synth 8-3321` aurora IP 既有族） |
 | 实现扫描（round2c，PASS） | `archive\...\build_r2_sweep2.log` / `_console.log` | 318,807 B / 321,242 B | `062d9091` / `5d141a67` | `062d9091eb11408fe1dbbd7b55aaca406492163babf8906728427417e7540422` / `5d141a678b57f60e108b47d870185c164985b872a17b9dfe15060663c1ebcb9c` | `SWEEP2_ExtraTimingOpt: WNS=0.004 WHS=0.004`（L2659）+ `V5_SWEEP2_OK ...`（L2764）+ DRC 0E/22W + write_bitstream 成功 |
 | 时序报告（round2c） | `archive\...\rpt2_ExtraTimingOpt.timing_summary.rpt` | 8,142,267 B | `cb10118f` | `cb10118ff2522ca985456e11cd11b16da00ce7bda44c64f8b58b2c38aee54aa6` | 报告口径 WNS 0.042 / WHS 0.004（均 ≥0；门限行以 `V5_SWEEP2_OK` 的 0.004 为准） |
 | 其它 round2c 报告 | `rpt2_ExtraTimingOpt.worst.rpt` / `.util.rpt` | 235,040 / 15,755 B | `9690380a` / `5570bae6` | 见 `SHA256.txt` | 已归档 |
-| 归档清单（round2c，27 项） | `archive\...\SHA256.txt` | **3,243 B** | **`73fb1aae`** | `73fb1aaebd81879f9c1e80c9ecbcef36d0ca9c604669f56ccac1201259ebe9b5` | **27 项逐文件 hash 权威清单（+ 清单自身）**；清单自身 hash 以磁盘复算为准（Lead 稍后发最终值） |\n| 归档新增证据（14:53 升级版） | `BUILD_STATUS.md` / `congestion_iter_3.txt` / `congestion_iter_4.txt` / `diag_arm_path_probe.tcl` | 3,656 / 16,497 / 12,603 / 675 B | `3e038904` / `6a1d9459` / `871a9638` / `a3151b6b` | 见 `SHA256.txt` 对应行 | round2c 构建/修复状态 + 拥塞证据 + ARM 关键路径逐级探针脚本 |
+| 归档清单（round2c，27 项） | `archive\...\SHA256.txt` | **3,243 B** | **`73fb1aae`** | `73fb1aaebd81879f9c1e80c9ecbcef36d0ca9c604669f56ccac1201259ebe9b5` | **27 项逐文件 hash 权威清单（+ 清单自身）**；清单自身 hash 以磁盘复算为准（Lead 稍后发最终值） |
+| 归档新增证据（14:53 升级版） | `BUILD_STATUS.md` / `congestion_iter_3.txt` / `congestion_iter_4.txt` / `diag_arm_path_probe.tcl` | 3,656 / 16,497 / 12,603 / 675 B | `3e038904` / `6a1d9459` / `871a9638` / `a3151b6b` | 见 `SHA256.txt` 对应行 | round2c 构建/修复状态 + 拥塞证据 + ARM 关键路径逐级探针脚本 |
 
 **round1 历史（失败轮，`archive\b31b_r2_2026-10-17\`，保留）**：位流 NO_BITSTREAM；`SHA256.txt` `041db3f1…`；`BUILD_STATUS.md` `ea9e7bc4…`；`build_r2_sweep2.log` 尾 `SWEEP2_ExtraPostPlacementOpt: WNS=-0.175 WHS=0.004`；诊断 worst rpt `ea05cc30…`（25/30 新写引擎 CE 锥 + 5/30 桥② 旧 FSM）。R1 在库参照 `c8cd3a32…` 仅存于该历史归档。
 
@@ -143,12 +146,12 @@
 
 | 工具 | 作用 | SHA256 前 8 | 状态/边界 |
 |---|---|---|---|
-| `out\r2_board.ps1` | S0–S11 总控（dry-run 默认） | `afe58e31` | 已交付（v1.7/round2c）；S0 已 PASS，`-Run` 待 Lead 上板 |
-| `out\r2_ilacap.tcl` | ILA PRE/POST 快照（纯 ASCII、env 参数化） | `bfefe843` | 已交付（round2b 探针布局/裁剪检查） |
+| `out\r2_board.ps1` | S0–S11 总控（dry-run 默认；round2d S2/S3b 口径修正+触发 ILA 支持） | `f92666f5` | 已交付（v1.9/round2d）；S0 已 PASS，板验待候选 ELF 复跑 |
+| `out\r2_ilacap.tcl` | ILA PRE/POST 快照（纯 ASCII、env 参数化；新增 `R2_TRIGGER_*`） | `9fda27ba` | 已交付（round2d 触发式抓取） |
 | `out\r2_counter_recon.py` | 双桥对账/差分/正负自检/Tcl 结构+ASCII 检查/s2mm_state 解码/round2b 裁列 INFO | `c4aa2c3a` | 已交付；自检 5/5（含 round2b 裁列合成用例） |
 | `out\r2_mb10_sha.ps1` | 10MB 质量档 + SHA 独立复算 | `8836a046` | 已交付（证据目录动态） |
 | `out\r2_dryrun.ps1` | dry-run 自证一键复现 | `b65f047a` | 已交付 |
-| `out\evidence_2026-10-17\R2_tools_README.md` | 工具链/判据分层/风险说明（v1.7） | `c9219b33` | 已交付（round2c 已同步） |
+| `out\evidence_2026-10-17\R2_tools_README.md` | 工具链/判据分层/风险说明（v1.9） | `cb8ec5f2` | 已交付（round2d 已同步） |
 | R1 只读复用 | `retire_s0_s8.ps1` / `j3_fourchains.ps1` / `uart_probe.py` / `manual_round.py` / `jb31b_burn_pair.tcl` / `jb31b_rdcap2_cmp.py` 等 | 见 R1 台账 | **只读，未改动**（`r2_dryrun.log` §7 hash 前后一致） |
 | 数据面脚本（只读） | `prj\project_9\scripts\json_storm.py`（10MB 默认参数）、`prj\project_10\prj_loop\scripts\udp_verify_ddr.py`（四档） | 见各自仓库 | 只读引用 |
 
@@ -172,6 +175,8 @@
 10. **round2b/round2c ILA 探针集裁剪（`[L2]`，判据边界，已进入 round2c 位流）**：ILA1@eth_rxc / ILA2@user_clk_b **整核移除**；ILA0 probe0 374→92 bit（probe1 9b 保留）；ILA3 probe0 184→152 bit；裁掉 `dbg_mem_bresp`/`dbg_mem_wslot`/`dbg_mem_rslot` ⇒ **不可观测 = INFO/NOT_OBTAINED（判据未取得≠失败）**；**S6/S10 不因缺 ILA1/2 报错**；S10 仍硬判桥① ui `wm/wr_frm/rd_frm/stall/len_err/ost` + 桥② ui 四计数（`ost=0`）+ `dbg_wr_fault`；S8c 用 ILA0 probe1（9b）不变。round2c ltx 实测仅 `u_ila_0`/`u_ila_3`。recon 对裁列缺失不判 FAIL（selftest 覆盖）。
 11. **S0 PASS（离线）≠ 板验通过**：S0 只核对工件身份/SHA256/WNS/WHS/DRC/okMarker（`[L2]`）；S1–S11 板验进行中，结论未取得前不得写“总体通过”。RTL blob 实测 `f43267db…`（ARM 时序修复版）；**升级版 `SHA256.txt`（14:53，27 项）头部已更正为 `f43267db`**（旧笔误 `06e6bd72` 已修，R19 关闭）；清单自身 3,243 B、`73fb1aae…`（以磁盘复算为准）。
 12. **round2c 门限行口径**：构建门限以 `build_r2_sweep2.log` 的 `V5_SWEEP2_OK: ... wns=0.004 whs=0.004` 为准；同归档 `rpt2_ExtraTimingOpt.timing_summary.rpt` 报告口径为 WNS 0.042/WHS 0.004（两者均 ≥0，差异属报告设置/阶段不同，不改变 PASS）。
+13. **round2d S2/S3b 判据修正（[L2] RTL+板证）**：`'U' wmwr`(+0x08)=`u_wr_frame` 是**收帧接受计数**（`frame_mem_if.v` 在帧接受时即+1，早于 commit；`axi_lite_regs.v` L16/70/464），R2 未服务阶段每来一帧都会+1 且被 WAITGO 良性丢弃 ⇒ 旧 S2 的 `wmwr delta=0` 必假 FAIL；**新 S2 硬判**=ping 0/1 + NIC Bytes delta=0 + `WR_DBG.last_commit_len==0` + fault==0。同理良性丢帧使 `u_wr_frame` 永久多计 ⇒ **旧 S3b 的 `wmwr==wmrd` 不可达**；**新 S3b**=pending==0 && fault==0（& bit25=0）连续两拍，wmwr/wmrd/backlog 仅 INFO；S9 J3 前置同步换口径。
+14. **round2d 未收口 A/B（不得写成通过）**：A=AXI 总线楔死（[L1] 假说：高频 serve_any ~143kHz Lite 读后 MB 挂死在 dread volatile load `lwi`，PC/标记定位 `g_dbg_addr=0x44A00034`=lite_regs DMA_REQ 读；UART 静默/`rst -processor` 不恢复/只能重配 FPGA；1ms 限速非确定性；疑 SET_WRGO 写后紧接读握手竞争）——待按 `R2_tools_README.md` §4.6 加探针 + §4.5 触发式 ILA 复现；B=TX 无帧（`rd_frm` 增长但 ping 0/4、NIC Bytes delta=0；eth ILA 已裁需补探针）。二者均未取得判据 ⇒ S4–S11 PENDING，本轮 S6/S10 CSV 只作格式/探针验证。
 
 > 更正记录（上板后用）：`（PENDING：若正文/记录与原始日志矛盾，在此登记“补记/更正”，保留原数字与出处）`
 
@@ -195,6 +200,10 @@
 | R2 WR TB / 负向对照日志 | `prj\project_11\sim\`（rtl-auditor 归档处） | rtl-auditor/Lead | PENDING（引用 `R2_rtl_audit.md`，不自行判定） |
 | 失败现场（如有）分析 | 本轮无板级失败现场；构建失败诊断见 BUILD_STATUS.md | Lead | **已完成 [L2]（构建侧）** |
 | **round2c 位流/ltx/xsa**（2026-10-18 归档） | `out\archive\b31b_r2_2026-10-18\{aurora_mem_bridge_r2_28921C6B.bit, probes_r2_28921C6B.ltx, mb_ctrl_r2.xsa, SHA256.txt}` | Lead | **已完成 [L2]（见 §3；S0 PASS）** |
+| **round2d 候选 ELF**（`1e3a42db` 50,944 B） | 待 Lead 归档（live `sw\j3_soft\Debug\j3_soft.elf`） | Lead | **PENDING（候选未归档；固件修 dread 3 读）** |
+| **round2d 触发式 ILA CSV**（`R2_ila_<tag>_{ui,user}_{pre,post}.csv`） | `evidence_2026-10-18\` | Lead（`R2_TRIGGER_PROBE=...` + `-IlaCapture`） | **PENDING（重建含 AXI/握手探针后抓取）** |
+| **AXI 楔死根因（A）** | 触发式 ILA 波形 + PC/标记定位 | Lead/script-tools | **PENDING（[L1] 假说；需新探针重建）** |
+| **TX 无帧（B）** | eth/TX 侧 ILA 探针 | Lead | **PENDING（eth ILA 已裁，需补探针）** |
 | **下一次成功位流对**（round2b 之后） | archive 新目录 + `probes_r2_<bit8>.ltx` + `mb_ctrl_r2.xsa` + SHA256.txt | Lead | **PENDING（等 round2b 构建）** |
 | 结论/等级定稿（§1 表回填） | 本文件 | 证据责任人 | PENDING（S0 已取得；S1–S11 待板验） |
 | 提交（commit）/ 远端 CI | git | Lead（统一提交） | PENDING（本工具链与文档未 commit） |
@@ -229,6 +238,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\FPGA\prj\project_11\out\r
   -Xsa 'D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\mb_ctrl_r2.xsa' `
   -ExpectBitHash8 28921C6B -ExpectElfHash8 1BC8088D -ExpectXsaHash8 16A4F01F `
   -IlaLtx 'D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-18\probes_r2_28921C6B.ltx'
+# 4c) round2d 触发式 ILA（示例：AXI 楔死，先设 env 再跑 tcl；或 -Run 前设 env 由 board 继承）
+$env:R2_TRIGGER_PROBE='dbg_s2mm_reqpend'   # 或新构建 dbg_lite_hang_st / dbg_lite_arvalid
+$env:R2_TRIGGER_COMPARE="eq1'b1"
+$env:R2_TRIGGER_TIMEOUT_S='20'; $env:R2_TRIGGER_POSITION='1536'
+$env:R2_STIM_CMD='<高频 serve/flood 命令>'; $env:R2_TAG='wedge'
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\FPGA\prj\project_11\out\r2_board.ps1 -Run ... -IlaCapture -IlaLtx <归档 ltx>
+#    或手工: vivado -mode batch -source D:\FPGA\prj\project_11\out\r2_ilacap.tcl -notrace -log <evid>\R2_ilacap_vivado_wedge.log
 # 5) 判据工具自检
 py D:\FPGA\prj\project_11\out\r2_counter_recon.py --mode selftest
 # 6) 对账/差分（**上板后**）
@@ -264,4 +280,6 @@ py D:\FPGA\prj\project_11\out\r2_counter_recon.py --mode recon --ui-post <ui_pos
 | v0.3（2026-10-17 22:4x 待命期） | **ELF 最终冻结 `1bc8088d`（50,896 B，blob `ee256c05`；fa38a8cd/67c0b73a 作废）** 同步 §1 C0/§3/§8；按 `R2_S2MM_DESIGN.md` v1.2 回填 §6 新口径（超时统一 24b≈56ms、WAITGO 良性丢帧 vs STREAM/PUSH/WAITDONE fail-stop、fault 恢复序列、lat_w 禁作判据 D8、alloc≠commit A12、D4/A3G2 等级边界）；§4 离线回归按审计报告引用（R2_rtl_audit.md，只引用不自判）；§5 工具 hash 更新到 v1.4 |
 | v0.4（2026-10-18 01:0x 收尾） | **按构建收口结果更新**：新增 §0.1「本轮场次结果」（NO_BITSTREAM 5 掷明细/综合 PASS/失败诊断 25/30 CE 锥+route 56.6%/板验未执行/失败轮不覆盖在库产物/归档与 SHA256.txt/下次开工主修建议，全部 `[L2]`）；§1 全部状态改为 **NOT_OBTAINED/SKIP** 并明确"本轮不写通过"；§2 标注本轮无板级证据；§3 改为"本轮实际状态"（R2 位流/ltx/xsa 未产出；在库 R1 参照 c8cd3a32/c9b52dd7；失败轮 ltx 仅核对探针名；综合 PASS；扫描 FAIL；诊断/BUILD_STATUS/SHA256.txt 实 hash）；§4 增加综合 PASS/扫描 FAIL/诊断 `[L2]` 行；§5 工具 hash 更新到 v1.5；§6 增加本轮构建未收口口径；§7 PENDING 台账逐行置为 NOT_OBTAINED/PENDING（等下一次成功位流对）；§8 复算命令改为失败轮归档/构建证据/S0 NOT_OBTAINED 复现；§9 补本轮收尾事实 |
 | v0.5（2026-10-18 12:5x round2b） | **同步 round2b ILA 探针集裁剪**：头部状态/§0.1 增加 round2（WNS −0.135）与 round2b（裁 ILA 重综合中）行；§3 增加 round2 扫描/round2b 综合行、R2 探针行改为裁剪后（ILA1/2 移除、ILA0 92b/ILA3 152b、裁 bresp/wslot/rslot）；§4 增加 round2/2b 时序攻坚行、dry-run 改 v1.6；§5 工具 hash 更新；§6 新增第 10 条 round2b 裁列判据边界；§7 增加 round2b 位流/ltx/xsa PENDING 行；§8 标注证据目录按日期动态；§9 补 round2b 事实；工具 `r2_counter_recon.py` 裁列缺失改 INFO（selftest 5/5 + 合成用例 PASS）、`r2_ilacap.tcl` round2b 布局/运行时检查、`r2_board.ps1` S6/S10 文案；dry-run 7/7 PASS |
-| v0.6（2026-10-18 14:5x round2c） | **round2c 成功位流 + S0 PASS 回填**：头部状态改为位流已出/S0 PASS/板验进行中；§0.1 增加 round2c 构建（V5_SWEEP2_OK WNS+0.004/DRC 0E、22W）、round2c 身份（bit/ltx/xsa/ELF/blob 实测）、S0 离线 PASS、板验进行中四行；§1 C0 改 **已取得 [L2]（S0 PASS）**、C1–C11 改 **PENDING（板验进行中）**；§2 改"板验进行中"；§3 重写为 round2c 权威表（bit `28921c6b`/ltx `4ac25546`/xsa `16a4f01f`/ELF `1bc8088d`/综合覆盖/扫描 PASS/timing 摘要）+ round1 历史段；§4 增加 round2c PASS 行、dry-run 改 v1.7；§5 工具 hash 更新（board `afe58e31`）；§6 补 S0≠板验/blobl 笔误/门限口径三条；§7 PENDING 台账置为已取得/板验进行中；§8 复算命令改 round2c 归档 + S0 钉身份命令；§9 补 round2c 事实；工具 `r2_board.ps1` round2c 常量/归档目录/日志候选（Lead 修复 okMarker `V5_SWEEP2_OK` 后复验 BOM+ParseFile） |\n| v0.7（2026-10-18 14:5x 归档清单升级同步） | **同步 Lead round2c 归档清单升级**：27 项（新增 `BUILD_STATUS.md`/`congestion_iter_3/4.txt`/`diag_arm_path_probe.tcl`），清单 3,243 B、`73fb1aae…`（磁盘复算，Lead 最终值待发）；头部 RTL blob 已更正 `f43267db`（R19 关闭）；§0.1/§3/§6/§7 引用同步为“27 项清单 + SHA256.txt（28 文件）”；S0 PASS/位流身份未变，未重跑 dry-run（工具与位流未变） |
+| v0.6（2026-10-18 14:5x round2c） | **round2c 成功位流 + S0 PASS 回填**：头部状态改为位流已出/S0 PASS/板验进行中；§0.1 增加 round2c 构建（V5_SWEEP2_OK WNS+0.004/DRC 0E、22W）、round2c 身份（bit/ltx/xsa/ELF/blob 实测）、S0 离线 PASS、板验进行中四行；§1 C0 改 **已取得 [L2]（S0 PASS）**、C1–C11 改 **PENDING（板验进行中）**；§2 改"板验进行中"；§3 重写为 round2c 权威表（bit `28921c6b`/ltx `4ac25546`/xsa `16a4f01f`/ELF `1bc8088d`/综合覆盖/扫描 PASS/timing 摘要）+ round1 历史段；§4 增加 round2c PASS 行、dry-run 改 v1.7；§5 工具 hash 更新（board `afe58e31`）；§6 补 S0≠板验/blobl 笔误/门限口径三条；§7 PENDING 台账置为已取得/板验进行中；§8 复算命令改 round2c 归档 + S0 钉身份命令；§9 补 round2c 事实；工具 `r2_board.ps1` round2c 常量/归档目录/日志候选（Lead 修复 okMarker `V5_SWEEP2_OK` 后复验 BOM+ParseFile） |
+| v0.7（2026-10-18 14:5x 归档清单升级同步） | **同步 Lead round2c 归档清单升级**：27 项（新增 `BUILD_STATUS.md`/`congestion_iter_3/4.txt`/`diag_arm_path_probe.tcl`），清单 3,243 B、`73fb1aae…`（磁盘复算，Lead 最终值待发）；头部 RTL blob 已更正 `f43267db`（R19 关闭）；§0.1/§3/§6/§7 引用同步为“27 项清单 + SHA256.txt（28 文件）”；S0 PASS/位流身份未变，未重跑 dry-run（工具与位流未变） |
+| v0.8（2026-10-18 16:5x round2d） | **round2d 板验初场回填 + S2/S3b 判据修正**：头部改"round2c 位流已出/S0 PASS；round2d 初场 S1/S3 PASS、端到端未建立（未收口）"；§0.1 增加板验 round2d 行（S0/S1/S3 PASS、固件 dread 3 读修复候选 ELF `1e3a42db`、修后 'I'=wr6/rd3/ILA wm=5/rd_frm=5/commit_len=86、A=AXI 楔死 [L1]/B=TX 无帧）；§1 C1→[L3] 已取得（S1 PASS）、C2 新口径 PENDING、C3 S3 已取得/S3b 待复跑；§3 ELF 行加候选；§4 增 round2d 行；§5 工具 hash（board `f92666f5`、tcl `9fda27ba`）；§6 新增第 13/14 条（判据修正 RTL 依据 + A/B 未收口不得写通过）；§7 增候选 ELF/触发 CSV/A/B 台账；§8 增触发式 ILA 命令块；§9 补 round2d 事实。 |
