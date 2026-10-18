@@ -585,6 +585,12 @@ module axi4_master_bridge #(
     reg [511:0] wd_data_r;
     reg [63:0]  wd_keep_r;
     reg         wd_beat_full, wd_noroom, wd_go_ok;
+    // ★2026-10-18 round2d 时序修复: 满槽/坏长判定拆到"注册判据 + WAITGO 首拍执行"
+    //   避免 full_bit_q[slot] (256:1 组合读, 4xLUT6+2xMUXF) 直接进 wd_wait_cnt[23:0] 的 CE
+    //   (round2d ExtraTimingOpt 30/30 最差路径 = full_bit_q_reg[179] -> wd_wait_cnt[*]/CE,
+    //    route 2.27ns/80%). 现在 full_bit 读只驱动 wd_noroom/wd_badlen_r 两个 FF,
+    //    request/pending/beats/计数器在 WAITGO 首拍按注册判据执行.
+    reg         wd_badlen_r, wd_arm_pend;
     reg         wd_go_seen, wd_req_pending, wd_req_toggle;
     reg [7:0]   wd_req_slot_r;
     reg [15:0]  wd_req_len_r;
@@ -650,6 +656,7 @@ module axi4_master_bridge #(
             wd_len <= 16'd0; wd_pop <= 16'd0; wd_rxc <= 16'd0;
             wd_data_r <= 512'd0; wd_keep_r <= 64'd0;
             wd_beat_full <= 1'b0; wd_noroom <= 1'b0; wd_go_ok <= 1'b0;
+            wd_badlen_r <= 1'b0; wd_arm_pend <= 1'b0;
             byte_q <= 8'd0; byte_valid_q <= 1'b0;
             wd_go_seen <= 1'b0; wd_req_pending <= 1'b0; wd_req_toggle <= 1'b0;
             wd_req_slot_r <= 8'd0; wd_req_len_r <= 16'd0;
@@ -686,34 +693,40 @@ module axi4_master_bridge #(
                     wd_beat_full <= 1'b0;
                     wd_data_r    <= 512'd0;
                     wd_keep_r    <= 64'd0;
-                    wd_noroom    <= wd_noroom_n;
+                    wd_noroom    <= wd_noroom_n;   // 只驱动 FF (不再进等待计数器 CE)
+                    wd_badlen_r  <= wd_badlen_n;
+                    wd_arm_pend  <= 1'b1;          // WAITGO 首拍按注册判据执行
                     dbg_wr_slot     <= wd_slot_next;
                     wr_last_slot_r  <= wd_slot_next;
                     // ★规则号 1: 接收时推进 (被拒帧同样消耗槽号; 同旧 W5/L2 语义)
                     wr_slot_ptr <= wr_slot_ptr + 16'd1;
-                    if (wd_noroom_n | wd_badlen_n) begin
+                    wdst <= WD_WAITGO;
+                end
+            end
+            //-----------------------------------------------------------------
+            WD_WAITGO: begin
+                // ★首拍: 按注册判据 (wd_noroom/wd_badlen_r) 决定拒收或正式发请求
+                if (wd_arm_pend) begin
+                    wd_arm_pend   <= 1'b0;
+                    wd_drain_wait <= 4'd0;
+                    wd_pop        <= 16'd0;
+                    if (wd_noroom | wd_badlen_r) begin
                         // 满槽/坏长度: 整帧丢弃, 不覆盖未读槽 (同旧 W_DRAIN)
-                        wd_drain_wait <= 4'd0;
+                        if (wd_badlen_r) stat_len_err <= stat_len_err + 16'd1;
                         wdst <= WD_DRAIN;
-                        if (wd_badlen_n) stat_len_err <= stat_len_err + 16'd1;
                     end else begin
-                        wd_beats <= (wd_data + 16'd63) >> 6;
-                        // 新请求: 翻转 toggle + 置 pending + 记下此刻 GO 电平
-                        wd_req_slot_r  <= wd_slot_next;
-                        wd_req_len_r   <= wd_data;
+                        wd_beats       <= (wd_len + 16'd63) >> 6;
+                        wd_req_slot_r  <= wd_slot;
+                        wd_req_len_r   <= wd_len;
                         wd_req_pending <= 1'b1;
                         wd_req_toggle  <= ~wd_req_toggle;
                         wd_go_ok       <= 1'b0;
                         wd_go_seen     <= dma_wr_go;
                         wd_wait_cnt    <= 24'd0;
-                        wdst <= WD_WAITGO;
                     end
                 end
-            end
-            //-----------------------------------------------------------------
-            WD_WAITGO: begin
                 // 等软核: ① GO 翻转 ② 整帧字节可见 (同旧 W_WAIT) ③ introut 已清
-                if (!wd_go_ok && (dma_wr_go != wd_go_seen)) begin
+                else if (!wd_go_ok && (dma_wr_go != wd_go_seen)) begin
                     wd_go_seen <= dma_wr_go;
                     wd_go_ok   <= 1'b1;
                 end
