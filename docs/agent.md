@@ -179,4 +179,4 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - **产物**：bit **`28921C6B…`**（10,266,180 B）/ ltx `4AC25546…`（审计 ltx 实物核对通过：仅 2 核、92/9/152、末 5bit 正确）/ xsa `16A4F01F…` / ELF `1bc8088d`；归档 `prj/project_11/out/archive/b31b_r2_2026-10-18/`（21 文件 + SHA256）；RTL 冻结 blob **`f43267db`**。
 - **S0 已钉**：`r2_board.ps1` dry-run **S0 PASS**（WNS/WHS/DRC/hash 全过；判据工具链 7/7 PASS）。
 - **板验待用户上电**：烧归档 bit+ELF → S0–S11（S4 单帧 86B 尾拍逐字节 + S2MM DMASR；`dbg_s2mm_state` 7=ARM 正常/6=HALT fail-stop；`fault` 全程 0；S10 bresp/wslot/rslot=INFO）。
-- **下一步**：上电 → S0–S11 → 证据归档（`out/evidence_2026-10-18/`）→ 记录/AGENTS/工作清单/docs 镜像回填 → 提交 + CI。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十。
+- **下一步**：上电 → S0–S11 → 证据归档（`out/evidence_2026-10-18/`）→ 记录/AGENTS/工作清单/docs 镜像回填 → 提交 + CI。**本构建里程碑提交 `8ef6dbe`（CI PASS）**。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十。
