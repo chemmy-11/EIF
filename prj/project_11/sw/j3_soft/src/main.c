@@ -140,6 +140,11 @@ static void uputh(unsigned v)          /* 8 位十六进制 */
 /* 坑 #39: 互联 Lite 读首笔可能陈旧 —— 读两次取第二值 */
 static unsigned dread(volatile unsigned *r)
 {
+    /* ★2026-10-18 板验实证 [L2]: 紧循环内交替读不同地址 (0x44/0x40/0x34) 时,
+     * r2_board 首场 S4 失败的根因 = Lite 读滞后不止 1 笔: 2 读取仍可能拿到
+     * 上一地址的数据 -> serve_write_once 永远看不到 pending=1, 从不 arm S2MM.
+     * 3 读取第 3 值后可正常看到 pending 并 arm/commit (板上实证). */
+    (void)*r;
     (void)*r;
     return *r;
 }
@@ -521,7 +526,10 @@ int main(void)
          * 退役桥硬件读引擎后, 所有出向帧(数据帧 + 栈自发 ARP/ICMP/命令应答)
          * 的读回都靠它 —— 无请求时本调用只是一次寄存器读(~1ms), 无副作用。 */
         while (!urx_poll()) {
-            if (g_dma_mode) serve_any();
+            /* ★2026-10-18 板验: 高速连续 serve_any (~143kHz AXI Lite 读) 会把
+             * MicroBlaze/AXI 总线楔死 (UART 静默、CPU 停在 dread 的 lwi);
+             * 1ms 节拍限速后总线稳定 (写/读计数均正常推进). 待根因定位后去掉. */
+            if (g_dma_mode) { serve_any(); busy_ms(1); }
         }
         c = urx_get();
         /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。
