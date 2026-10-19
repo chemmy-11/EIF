@@ -510,6 +510,12 @@ module frame_mem_if #(
         assign ro_dma_wr_dbg = {fl_s2, 7'b0, ls_s2, ll_s2};
         assign ro_stat_wr_timeout = stat_wr_timeout_i;
         assign ro_dbg_wr_state    = dbg_wr_state_i;
+
+        // ---- round3c (2026-10-19): GO/ACK/introut 2FF 镜像探针 (纯观测; ui 域) ----
+        //   去向 u_ila_5 probe5；用于判别"GO 未到桥 / introut 粘滞 / 桥内 go_ok 未置"。
+        (* mark_debug = "true" *) wire dbg_wd_go_ui   = go_ui;
+        (* mark_debug = "true" *) wire dbg_wd_ack_ui  = ack_ui;
+        (* mark_debug = "true" *) wire dbg_wd_intr_ui = intr_ui;
     end else begin : gen_no_wr_dma_obs
         assign dma_wr_go_ui       = 1'b0;
         assign dma_wr_ack_ui      = 1'b0;

@@ -1,0 +1,233 @@
+﻿# analyzer dry-run evidence (regenerated 2026-10-19 12:3x, includes HYPOTHESIS lines)
+# command 1: py r3c_ila_analyze.py --dir <evidence> --pattern R2_ila_wed2_*.csv
+==============================================================================
+ANALYZE_FILE: D:\FPGA\prj\project_11\out\evidence_2026-10-19\R2_ila_wed2_ui_pre.csv
+PROFILE: LEGACY_UI (rows=1024 cols=17)
+TRIGGER_INDEX: [0]
+  COUNTERS (first -> last, delta, distinct_values):
+    dbg_mem_wm             0 -> 0  delta=0  (STATIC)
+    dbg_mem_wr_frm         0 -> 0  delta=0  (STATIC)
+    dbg_mem_rd_frm         0 -> 0  delta=0  (STATIC)
+    dbg_mem_stall          0 -> 0  delta=0  (STATIC)
+    dbg_mem_len_err        0 -> 0  delta=0  (STATIC)
+    dbg_mem_ost            0 -> 0  delta=0  (STATIC)
+    dbg_mem2_wm            0 -> 0  delta=0  (STATIC)
+    dbg_mem2_wr_frm        0 -> 0  delta=0  (STATIC)
+    dbg_mem2_rd_frm        0 -> 0  delta=0  (STATIC)
+    dbg_mem2_ost           0 -> 0  delta=0  (STATIC)
+    dbg_s2mm_state         0 -> 0  delta=0  (STATIC)
+    dbg_s2mm_tvalid_1      0 -> 0  delta=0  (STATIC)
+    dbg_s2mm_tready_1      1 -> 1  delta=0  (STATIC)
+  S2MM_STATE_HIST: IDLE=1024 (last=0)
+  S2MM_STREAM_BEATS_IN_WINDOW: 0
+  BRIDGE1_UI_DELTA: wm=0 wr_frm=0 rd_frm=0 stall=0 len_err=0 ost=0
+  LEGACY_UI_VERDICT:
+    [L1] bridge1 ui counters are STATIC (wm=wr_frm=rd_frm=ost unchanged over the window): no commit/read activity was captured -- consistent with the round3b zero-commit wedge (user-side count stopped at the pre-wedge value)
+==============================================================================
+ANALYZE_FILE: D:\FPGA\prj\project_11\out\evidence_2026-10-19\R2_ila_wed2_user_pre.csv
+PROFILE: LEGACY_USER (rows=2048 cols=16)
+TRIGGER_INDEX: [0]
+  COUNTERS (first -> last, delta, distinct_values):
+    dbg_mem_ost_s          0 -> 0  delta=0  (STATIC)
+    dbg_mem_u_wr           6 -> 6  delta=0  (STATIC)
+    dbg_mem_u_rd           0 -> 0  delta=0  (STATIC)
+    dbg_mem_u_drop         0 -> 0  delta=0  (STATIC)
+    dbg_mem_ost_s          0 -> 0  delta=0  (STATIC)
+    dbg_mem2_u_wr          0 -> 0  delta=0  (STATIC)
+    dbg_mem2_u_rd          0 -> 0  delta=0  (STATIC)
+    dbg_s2mm_reqpend       0 -> 0  delta=0  (STATIC)
+    dbg_wr_fault           0 -> 0  delta=0  (STATIC)
+    dbg_pfwd_en            0 -> 0  delta=0  (STATIC)
+  BRIDGE1_USER_DELTA: u_wr=0 u_rd=0 u_drop=0
+  LEGACY_USER_VERDICT:
+    [L1] user-side read counter did NOT advance: no frame was read out of frame_mem_if in this window
+==============================================================================
+ANALYZE_DONE: files=2 ok=2 failed=0
+# command 2: py r3c_ila_analyze.py <selftest ILA4 named / packed / ILA5 CSV>
+==============================================================================
+ANALYZE_FILE: D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\r3c_selftest_ila4_wedge.csv
+PROFILE: ILA4 (rows=64 cols=28)
+TRIGGER_INDEX: [17]
+  ILA4_LAYOUT: named dbg_l_* alias nets (audit-plan layout)
+  PROBE_ALIAS:
+    a_ack_s1     -> dbg_l_a_ack_s1_1
+    a_req        -> dbg_l_a_req_1
+    araddr       -> dbg_l_araddr
+    aresetn      -> dbg_l_aresetn_1
+    arready      -> dbg_l_arready_1
+    arvalid      -> dbg_l_arvalid_1
+    awaddr       -> dbg_l_awaddr
+    awready      -> dbg_l_awready_1
+    awvalid      -> dbg_l_awvalid_1
+    bready       -> dbg_l_bready_1
+    bvalid       -> dbg_l_bvalid_1
+    d_ack        -> dbg_l_d_ack_1
+    d_req_s1     -> dbg_l_d_req_s1_1
+    lrst         -> dbg_l_lrst
+    lwst         -> dbg_l_lwst
+    r_ack_s1     -> dbg_l_r_ack_s1_1
+    r_req        -> dbg_l_r_req_1
+    rready       -> dbg_l_rready_1
+    rstuser_evt  -> dbg_l_rstuser_evt_1
+    rstuser_s2   -> dbg_l_rstuser_s2_1
+    rvalid       -> dbg_l_rvalid_1
+    stuck        -> dbg_l_stuck
+    stuck_or     -> dbg_l_stuck_or_1
+    wready       -> dbg_l_wready_1
+    wvalid       -> dbg_l_wvalid_1
+  HANDSHAKE_COUNTS: AR=2 R=1 AW=0 W=0 B=0
+  VALID_SEEN: arvalid=2 rvalid=1 awvalid=0 wvalid=0 bvalid=0
+  ADDR_DECODE: word offset x4 (probe = s_axi_axaddr[7:2])
+  AR_ADDR_SEQ:
+    sample=10    word=0x0D byte=0x34 DMA_REQ
+    sample=17    word=0x11 byte=0x44 WR_DBG
+    AR_ADDR_COUNT=2
+  AW_ADDR_SEQ:
+    (none; no AW address handshake in window)
+    AW_ADDR_COUNT=0
+  LAST_AR: sample=17 word=0x11 byte=0x44 WR_DBG
+  R_AFTER_LAST_AR: count=0
+  TAIL_WAIT_CYCLES (last 16 samples): arvalid&!arready=0, rvalid&!rready=0, awvalid&!awready=0, wvalid&!wready=0, bvalid&!bready=0
+  STATE_LAST: lwst=0(LW_IDLE) lrst=1(LR_RACK) stuck=0x1 stuck_or=1
+  LWST_HIST: LW_IDLE=64
+  LRST_HIST: LR_IDLE=14, LR_RACK=48, LR_DRQ=1, LR_DACK=1
+  MAILBOX_LAST: a_req        last=0 high_cycles=0 rising=0
+  MAILBOX_LAST: a_ack_s1     last=0 high_cycles=0 rising=0
+  MAILBOX_LAST: r_req        last=1 high_cycles=49 rising=2
+  MAILBOX_LAST: r_ack_s1     last=0 high_cycles=1 rising=1
+  MAILBOX_LAST: d_req_s1     last=0 high_cycles=1 rising=1
+  MAILBOX_LAST: d_ack        last=0 high_cycles=1 rising=1
+  MAILBOX_LAST: aresetn      last=1 high_cycles=64 rising=0
+  MAILBOX_LAST: rstuser_s2   last=1 high_cycles=64 rising=0
+  MAILBOX_LAST: rstuser_evt  last=0 high_cycles=0 rising=0
+  LAST_8_ROWS (sample | lwst lrst a_req a_ack_s1 r_req r_ack_s1 d_req_s1 d_ack stuck stuck_or):
+       56 | 0 1 0 0 1 0 0 0 1 1
+       57 | 0 1 0 0 1 0 0 0 1 1
+       58 | 0 1 0 0 1 0 0 0 1 1
+       59 | 0 1 0 0 1 0 0 0 1 1
+       60 | 0 1 0 0 1 0 0 0 1 1
+       61 | 0 1 0 0 1 0 0 0 1 1
+       62 | 0 1 0 0 1 0 0 0 1 1
+       63 | 0 1 0 0 1 0 0 0 1 1
+  LONGEST_ARVALID_NO_ARREADY_RUN: 0 samples
+  LONGEST_RVALID_NO_RREADY_RUN: 0 samples
+  ILA4_VERDICT:
+    [L1] STUCK_OR=1 at end of window: lite_regs AXI window is stuck; set bits=[0] (lrst != LR_IDLE (read FSM busy >256 cycles))
+    [L1] READ FSM stuck in LR_RACK: r_req fired but the user-domain ack (r_ack_s1) never came => cross-domain mailbox/user side did not answer the read request
+    [L1] AR accepted (sample 17, word=0x11 byte=0x44 WR_DBG) but NO R beat after it: the read data phase never completed
+    [L1] LAST_AR reads +0x44 WR_DBG: consistent with the firmware g_step=11 wedge (dread(R_WRDBG 0x44) never returns) -- cross-check with r3c_diag.tcl G_STEP
+  R3C_ILA4_HYPOTHESIS: H-acklost | lrst=1 r_req=1 r_ack_s1=0 => read mailbox C return lost (lite waits in LR_RACK; user domain never acked)
+==============================================================================
+ANALYZE_FILE: D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\r3c_selftest_ila4_bus_wedge.csv
+PROFILE: ILA4 (rows=64 cols=40)
+TRIGGER_INDEX: [17]
+  ILA4_LAYOUT: PACKED round3c dbg_l_bus[35:0] (u_ila_4 probe0=36b + probe1=bit35); logical signals rebuilt from the RTL bit map
+  ILA4_BITMAP: 0=dbg_l_arvalid, 1=dbg_l_arready, 2=dbg_l_rvalid, 3=dbg_l_rready, 4=dbg_l_awvalid, 5=dbg_l_awready, 6=dbg_l_wvalid, 7=dbg_l_wready, 8=dbg_l_bvalid, 9=dbg_l_bready, 18=dbg_l_lwst_b0, 19=dbg_l_lwst_b1, 20=dbg_l_lrst_b0, 21=dbg_l_lrst_b1, 22=dbg_l_a_req, 23=dbg_l_a_ack_s1, 24=dbg_l_r_req, 25=dbg_l_r_ack_s1, 26=dbg_l_d_req_s1, 27=dbg_l_d_ack, 28=dbg_l_aresetn, 29=dbg_l_rstuser_s2, 30=dbg_l_rstuser_evt, 31=dbg_l_stuck_b0, 32=dbg_l_stuck_b1, 33=dbg_l_stuck_b2, 34=dbg_l_stuck_b3, 35=dbg_l_stuck_or
+  PROBE_ALIAS:
+    a_ack_s1     -> dbg_l_a_ack_s1
+    a_req        -> dbg_l_a_req
+    araddr       -> dbg_l_araddr
+    aresetn      -> dbg_l_aresetn
+    arready      -> dbg_l_arready
+    arvalid      -> dbg_l_arvalid
+    awaddr       -> dbg_l_awaddr
+    awready      -> dbg_l_awready
+    awvalid      -> dbg_l_awvalid
+    bready       -> dbg_l_bready
+    bvalid       -> dbg_l_bvalid
+    d_ack        -> dbg_l_d_ack
+    d_req_s1     -> dbg_l_d_req_s1
+    lrst         -> dbg_l_lrst_b0
+    lwst         -> dbg_l_lwst_b0
+    r_ack_s1     -> dbg_l_r_ack_s1
+    r_req        -> dbg_l_r_req
+    rready       -> dbg_l_rready
+    rstuser_evt  -> dbg_l_rstuser_evt
+    rstuser_s2   -> dbg_l_rstuser_s2
+    rvalid       -> dbg_l_rvalid
+    stuck        -> dbg_l_stuck_b0
+    stuck_or     -> dbg_l_stuck_or
+    wready       -> dbg_l_wready
+    wvalid       -> dbg_l_wvalid
+  HANDSHAKE_COUNTS: AR=2 R=1 AW=0 W=0 B=0
+  VALID_SEEN: arvalid=2 rvalid=1 awvalid=0 wvalid=0 bvalid=0
+  ADDR_DECODE: word offset x4 (probe = s_axi_axaddr[7:2])
+  AR_ADDR_SEQ:
+    sample=10    word=0x0D byte=0x34 DMA_REQ
+    sample=17    word=0x11 byte=0x44 WR_DBG
+    AR_ADDR_COUNT=2
+  AW_ADDR_SEQ:
+    (none; no AW address handshake in window)
+    AW_ADDR_COUNT=0
+  LAST_AR: sample=17 word=0x11 byte=0x44 WR_DBG
+  R_AFTER_LAST_AR: count=0
+  TAIL_WAIT_CYCLES (last 16 samples): arvalid&!arready=0, rvalid&!rready=0, awvalid&!awready=0, wvalid&!wready=0, bvalid&!bready=0
+  STATE_LAST: lwst=0(LW_IDLE) lrst=1(LR_RACK) stuck=0x1 stuck_or=1
+  LWST_HIST: LW_IDLE=64
+  LRST_HIST: LR_IDLE=15, LR_RACK=49
+  MAILBOX_LAST: a_req        last=0 high_cycles=0 rising=0
+  MAILBOX_LAST: a_ack_s1     last=0 high_cycles=1 rising=1
+  MAILBOX_LAST: r_req        last=1 high_cycles=49 rising=2
+  MAILBOX_LAST: r_ack_s1     last=0 high_cycles=0 rising=0
+  MAILBOX_LAST: d_req_s1     last=0 high_cycles=1 rising=1
+  MAILBOX_LAST: d_ack        last=0 high_cycles=1 rising=1
+  MAILBOX_LAST: aresetn      last=1 high_cycles=64 rising=0
+  MAILBOX_LAST: rstuser_s2   last=1 high_cycles=64 rising=0
+  MAILBOX_LAST: rstuser_evt  last=0 high_cycles=0 rising=0
+  LAST_8_ROWS (sample | lwst lrst a_req a_ack_s1 r_req r_ack_s1 d_req_s1 d_ack stuck stuck_or):
+       56 | 0 1 0 0 1 0 0 0 1 1
+       57 | 0 1 0 0 1 0 0 0 1 1
+       58 | 0 1 0 0 1 0 0 0 1 1
+       59 | 0 1 0 0 1 0 0 0 1 1
+       60 | 0 1 0 0 1 0 0 0 1 1
+       61 | 0 1 0 0 1 0 0 0 1 1
+       62 | 0 1 0 0 1 0 0 0 1 1
+       63 | 0 1 0 0 1 0 0 0 1 1
+  LONGEST_ARVALID_NO_ARREADY_RUN: 0 samples
+  LONGEST_RVALID_NO_RREADY_RUN: 0 samples
+  ILA4_VERDICT:
+    [L1] STUCK_OR=1 at end of window: lite_regs AXI window is stuck; set bits=[0] (lrst != LR_IDLE (read FSM busy >256 cycles))
+    [L1] READ FSM stuck in LR_RACK: r_req fired but the user-domain ack (r_ack_s1) never came => cross-domain mailbox/user side did not answer the read request
+    [L1] AR accepted (sample 17, word=0x11 byte=0x44 WR_DBG) but NO R beat after it: the read data phase never completed
+    [L1] LAST_AR reads +0x44 WR_DBG: consistent with the firmware g_step=11 wedge (dread(R_WRDBG 0x44) never returns) -- cross-check with r3c_diag.tcl G_STEP
+  R3C_ILA4_HYPOTHESIS: H-acklost | lrst=1 r_req=1 r_ack_s1=0 => read mailbox C return lost (lite waits in LR_RACK; user domain never acked)
+==============================================================================
+ANALYZE_FILE: D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\r3c_selftest_ila5_go.csv
+PROFILE: ILA5 (rows=64 cols=13)
+TRIGGER_INDEX: [16]
+  PROBE_ALIAS:
+    ack_ui       -> dbg_wd_ack_ui_1
+    go_ok        -> dbg_wd_go_ok_1
+    go_ui        -> dbg_wd_go_ui_1
+    intr_ui      -> dbg_wd_intr_ui_1
+    s2mm_state   -> dbg_s2mm_state
+    tdata64      -> dbg_s2mm_tdata64
+    tkeep8       -> dbg_s2mm_tkeep8
+    tlast        -> dbg_s2mm_tlast_w_1
+    tready       -> dbg_s2mm_tready_1
+    tvalid       -> dbg_s2mm_tvalid_1
+  GO_UI: rising=1 falling=1 first_rise=8 last_value=0
+  ACK_UI: rising=1 last_value=0
+  GO_OK: rising=1 last_value=0
+  INTR_UI: rising=1 last_value=1 sticky_at_end=YES
+  S2MM_STATE: first=0(IDLE) last=4(WAITDONE) hist=[IDLE=7, WAITGO=4, STREAM=8, WAITDONE=45]
+  S2MM_BEATS: count=2
+  S2MM_FIRST_BEAT: sample=12 tdata=0xD555555555555555 tkeep=0xFF tlast=0
+  LAST_8_ROWS (sample | go_ui ack_ui intr_ui go_ok s2mm_state):
+       56 | 0 0 1 0 4
+       57 | 0 0 1 0 4
+       58 | 0 0 1 0 4
+       59 | 0 0 1 0 4
+       60 | 0 0 1 0 4
+       61 | 0 0 1 0 4
+       62 | 0 0 1 0 4
+       63 | 0 0 1 0 4
+  ILA5_VERDICT:
+    [L1] GO_UI reached the bridge at sample 8 (1 pulse(s))
+    [L1] S2MM introut is STICKY: asserted at sample 20 and never deasserted in the window (no retirement seen)
+    [L1] S2MM entered STREAM (state=2) at sample 11 => the write stream started
+    [L1] first S2MM beat tdata=0xD555555555555555 (= 8B preamble + SFD as expected for len>=66)
+  R3C_ILA5_HYPOTHESIS: INTR_STICKY | intr_ui rose at sample 20 and never deasserted (last=1) => S2MM introut sticky / no retirement handshake seen
+  R3C_ILA5_HYPOTHESIS: ENTERED_STREAM | s2mm_state=2(STREAM) at sample 11 (hist=[IDLE=7, WAITGO=4, STREAM=8, WAITDONE=45])
+==============================================================================
+ANALYZE_DONE: files=3 ok=3 failed=0

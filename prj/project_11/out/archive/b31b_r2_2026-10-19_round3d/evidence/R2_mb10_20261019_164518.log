@@ -1,0 +1,57 @@
+﻿==============================================================================
+prj11 R2 S8 · 10MB 质量档传输 + SHA256 判定封装
+脚本版本 2026-10-17   模式: RUN(会占用 UDP 1234 并向 192.168.1.10 打 10MB 流量!)
+日志(UTF-8 BOM) D:\FPGA\prj\project_11\out\evidence_2026-10-19\R2_mb10_20261019_164518.log
+==============================================================================
+==============================================================================
+== O0 离线真校验(不建 socket / 不发送 / 不碰板): 源文件 + json_storm 参数 + Python + 端口
+==============================================================================
+[16:45:18] 源文件 = D:\FPGA\prj\project_9\testdata\session_full.jsonl
+[16:45:18] 源大小 = 10293111 B (期望 10293111)
+[16:45:18] 源 SHA256 = 4f38af2c85d9d03336b92548a2cb5f6b048f822a8632d0ee2499972f94ba3bf5
+[16:45:18] 源大小与期望一致 ✓
+[16:45:18] 源 SHA256 与钉死期望一致 ✓
+[16:45:19] json_storm.py = D:\FPGA\prj\project_9\scripts\json_storm.py
+[16:45:19] 质量档默认参数(源码实测): chunk=1466B (CHUNK_MAX), gap=1ms (--gap-ms 默认), port=1234
+[16:45:19] 判据标记: JSON_STORM_SUMMARY=True sha_match=True SHA256比对=True --out=True pace-us 可用=True
+[16:45:19] python = C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe  (prefix: )
+[16:45:20] UDP/TCP 1234 端口状态 = FREE
+[16:45:20] 证据目录 = D:\FPGA\prj\project_11\out\evidence_2026-10-19
+[16:45:20] 本次日志 = D:\FPGA\prj\project_11\out\evidence_2026-10-19\R2_mb10_20261019_164518.log
+==============================================================================
+== S8 10MB 质量档真执行(json_storm.py; 会占用 UDP 1234 并打流量到板卡)
+==============================================================================
+[16:45:20] 执行: C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe D:\FPGA\prj\project_9\scripts\json_storm.py D:\FPGA\prj\project_9\testdata\session_full.jsonl --out D:\FPGA\prj\project_11\out\evidence_2026-10-19\R2_mb10_20261019_164518.recomposed.jsonl
+[16:45:20] 源 SHA256(独立复算) = 4f38af2c85d9d03336b92548a2cb5f6b048f822a8632d0ee2499972f94ba3bf5
+生效口径: chunk=1466B | UDP载荷=1472B | 以太帧=1518B | 线上=1538B(含前导+IFG) | gap=1.0ms(sleep 节拍, Windows 精度 ~0.5ms) | parallel=1 | sndbuf=4.00MB
+节奏裁决: 未启用 pace(--pace-us=0), 用 --gap-ms=1.0ms | 该 chunk 净载荷线速上限 953.2Mbps
+负载: 10293111 B -> 7022 片 x 1466 B, 预构造 23.5 ms(3.348 µs/帧, 不含在发送计时内)
+源 SHA256: 4F38AF2C85D9D03336B92548A2CB5F6B048F822A8632D0EE2499972F94BA3BF5
+发送 socket: SO_SNDBUF 请求 4194304 B -> 实际 4194304 B (getsockopt 回读)  ✓
+
+==== 传输质量报告 ====
+发送片数        : 7022
+收到片数        : 7022  (100.00%)
+丢失片数        : 0  
+损坏片数(MD5不符): 0 
+到达流逆序对    : 0
+RTT ms  min/avg/p95/max : 0.64 / 0.76 / 0.86 / 3.96
+发送用时        : 11.23s   全程(含收尾): 11.24s
+A2 预构造用时   : 23.5 ms (3.348 µs/帧, 已移出发送计时窗口)
+单向有效吞吐    : 0.92 MB/s (7.3 Mbps)
+发送阶段速率    : 0.92 MB/s (7.3 Mbps)  [扣除收尾等待, 纯 sendto 循环+节拍]
+含预构造速率    : 7.3 Mbps  [诚实口径: 预构造+发送]
+等效信道速率    : 1.83 MB/s (14.7 Mbps)  [数据渡链路两次]
+重组 SHA256     : 4F38AF2C85D9D03336B92548A2CB5F6B048F822A8632D0EE2499972F94BA3BF5
+SHA256 比对     : 一致 ✓ 全量数据完好穿越光链路往返
+JSON_STORM_SUMMARY: {"file_bytes": 10293111, "chunks": 7022, "chunk_size": 1466, "gap_ms": 1.0, "pace_us": 0.0, "pace_per_proc_us": 0.0, "sndbuf_requested": 4194304, "sndbuf_actual": 4194304, "prep_s": 0.0235, "prep_us_per_frame": 3.348, "recv": 7022, "lost": 0, "corrupt": 0, "inversions": 0, "rtt_avg_ms": 0.7579595415988378, "goodput_mbps": 7.3279862024566755, "goodput_send_mbps": 7.330777393559674, "channel_mbps": 14.655972404913351, "sha_match": true, "pace_late": 0, "pace_waited": 0, "pace_iv_avg_us": -1}
+[16:45:31] json_storm 退出码 = 0
+[16:45:32] summary: chunks=7022 recv=7022 lost=0 corrupt=0 sha_match=True
+[16:45:32] 脚本打印: 源=4F38AF2C85D9D03336B92548A2CB5F6B048F822A8632D0EE2499972F94BA3BF5 重组= SHA256比对一致=False
+[16:45:32] 独立复算: 源文件独立 SHA256=钉死期望 ✓
+[16:45:32] 独立复算: 工具读出源 SHA256=独立复算 ✓
+[16:45:32] 独立复算: 重组文件独立 SHA256=源 ✓ (size=10293111)
+[16:45:32] 片数: 发送=7022 收到=7022 丢失=0 损坏=0 到达率=100%
+[JUDGE] R2_S8 PASS: 10MB 100% 逐片回显 + SHA256 一致: chunks=7022 recv=7022 lost=0 corrupt=0 sha_match=true; 独立复算源/重组 SHA256 一致
+R2_MB10_RESULT: PASS
+全量日志: D:\FPGA\prj\project_11\out\evidence_2026-10-19\R2_mb10_20261019_164518.log

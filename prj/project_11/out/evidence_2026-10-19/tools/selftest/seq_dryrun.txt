@@ -1,0 +1,72 @@
+﻿[12:12:16] INFO R3C_SEQ_START step=Plan run=False tag=r3c
+[12:12:16] INFO R3C_SEQ_HOST XUEGULIN
+[12:12:16] INFO R3C_SEQ_PS 5.1.26100.9711
+[12:12:16] INFO STEP Plan: offline validation only (no hardware access)
+[12:12:16] INFO INPUT: Bit=
+[12:12:16] INFO INPUT: Elf=D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf
+[12:12:16] INFO INPUT: Ltx=
+[12:12:16] INFO INPUT: OutDir=D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout
+[12:12:16] INFO INPUT: Round3cDir=D:\FPGA\prj\project_11\out\archive\b31b_r2_2026-10-19_round3c
+[12:12:16] INFO INPUT: Port=COM5 baud=9600
+[12:12:16] INFO INPUT: Tag=r3c Steps=Plan Run=False
+[12:12:16] INFO INPUT: TrigILA4='dbg_l_bus[35]=eq1'b1' TrigILA5='dbg_wd_go_ui=eq1'b1' timeout_min=2
+[12:12:16] INFO INPUT: StimCmd='ping -n 1 -w 900 192.168.1.10' SnapshotOnly=False
+[12:12:16] WARN ARTIFACT_MISSING: BIT path is empty (not pinned yet)
+[12:12:16] INFO ARTIFACT: ELF path=D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf size=54224 sha8=F5E0F1F3
+[12:12:16] INFO HASH_OK: ELF sha8=F5E0F1F3 == expect F5E0F1F3
+[12:12:16] WARN ARTIFACT_MISSING: LTX path is empty (not pinned yet)
+[12:12:16] WARN PLAN_NOTE: BIT hash not pinned/verified; Burn will refuse unless -AllowUnpinned is given (r3c_pin.md)
+[12:12:16] INFO TOOL_OK: python(full path) = C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe
+[12:12:16] INFO TOOL_OK: uart_probe.py = D:\FPGA\prj\project_11\out\uart_probe.py
+[12:12:16] INFO TOOL_OK: xsct.bat = D:\Xilinx\Vitis\2023.1\bin\xsct.bat
+[12:12:16] INFO TOOL_OK: vivado.bat = D:\Xilinx\Vivado\2023.1\bin\vivado.bat
+[12:12:16] INFO TOOL_OK: jb31b_burn_pair.tcl = D:\FPGA\prj\project_11\out\jb31b_burn_pair.tcl
+[12:12:16] INFO TOOL_OK: r3c_cap.tcl = D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_cap.tcl
+[12:12:16] INFO TOOL_OK: r3c_diag.tcl = D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_diag.tcl
+[12:12:16] INFO TOOL_OK: r3c_ila_analyze.py = D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py
+[12:12:16] INFO PY_PYSERIAL: pyserial 3.5
+[12:12:16] INFO SERIAL_PORTS: COM3,COM4,COM5 | wanted=COM5 present=True
+[12:12:16] INFO PLAN_NEXT_COMMANDS (dry-run; add -Run to execute per-step):
+[12:12:16] INFO   xsct "D:\Xilinx\Vitis\2023.1\bin\xsct.bat" "D:\FPGA\prj\project_11\out\jb31b_burn_pair.tcl" "" "D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf" > burn.log 2>&1
+[12:12:16] INFO   "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" "D:\FPGA\prj\project_11\out\uart_probe.py" --port COM5 --cmd U --wait 2.5 --raw
+[12:12:16] INFO   "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" "D:\FPGA\prj\project_11\out\uart_probe.py" --port COM5 --cmd d --wait 1.5 --raw
+[12:12:16] INFO   "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" "D:\FPGA\prj\project_11\out\uart_probe.py" --port COM5 --cmd W --wait 1.5 --raw
+[12:12:16] INFO   "D:\Xilinx\Vivado\2023.1\bin\vivado.bat" -mode batch -source "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_cap.tcl" -notrace -log cap_vivado.log > cap_console.log 2>&1
+[12:12:16] INFO   xsct "D:\Xilinx\Vitis\2023.1\bin\xsct.bat" "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_diag.tcl" > diag.log 2>&1
+[12:12:16] INFO   "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py" --dir "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout" --pattern "R3C_*.csv"
+[12:12:16] RESULT R3C_STEP_RESULT: step=Plan result=PASS bitOk=False elfOk=True ltxOk=False
+[12:12:16] INFO R3C_SEQ_LOG: D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_seq.log
+[12:12:16] RESULT R3C_SEQ_RESULT: PASS (steps=1)
+--- ALL (dry-run) ---
+[12:12:16] INFO R3C_SEQ_START step=All run=False tag=r3c
+[12:12:16] INFO R3C_SEQ_HOST XUEGULIN
+[12:12:16] INFO R3C_SEQ_PS 5.1.26100.9711
+[12:12:16] INFO STEP All: Burn -> Serial -> Cap -> Diag -> SerialPost
+[12:12:16] INFO STEP Burn: xsct flash bit+ELF pair
+[12:12:16] WARN ARTIFACT_MISSING: BIT path is empty (not pinned yet)
+[12:12:17] INFO ARTIFACT: ELF path=D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf size=54224 sha8=F5E0F1F3
+[12:12:17] INFO HASH_OK: ELF sha8=F5E0F1F3 == expect F5E0F1F3
+[12:12:17] WARN BURN_PIN_WARN: one artifact hash is not pinned/verified (dry-run OK; -Run refuses unless -AllowUnpinned)
+[12:12:17] INFO EXEC: "D:\Xilinx\Vitis\2023.1\bin\xsct.bat" "D:\FPGA\prj\project_11\out\jb31b_burn_pair.tcl" "" "D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf" > "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_burn.log" 2>&1
+[12:12:17] DRYRUN DRYRUN: would execute the command above; output -> D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_burn.log
+[12:12:17] RESULT R3C_STEP_RESULT: step=Burn result=DRYRUN would burn  + D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf
+[12:12:17] INFO STEP Serial: U -> d -> W on COM5 @9600
+[12:12:17] DRYRUN DRYRUN: would run: "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" D:\FPGA\prj\project_11\out\uart_probe.py --port COM5 --cmd U --wait 2.5 --drain 0.2 --raw
+[12:12:17] DRYRUN DRYRUN: would run: "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" D:\FPGA\prj\project_11\out\uart_probe.py --port COM5 --cmd d --wait 1.5 --drain 0.2 --raw
+[12:12:17] DRYRUN DRYRUN: would run: "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" D:\FPGA\prj\project_11\out\uart_probe.py --port COM5 --cmd W --wait 1.5 --drain 0.2 --raw
+[12:12:17] RESULT R3C_STEP_RESULT: step=Serial result=DRYRUN U/d/W planned
+[12:12:17] INFO STEP Cap: 4-ILA capture (PRE -> arm -> stim -> POST)
+[12:12:17] WARN CAP_DRYRUN_PENDING: Ltx not pinned yet (); a real run will refuse
+[12:12:17] INFO CAP_ENV: R2_LTX= R2_OUT_DIR=D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout R2_TAG=r3c R2_SNAPSHOT_ONLY= R2_STIM_CMD=ping -n 1 -w 900 192.168.1.10 R2_WAIT_MIN=2
+[12:12:17] INFO EXEC: "D:\Xilinx\Vivado\2023.1\bin\vivado.bat" -mode batch -source "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_cap.tcl" -notrace -log "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_cap_vivado.log" > "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_cap_console.log" 2>&1
+[12:12:17] DRYRUN DRYRUN: would execute the command above; output -> D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_cap_vivado.log
+[12:12:17] RESULT R3C_STEP_RESULT: step=Cap result=DRYRUN vivado batch 4-ILA capture planned
+[12:12:17] INFO STEP Diag: post-wedge JTAG/LMB field read (xsct)
+[12:12:17] INFO EXEC: "D:\Xilinx\Vitis\2023.1\bin\xsct.bat" "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_diag.tcl" > "D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_diag.log" 2>&1
+[12:12:17] DRYRUN DRYRUN: would execute the command above; output -> D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_diag.log
+[12:12:17] RESULT R3C_STEP_RESULT: step=Diag result=DRYRUN xsct LMB read planned
+[12:12:17] INFO STEP SerialPost: best-effort 'W' after the wedge (silence is evidence)
+[12:12:17] DRYRUN DRYRUN: would run: "C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" D:\FPGA\prj\project_11\out\uart_probe.py --port COM5 --cmd W --wait 2 --drain 0.2 --raw
+[12:12:17] RESULT R3C_STEP_RESULT: step=SerialPost result=DRYRUN W planned
+[12:12:17] INFO R3C_SEQ_LOG: D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\seqout\R3C_20261019_121216_seq.log
+[12:12:17] RESULT R3C_SEQ_RESULT: PASS (steps=5)

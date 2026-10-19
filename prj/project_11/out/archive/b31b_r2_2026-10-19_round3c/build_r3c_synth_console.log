@@ -1,0 +1,1770 @@
+
+****** Vivado v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source {D:\FPGA\prj\project_11\scripts\build_synth_only.tcl} -notrace
+WARNING: [filemgmt 56-3] IPUserFilesDir: Could not find the directory 'D:/FPGA/prj/project_11/vivado/prj11.ip_user_files'.
+Scanning sources...
+Finished scanning sources
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1704] No user IP repositories specified
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository 'D:/Xilinx/Vivado/2023.1/data/ip'.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+open_project: Time (s): cpu = 00:00:09 ; elapsed = 00:00:10 . Memory (MB): peak = 1552.406 ; gain = 245.730
+INFO: [IP_Flow 19-1686] Generating 'Instantiation Template' target for IP 'ddr4_0'...
+INFO: [IP_Flow 19-1686] Generating 'Synthesis' target for IP 'ddr4_0'...
+INFO: [Device 21-403] Loading part xcku060-ffva1156-2-i
+INFO: [IP_Flow 19-1686] Generating 'Simulation' target for IP 'ddr4_0'...
+INFO: [IP_Flow 19-1686] Generating 'Implementation' target for IP 'ddr4_0'...
+INFO: [IP_Flow 19-1686] Generating 'Change Log' target for IP 'ddr4_0'...
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+Exporting to file d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/hw_handoff/ddr4_0_microblaze_mcs.hwh
+Generated Hardware Definition File d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/synth/ddr4_0_microblaze_mcs.hwdef
+generate_target: Time (s): cpu = 00:00:13 ; elapsed = 00:00:18 . Memory (MB): peak = 2403.773 ; gain = 851.367
+MODULE_REF_RESET: mb_ctrl_axi_lite_regs_0_0_synth_1
+MODULE_REF_RESET: mb_ctrl_axi_lite_regs_0_0_impl_1
+INFO: [Project 1-1161] Replacing file D:/FPGA/prj/project_11/vivado/prj11.srcs/utils_1/imports/synth_1/aurora_mem_bridge.dcp with file D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/aurora_mem_bridge.dcp
+[Mon Oct 19 13:33:58 2026] Launched ddr4_0_synth_1, mb_ctrl_axi_lite_regs_0_0_synth_1...
+Run output will be captured here:
+ddr4_0_synth_1: D:/FPGA/prj/project_11/vivado/prj11.runs/ddr4_0_synth_1/runme.log
+mb_ctrl_axi_lite_regs_0_0_synth_1: D:/FPGA/prj/project_11/vivado/prj11.runs/mb_ctrl_axi_lite_regs_0_0_synth_1/runme.log
+[Mon Oct 19 13:33:58 2026] Launched synth_1...
+Run output will be captured here: D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/runme.log
+[Mon Oct 19 13:33:58 2026] Waiting for synth_1 to finish...
+
+
+*** Running vivado
+    with args -log aurora_mem_bridge.vds -m64 -product Vivado -mode batch -messageDb vivado.pb -notrace -source aurora_mem_bridge.tcl
+
+
+
+****** Vivado v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source aurora_mem_bridge.tcl -notrace
+create_project: Time (s): cpu = 00:00:05 ; elapsed = 00:00:05 . Memory (MB): peak = 1468.934 ; gain = 161.449
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1704] No user IP repositories specified
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository 'D:/Xilinx/Vivado/2023.1/data/ip'.
+Command: read_checkpoint -auto_incremental -incremental D:/FPGA/prj/project_11/vivado/prj11.srcs/utils_1/imports/synth_1/aurora_mem_bridge.dcp
+INFO: [Vivado 12-5825] Read reference checkpoint from D:/FPGA/prj/project_11/vivado/prj11.srcs/utils_1/imports/synth_1/aurora_mem_bridge.dcp for incremental synthesis
+INFO: [Vivado 12-7989] Please ensure there are no constraint changes
+Command: synth_design -top aurora_mem_bridge -part xcku060-ffva1156-2-i
+Starting synth_design
+Attempting to get a license for feature 'Synthesis' and/or device 'xcku060'
+INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xcku060'
+INFO: [Device 21-403] Loading part xcku060-ffva1156-2-i
+INFO: [Designutils 20-5440] No compile time benefit to using incremental synthesis; A full resynthesis will be run
+INFO: [Designutils 20-4379] Flow is switching to default flow due to incremental criteria not met. If you would like to alter this behaviour and have the flow terminate instead, please set the following parameter config_implementation {autoIncr.Synth.RejectBehavior Terminate}
+INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 2 processes.
+INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
+INFO: [Synth 8-7075] Helper process launched with PID 21616
+INFO: [Synth 8-11241] undeclared symbol 'power_down_i', assumed default net type 'wire' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:231]
+INFO: [Synth 8-11241] undeclared symbol 'gt_to_common_qpllreset_i', assumed default net type 'wire' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:276]
+INFO: [Synth 8-11241] undeclared symbol 'tx_lock', assumed default net type 'wire' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:370]
+---------------------------------------------------------------------------------
+Starting RTL Elaboration : Time (s): cpu = 00:00:04 ; elapsed = 00:00:05 . Memory (MB): peak = 2726.023 ; gain = 408.461
+---------------------------------------------------------------------------------
+INFO: [Synth 8-6157] synthesizing module 'aurora_mem_bridge' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:43]
+INFO: [Synth 8-6157] synthesizing module 'IBUFDS' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:71783]
+INFO: [Synth 8-6155] done synthesizing module 'IBUFDS' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:71783]
+INFO: [Synth 8-6157] synthesizing module 'BUFG' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:1519]
+INFO: [Synth 8-6155] done synthesizing module 'BUFG' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:1519]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_support_ext' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:67]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_gt_common_wrapper' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_gt_common_wrapper.v:6]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_gt_gthe3_common_wrapper' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_gt_gthe3_common_wrapper.v:4]
+INFO: [Synth 8-6157] synthesizing module 'gtwizard_ultrascale_v1_7_16_gthe3_common' [D:/FPGA/prj/project_11/rtl/shared_logic/gtwizard_ultrascale_v1_7_gthe3_common.v:55]
+	Parameter GTHE3_COMMON_BIAS_CFG0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_BIAS_CFG1 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_BIAS_CFG2 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_BIAS_CFG3 bound to: 16'b0000000001000000 
+	Parameter GTHE3_COMMON_BIAS_CFG4 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_BIAS_CFG_RSVD bound to: 10'b0000000000 
+	Parameter GTHE3_COMMON_COMMON_CFG0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_COMMON_CFG1 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_POR_CFG bound to: 16'b0000000000000100 
+	Parameter GTHE3_COMMON_QPLL0_CFG0 bound to: 16'b0011001000011100 
+	Parameter GTHE3_COMMON_QPLL0_CFG1 bound to: 16'b0001000000011000 
+	Parameter GTHE3_COMMON_QPLL0_CFG1_G3 bound to: 16'b0001000000011000 
+	Parameter GTHE3_COMMON_QPLL0_CFG2 bound to: 16'b0000000001001000 
+	Parameter GTHE3_COMMON_QPLL0_CFG2_G3 bound to: 16'b0000000001001000 
+	Parameter GTHE3_COMMON_QPLL0_CFG3 bound to: 16'b0000000100100000 
+	Parameter GTHE3_COMMON_QPLL0_CFG4 bound to: 16'b0000000000001001 
+	Parameter GTHE3_COMMON_QPLL0_CP bound to: 10'b0000011111 
+	Parameter GTHE3_COMMON_QPLL0_CP_G3 bound to: 10'b1111111111 
+	Parameter GTHE3_COMMON_QPLL0_FBDIV bound to: 66 - type: integer 
+	Parameter GTHE3_COMMON_QPLL0_FBDIV_G3 bound to: 80 - type: integer 
+	Parameter GTHE3_COMMON_QPLL0_INIT_CFG0 bound to: 16'b0000001010110010 
+	Parameter GTHE3_COMMON_QPLL0_INIT_CFG1 bound to: 8'b00000000 
+	Parameter GTHE3_COMMON_QPLL0_LOCK_CFG bound to: 16'b0010000111101000 
+	Parameter GTHE3_COMMON_QPLL0_LOCK_CFG_G3 bound to: 16'b0010000111101000 
+	Parameter GTHE3_COMMON_QPLL0_LPF bound to: 10'b1111111100 
+	Parameter GTHE3_COMMON_QPLL0_LPF_G3 bound to: 10'b0000010101 
+	Parameter GTHE3_COMMON_QPLL0_REFCLK_DIV bound to: 1 - type: integer 
+	Parameter GTHE3_COMMON_QPLL0_SDM_CFG0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_QPLL0_SDM_CFG1 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_QPLL0_SDM_CFG2 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_QPLL1_CFG0 bound to: 16'b0011001000011100 
+	Parameter GTHE3_COMMON_QPLL1_CFG1 bound to: 16'b0001000000011000 
+	Parameter GTHE3_COMMON_QPLL1_CFG1_G3 bound to: 16'b0001000000011000 
+	Parameter GTHE3_COMMON_QPLL1_CFG2 bound to: 16'b0000000001000000 
+	Parameter GTHE3_COMMON_QPLL1_CFG2_G3 bound to: 16'b0000000001000000 
+	Parameter GTHE3_COMMON_QPLL1_CFG3 bound to: 16'b0000000100100000 
+	Parameter GTHE3_COMMON_QPLL1_CFG4 bound to: 16'b0000000000001001 
+	Parameter GTHE3_COMMON_QPLL1_CP bound to: 10'b0001111111 
+	Parameter GTHE3_COMMON_QPLL1_CP_G3 bound to: 10'b1111111111 
+	Parameter GTHE3_COMMON_QPLL1_FBDIV bound to: 64 - type: integer 
+	Parameter GTHE3_COMMON_QPLL1_FBDIV_G3 bound to: 80 - type: integer 
+	Parameter GTHE3_COMMON_QPLL1_INIT_CFG0 bound to: 16'b0000001010110010 
+	Parameter GTHE3_COMMON_QPLL1_INIT_CFG1 bound to: 8'b00000000 
+	Parameter GTHE3_COMMON_QPLL1_LOCK_CFG bound to: 16'b0010000111101000 
+	Parameter GTHE3_COMMON_QPLL1_LOCK_CFG_G3 bound to: 16'b0010000111101000 
+	Parameter GTHE3_COMMON_QPLL1_LPF bound to: 10'b1111111100 
+	Parameter GTHE3_COMMON_QPLL1_LPF_G3 bound to: 10'b0000010101 
+	Parameter GTHE3_COMMON_QPLL1_REFCLK_DIV bound to: 1 - type: integer 
+	Parameter GTHE3_COMMON_QPLL1_SDM_CFG0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_QPLL1_SDM_CFG1 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_QPLL1_SDM_CFG2 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_RSVD_ATTR0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_RSVD_ATTR1 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_RSVD_ATTR2 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_RSVD_ATTR3 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_RXRECCLKOUT0_SEL bound to: 2'b00 
+	Parameter GTHE3_COMMON_RXRECCLKOUT1_SEL bound to: 2'b00 
+	Parameter GTHE3_COMMON_SARC_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_SARC_SEL bound to: 1'b0 
+	Parameter GTHE3_COMMON_SDM0DATA1_0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_SDM0DATA1_1 bound to: 9'b000000000 
+	Parameter GTHE3_COMMON_SDM0INITSEED0_0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_SDM0INITSEED0_1 bound to: 9'b000000000 
+	Parameter GTHE3_COMMON_SDM0_DATA_PIN_SEL bound to: 1'b0 
+	Parameter GTHE3_COMMON_SDM0_WIDTH_PIN_SEL bound to: 1'b0 
+	Parameter GTHE3_COMMON_SDM1DATA1_0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_SDM1DATA1_1 bound to: 9'b000000000 
+	Parameter GTHE3_COMMON_SDM1INITSEED0_0 bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_SDM1INITSEED0_1 bound to: 9'b000000000 
+	Parameter GTHE3_COMMON_SDM1_DATA_PIN_SEL bound to: 1'b0 
+	Parameter GTHE3_COMMON_SDM1_WIDTH_PIN_SEL bound to: 1'b0 
+	Parameter GTHE3_COMMON_SIM_RESET_SPEEDUP bound to: TRUE - type: string 
+	Parameter GTHE3_COMMON_SIM_VERSION bound to: 2 - type: integer 
+	Parameter GTHE3_COMMON_BGBYPASSB_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGMONITORENB_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGPDB_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGRCALOVRD_VAL bound to: 5'b11111 
+	Parameter GTHE3_COMMON_BGRCALOVRDENB_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_DRPADDR_VAL bound to: 9'b000000000 
+	Parameter GTHE3_COMMON_DRPCLK_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_DRPDI_VAL bound to: 16'b0000000000000000 
+	Parameter GTHE3_COMMON_DRPEN_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_DRPWE_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTGREFCLK0_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTGREFCLK1_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK00_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK01_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK10_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK11_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK00_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK01_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK10_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK11_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK00_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK01_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK10_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK11_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_PMARSVD0_VAL bound to: 8'b00000000 
+	Parameter GTHE3_COMMON_PMARSVD1_VAL bound to: 8'b00000000 
+	Parameter GTHE3_COMMON_QPLL0CLKRSVD0_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0CLKRSVD1_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0LOCKDETCLK_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0LOCKEN_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0PD_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_QPLL0REFCLKSEL_VAL bound to: 3'b001 
+	Parameter GTHE3_COMMON_QPLL0RESET_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_QPLL1CLKRSVD0_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1CLKRSVD1_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1LOCKDETCLK_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1LOCKEN_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_QPLL1PD_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1REFCLKSEL_VAL bound to: 3'b001 
+	Parameter GTHE3_COMMON_QPLL1RESET_VAL bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLLRSVD1_VAL bound to: 8'b00000000 
+	Parameter GTHE3_COMMON_QPLLRSVD2_VAL bound to: 5'b00000 
+	Parameter GTHE3_COMMON_QPLLRSVD3_VAL bound to: 5'b00000 
+	Parameter GTHE3_COMMON_QPLLRSVD4_VAL bound to: 8'b00000000 
+	Parameter GTHE3_COMMON_RCALENB_VAL bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGBYPASSB_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGMONITORENB_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGPDB_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGRCALOVRD_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_BGRCALOVRDENB_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_DRPADDR_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_DRPCLK_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_DRPDI_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_DRPEN_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_DRPWE_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTGREFCLK0_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTGREFCLK1_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK00_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK01_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK10_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTNORTHREFCLK11_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK00_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK01_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK10_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTREFCLK11_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK00_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK01_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK10_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_GTSOUTHREFCLK11_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_PMARSVD0_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_PMARSVD1_TIE_EN bound to: 1'b1 
+	Parameter GTHE3_COMMON_QPLL0CLKRSVD0_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0CLKRSVD1_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0LOCKDETCLK_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0LOCKEN_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0PD_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0REFCLKSEL_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL0RESET_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1CLKRSVD0_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1CLKRSVD1_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1LOCKDETCLK_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1LOCKEN_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1PD_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1REFCLKSEL_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLL1RESET_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLLRSVD1_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLLRSVD2_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLLRSVD3_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_QPLLRSVD4_TIE_EN bound to: 1'b0 
+	Parameter GTHE3_COMMON_RCALENB_TIE_EN bound to: 1'b1 
+INFO: [Synth 8-6157] synthesizing module 'GTHE3_COMMON' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:43378]
+	Parameter BIAS_CFG0 bound to: 16'b0000000000000000 
+	Parameter BIAS_CFG1 bound to: 16'b0000000000000000 
+	Parameter BIAS_CFG2 bound to: 16'b0000000000000000 
+	Parameter BIAS_CFG3 bound to: 16'b0000000001000000 
+	Parameter BIAS_CFG4 bound to: 16'b0000000000000000 
+	Parameter BIAS_CFG_RSVD bound to: 10'b0000000000 
+	Parameter COMMON_CFG0 bound to: 16'b0000000000000000 
+	Parameter COMMON_CFG1 bound to: 16'b0000000000000000 
+	Parameter POR_CFG bound to: 16'b0000000000000100 
+	Parameter QPLL0_CFG0 bound to: 16'b0011001000011100 
+	Parameter QPLL0_CFG1 bound to: 16'b0001000000011000 
+	Parameter QPLL0_CFG1_G3 bound to: 16'b0001000000011000 
+	Parameter QPLL0_CFG2 bound to: 16'b0000000001001000 
+	Parameter QPLL0_CFG2_G3 bound to: 16'b0000000001001000 
+	Parameter QPLL0_CFG3 bound to: 16'b0000000100100000 
+	Parameter QPLL0_CFG4 bound to: 16'b0000000000001001 
+	Parameter QPLL0_CP bound to: 10'b0000011111 
+	Parameter QPLL0_CP_G3 bound to: 10'b1111111111 
+	Parameter QPLL0_FBDIV bound to: 66 - type: integer 
+	Parameter QPLL0_FBDIV_G3 bound to: 80 - type: integer 
+	Parameter QPLL0_INIT_CFG0 bound to: 16'b0000001010110010 
+	Parameter QPLL0_INIT_CFG1 bound to: 8'b00000000 
+	Parameter QPLL0_LOCK_CFG bound to: 16'b0010000111101000 
+	Parameter QPLL0_LOCK_CFG_G3 bound to: 16'b0010000111101000 
+	Parameter QPLL0_LPF bound to: 10'b1111111100 
+	Parameter QPLL0_LPF_G3 bound to: 10'b0000010101 
+	Parameter QPLL0_REFCLK_DIV bound to: 1 - type: integer 
+	Parameter QPLL0_SDM_CFG0 bound to: 16'b0000000000000000 
+	Parameter QPLL0_SDM_CFG1 bound to: 16'b0000000000000000 
+	Parameter QPLL0_SDM_CFG2 bound to: 16'b0000000000000000 
+	Parameter QPLL1_CFG0 bound to: 16'b0011001000011100 
+	Parameter QPLL1_CFG1 bound to: 16'b0001000000011000 
+	Parameter QPLL1_CFG1_G3 bound to: 16'b0001000000011000 
+	Parameter QPLL1_CFG2 bound to: 16'b0000000001000000 
+	Parameter QPLL1_CFG2_G3 bound to: 16'b0000000001000000 
+	Parameter QPLL1_CFG3 bound to: 16'b0000000100100000 
+	Parameter QPLL1_CFG4 bound to: 16'b0000000000001001 
+	Parameter QPLL1_CP bound to: 10'b0001111111 
+	Parameter QPLL1_CP_G3 bound to: 10'b1111111111 
+	Parameter QPLL1_FBDIV bound to: 64 - type: integer 
+	Parameter QPLL1_FBDIV_G3 bound to: 80 - type: integer 
+	Parameter QPLL1_INIT_CFG0 bound to: 16'b0000001010110010 
+	Parameter QPLL1_INIT_CFG1 bound to: 8'b00000000 
+	Parameter QPLL1_LOCK_CFG bound to: 16'b0010000111101000 
+	Parameter QPLL1_LOCK_CFG_G3 bound to: 16'b0010000111101000 
+	Parameter QPLL1_LPF bound to: 10'b1111111100 
+	Parameter QPLL1_LPF_G3 bound to: 10'b0000010101 
+	Parameter QPLL1_REFCLK_DIV bound to: 1 - type: integer 
+	Parameter QPLL1_SDM_CFG0 bound to: 16'b0000000000000000 
+	Parameter QPLL1_SDM_CFG1 bound to: 16'b0000000000000000 
+	Parameter QPLL1_SDM_CFG2 bound to: 16'b0000000000000000 
+	Parameter RSVD_ATTR0 bound to: 16'b0000000000000000 
+	Parameter RSVD_ATTR1 bound to: 16'b0000000000000000 
+	Parameter RSVD_ATTR2 bound to: 16'b0000000000000000 
+	Parameter RSVD_ATTR3 bound to: 16'b0000000000000000 
+	Parameter RXRECCLKOUT0_SEL bound to: 2'b00 
+	Parameter RXRECCLKOUT1_SEL bound to: 2'b00 
+	Parameter SARC_EN bound to: 1'b1 
+	Parameter SARC_SEL bound to: 1'b0 
+	Parameter SDM0DATA1_0 bound to: 16'b0000000000000000 
+	Parameter SDM0DATA1_1 bound to: 9'b000000000 
+	Parameter SDM0INITSEED0_0 bound to: 16'b0000000000000000 
+	Parameter SDM0INITSEED0_1 bound to: 9'b000000000 
+	Parameter SDM0_DATA_PIN_SEL bound to: 1'b0 
+	Parameter SDM0_WIDTH_PIN_SEL bound to: 1'b0 
+	Parameter SDM1DATA1_0 bound to: 16'b0000000000000000 
+	Parameter SDM1DATA1_1 bound to: 9'b000000000 
+	Parameter SDM1INITSEED0_0 bound to: 16'b0000000000000000 
+	Parameter SDM1INITSEED0_1 bound to: 9'b000000000 
+	Parameter SDM1_DATA_PIN_SEL bound to: 1'b0 
+	Parameter SDM1_WIDTH_PIN_SEL bound to: 1'b0 
+	Parameter SIM_RESET_SPEEDUP bound to: TRUE - type: string 
+	Parameter SIM_VERSION bound to: 2 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'GTHE3_COMMON' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:43378]
+INFO: [Synth 8-6155] done synthesizing module 'gtwizard_ultrascale_v1_7_16_gthe3_common' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/gtwizard_ultrascale_v1_7_gthe3_common.v:55]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_gt_gthe3_common_wrapper' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_gt_gthe3_common_wrapper.v:4]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_gt_common_wrapper' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_gt_common_wrapper.v:6]
+INFO: [Synth 8-6157] synthesizing module 'IBUFDS_GTE3' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:71941]
+INFO: [Synth 8-6155] done synthesizing module 'IBUFDS_GTE3' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:71941]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_CLOCK_MODULE' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_clock_module.v:67]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_ultrascale_tx_userclk' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_ultrascale_tx_userclk.v:60]
+INFO: [Synth 8-6157] synthesizing module 'BUFG_GT' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:1695]
+INFO: [Synth 8-6155] done synthesizing module 'BUFG_GT' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:1695]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_ultrascale_tx_userclk' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_ultrascale_tx_userclk.v:60]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_CLOCK_MODULE' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_clock_module.v:67]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_SUPPORT_RESET_LOGIC' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:61]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0_rst_sync_shared' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:139]
+	Parameter c_mtbf_stages bound to: 5'b00101 
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_rst_sync_shared' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:139]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_SUPPORT_RESET_LOGIC' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:61]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/aurora_64b66b_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/aurora_64b66b_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'gt_powergood' of module 'aurora_64b66b_0' is unconnected for instance 'aurora_64b66b_0_i' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:404]
+WARNING: [Synth 8-7023] instance 'aurora_64b66b_0_i' of module 'aurora_64b66b_0' has 55 connections declared, but only 54 given [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:404]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_0_support_ext' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_ext.v:67]
+INFO: [Synth 8-6157] synthesizing module 'axis_word_unpack' [D:/FPGA/prj/project_11/rtl/axis_word_unpack.v:30]
+INFO: [Synth 8-6155] done synthesizing module 'axis_word_unpack' (0#1) [D:/FPGA/prj/project_11/rtl/axis_word_unpack.v:30]
+INFO: [Synth 8-6157] synthesizing module 'axis_word_pack' [D:/FPGA/prj/project_11/rtl/axis_word_pack.v:34]
+INFO: [Synth 8-6155] done synthesizing module 'axis_word_pack' (0#1) [D:/FPGA/prj/project_11/rtl/axis_word_pack.v:34]
+WARNING: [Synth 8-689] width (16) of port connection 'o_overflow' does not match port width (1) of module 'axis_word_pack' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:480]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_1_support_shared' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_1_support_shared.v:10]
+INFO: [Synth 8-6157] synthesizing module 'aurora_64b66b_1' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/aurora_64b66b_1_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_1' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/aurora_64b66b_1_stub.v:6]
+WARNING: [Synth 8-7071] port 'gt_powergood' of module 'aurora_64b66b_1' is unconnected for instance 'aurora_64b66b_1_i' [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_1_support_shared.v:95]
+WARNING: [Synth 8-7023] instance 'aurora_64b66b_1_i' of module 'aurora_64b66b_1' has 55 connections declared, but only 54 given [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_1_support_shared.v:95]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_64b66b_1_support_shared' (0#1) [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_1_support_shared.v:10]
+INFO: [Synth 8-6157] synthesizing module 'gmii_to_rgmii' [D:/FPGA/prj/project_11/rtl/gmii_to_rgmii/gmii_to_rgmii.v:23]
+INFO: [Synth 8-6157] synthesizing module 'rgmii_rx' [D:/FPGA/prj/project_11/rtl/rgmii_rx_fix2.v:7]
+INFO: [Synth 8-6157] synthesizing module 'IDELAYE3' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:73963]
+	Parameter CASCADE bound to: NONE - type: string 
+	Parameter DELAY_FORMAT bound to: TIME - type: string 
+	Parameter DELAY_SRC bound to: IDATAIN - type: string 
+	Parameter DELAY_TYPE bound to: FIXED - type: string 
+	Parameter DELAY_VALUE bound to: 1250 - type: integer 
+	Parameter IS_CLK_INVERTED bound to: 1'b0 
+	Parameter IS_RST_INVERTED bound to: 1'b0 
+	Parameter REFCLK_FREQUENCY bound to: 200.000000 - type: double 
+	Parameter SIM_DEVICE bound to: ULTRASCALE - type: string 
+	Parameter UPDATE_MODE bound to: ASYNC - type: string 
+INFO: [Synth 8-6155] done synthesizing module 'IDELAYE3' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:73963]
+INFO: [Synth 8-6157] synthesizing module 'IDDRE1' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:73794]
+	Parameter DDR_CLK_EDGE bound to: SAME_EDGE_PIPELINED - type: string 
+	Parameter IS_CB_INVERTED bound to: 1'b1 
+	Parameter IS_C_INVERTED bound to: 1'b0 
+INFO: [Synth 8-6155] done synthesizing module 'IDDRE1' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:73794]
+INFO: [Synth 8-6157] synthesizing module 'BUFIO' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:1791]
+INFO: [Synth 8-6155] done synthesizing module 'BUFIO' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:1791]
+INFO: [Synth 8-6157] synthesizing module 'MMCME3_ADV' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:80502]
+	Parameter BANDWIDTH bound to: OPTIMIZED - type: string 
+	Parameter CLKFBOUT_MULT_F bound to: 8.000000 - type: double 
+	Parameter CLKFBOUT_PHASE bound to: 0.000000 - type: double 
+	Parameter CLKIN1_PERIOD bound to: 8.000000 - type: double 
+	Parameter CLKOUT0_DIVIDE_F bound to: 5.000000 - type: double 
+	Parameter CLKOUT0_DUTY_CYCLE bound to: 0.500000 - type: double 
+	Parameter CLKOUT0_PHASE bound to: 0.000000 - type: double 
+	Parameter DIVCLK_DIVIDE bound to: 1 - type: integer 
+	Parameter REF_JITTER1 bound to: 0.010000 - type: double 
+	Parameter STARTUP_WAIT bound to: FALSE - type: string 
+INFO: [Synth 8-6155] done synthesizing module 'MMCME3_ADV' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:80502]
+WARNING: [Synth 8-7071] port 'CDDCDONE' of module 'MMCME3_ADV' is unconnected for instance 'u_mmcm_200m' [D:/FPGA/prj/project_11/rtl/rgmii_rx_fix2.v:48]
+WARNING: [Synth 8-7023] instance 'u_mmcm_200m' of module 'MMCME3_ADV' has 35 connections declared, but only 34 given [D:/FPGA/prj/project_11/rtl/rgmii_rx_fix2.v:48]
+WARNING: [Synth 8-4446] all outputs are unconnected for this instance and logic may be removed [D:/FPGA/prj/project_11/rtl/rgmii_rx_fix2.v:70]
+INFO: [Synth 8-6157] synthesizing module 'IDELAYCTRL' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:73864]
+	Parameter SIM_DEVICE bound to: ULTRASCALE - type: string 
+INFO: [Synth 8-6155] done synthesizing module 'IDELAYCTRL' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:73864]
+INFO: [Synth 8-6155] done synthesizing module 'rgmii_rx' (0#1) [D:/FPGA/prj/project_11/rtl/rgmii_rx_fix2.v:7]
+INFO: [Synth 8-6157] synthesizing module 'rgmii_tx' [D:/FPGA/prj/project_11/rtl/gmii_to_rgmii/rgmii_tx.v:23]
+INFO: [Synth 8-6157] synthesizing module 'ODDRE1' [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:94816]
+	Parameter IS_C_INVERTED bound to: 1'b0 
+	Parameter IS_D1_INVERTED bound to: 1'b0 
+	Parameter IS_D2_INVERTED bound to: 1'b0 
+	Parameter SIM_DEVICE bound to: ULTRASCALE - type: string 
+	Parameter SRVAL bound to: 1'b0 
+INFO: [Synth 8-6155] done synthesizing module 'ODDRE1' (0#1) [D:/Xilinx/Vivado/2023.1/scripts/rt/data/unisim_comp.v:94816]
+INFO: [Synth 8-6155] done synthesizing module 'rgmii_tx' (0#1) [D:/FPGA/prj/project_11/rtl/gmii_to_rgmii/rgmii_tx.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'gmii_to_rgmii' (0#1) [D:/FPGA/prj/project_11/rtl/gmii_to_rgmii/gmii_to_rgmii.v:23]
+INFO: [Synth 8-6157] synthesizing module 'arp' [D:/FPGA/prj/project_11/rtl/arp/arp.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+	Parameter DES_MAC bound to: 48'b111111111111111111111111111111111111111111111111 
+	Parameter DES_IP bound to: -1062731418 - type: integer 
+INFO: [Synth 8-6157] synthesizing module 'arp_rx' [D:/FPGA/prj/project_11/rtl/arp/arp_rx.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'arp_rx' (0#1) [D:/FPGA/prj/project_11/rtl/arp/arp_rx.v:23]
+INFO: [Synth 8-6157] synthesizing module 'arp_tx' [D:/FPGA/prj/project_11/rtl/arp/arp_tx.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+	Parameter DES_MAC bound to: 48'b111111111111111111111111111111111111111111111111 
+	Parameter DES_IP bound to: -1062731418 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'arp_tx' (0#1) [D:/FPGA/prj/project_11/rtl/arp/arp_tx.v:23]
+INFO: [Synth 8-6157] synthesizing module 'crc32_d8' [D:/FPGA/prj/project_11/rtl/arp/crc32_d8.v:22]
+INFO: [Synth 8-6155] done synthesizing module 'crc32_d8' (0#1) [D:/FPGA/prj/project_11/rtl/arp/crc32_d8.v:22]
+INFO: [Synth 8-6155] done synthesizing module 'arp' (0#1) [D:/FPGA/prj/project_11/rtl/arp/arp.v:23]
+INFO: [Synth 8-6157] synthesizing module 'icmp' [D:/FPGA/prj/project_11/rtl/icmp/icmp.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+	Parameter DES_MAC bound to: 48'b111111111111111111111111111111111111111111111111 
+	Parameter DES_IP bound to: -1062731418 - type: integer 
+INFO: [Synth 8-6157] synthesizing module 'icmp_rx' [D:/FPGA/prj/project_11/rtl/icmp/icmp_rx.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'icmp_rx' (0#1) [D:/FPGA/prj/project_11/rtl/icmp/icmp_rx.v:23]
+INFO: [Synth 8-6157] synthesizing module 'icmp_tx' [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+	Parameter DES_MAC bound to: 48'b111111111111111111111111111111111111111111111111 
+	Parameter DES_IP bound to: -1062731418 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'icmp_tx' (0#1) [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'icmp' (0#1) [D:/FPGA/prj/project_11/rtl/icmp/icmp.v:23]
+INFO: [Synth 8-6157] synthesizing module 'udp' [D:/FPGA/prj/project_11/rtl/udp/udp.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+	Parameter DES_MAC bound to: 48'b111111111111111111111111111111111111111111111111 
+	Parameter DES_IP bound to: -1062731418 - type: integer 
+INFO: [Synth 8-6157] synthesizing module 'udp_rx' [D:/FPGA/prj/project_11/rtl/udp/udp_rx.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'udp_rx' (0#1) [D:/FPGA/prj/project_11/rtl/udp/udp_rx.v:23]
+INFO: [Synth 8-6157] synthesizing module 'udp_tx' [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:23]
+	Parameter BOARD_MAC bound to: 48'b000000000001000100100010001100110100010001010101 
+	Parameter BOARD_IP bound to: -1062731510 - type: integer 
+	Parameter DES_MAC bound to: 48'b111111111111111111111111111111111111111111111111 
+	Parameter DES_IP bound to: -1062731418 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'udp_tx' (0#1) [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'udp' (0#1) [D:/FPGA/prj/project_11/rtl/udp/udp.v:23]
+INFO: [Synth 8-6157] synthesizing module 'async_fifo_2048x8b' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/async_fifo_2048x8b_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'async_fifo_2048x8b' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/async_fifo_2048x8b_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'eth_ctrl' [D:/FPGA/prj/project_11/rtl/eth_ctrl.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'eth_ctrl' (0#1) [D:/FPGA/prj/project_11/rtl/eth_ctrl.v:23]
+INFO: [Synth 8-6157] synthesizing module 'cmd_channel' [D:/FPGA/prj/project_11/rtl/cmd_channel.v:66]
+INFO: [Synth 8-226] default block is never used [D:/FPGA/prj/project_11/rtl/cmd_channel.v:436]
+INFO: [Synth 8-6155] done synthesizing module 'cmd_channel' (0#1) [D:/FPGA/prj/project_11/rtl/cmd_channel.v:66]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:395]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_axi_dma_0_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_axi_dma_0_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_axi_dma_0_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_axi_dma_0_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'mm2s_prmry_reset_out_n' of module 'mb_ctrl_axi_dma_0_0' is unconnected for instance 'axi_dma_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:788]
+WARNING: [Synth 8-7071] port 's2mm_prmry_reset_out_n' of module 'mb_ctrl_axi_dma_0_0' is unconnected for instance 'axi_dma_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:788]
+WARNING: [Synth 8-7071] port 'mm2s_introut' of module 'mb_ctrl_axi_dma_0_0' is unconnected for instance 'axi_dma_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:788]
+WARNING: [Synth 8-7071] port 'axi_dma_tstvec' of module 'mb_ctrl_axi_dma_0_0' is unconnected for instance 'axi_dma_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:788]
+WARNING: [Synth 8-7023] instance 'axi_dma_0' of module 'mb_ctrl_axi_dma_0_0' has 64 connections declared, but only 60 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:788]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_axi_interconnect_0_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1096]
+INFO: [Synth 8-6157] synthesizing module 'm00_couplers_imp_XQQSUV' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:13]
+INFO: [Synth 8-6155] done synthesizing module 'm00_couplers_imp_XQQSUV' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:13]
+INFO: [Synth 8-6157] synthesizing module 'm01_couplers_imp_1YJETW4' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:145]
+INFO: [Synth 8-6155] done synthesizing module 'm01_couplers_imp_1YJETW4' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:145]
+INFO: [Synth 8-6157] synthesizing module 'm02_couplers_imp_1C6AIJ4' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:270]
+INFO: [Synth 8-6155] done synthesizing module 'm02_couplers_imp_1C6AIJ4' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:270]
+INFO: [Synth 8-6157] synthesizing module 's00_couplers_imp_1YNIVIJ' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1894]
+INFO: [Synth 8-6155] done synthesizing module 's00_couplers_imp_1YNIVIJ' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1894]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_xbar_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_xbar_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_xbar_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_xbar_0_stub.v:6]
+WARNING: [Synth 8-689] width (4) of port connection 'm_axi_wstrb' does not match port width (12) of module 'mb_ctrl_xbar_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1637]
+WARNING: [Synth 8-7071] port 'm_axi_awprot' of module 'mb_ctrl_xbar_0' is unconnected for instance 'xbar' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1619]
+WARNING: [Synth 8-7071] port 'm_axi_arprot' of module 'mb_ctrl_xbar_0' is unconnected for instance 'xbar' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1619]
+WARNING: [Synth 8-7023] instance 'xbar' of module 'mb_ctrl_xbar_0' has 40 connections declared, but only 38 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1619]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_axi_interconnect_0_0' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1096]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_axi_lite_regs_0_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_axi_lite_regs_0_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_axi_lite_regs_0_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_axi_lite_regs_0_0_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_axi_uartlite_0_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_axi_uartlite_0_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_axi_uartlite_0_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_axi_uartlite_0_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'interrupt' of module 'mb_ctrl_axi_uartlite_0_0' is unconnected for instance 'axi_uartlite_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:974]
+WARNING: [Synth 8-7023] instance 'axi_uartlite_0' of module 'mb_ctrl_axi_uartlite_0_0' has 22 connections declared, but only 21 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:974]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_mdm_1_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_mdm_1_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_mdm_1_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_mdm_1_0_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_microblaze_0_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_microblaze_0_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_microblaze_0_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_microblaze_0_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'Interrupt_Ack' of module 'mb_ctrl_microblaze_0_0' is unconnected for instance 'microblaze_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1009]
+WARNING: [Synth 8-7023] instance 'microblaze_0' of module 'mb_ctrl_microblaze_0_0' has 52 connections declared, but only 51 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1009]
+INFO: [Synth 8-6157] synthesizing module 'microblaze_0_local_memory_imp_LM4N4C' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1660]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_dlmb_bram_if_cntlr_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_dlmb_bram_if_cntlr_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_dlmb_bram_if_cntlr_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_dlmb_bram_if_cntlr_0_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_dlmb_v10_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_dlmb_v10_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_dlmb_v10_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_dlmb_v10_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'LMB_Rst' of module 'mb_ctrl_dlmb_v10_0' is unconnected for instance 'dlmb_v10' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1806]
+WARNING: [Synth 8-7023] instance 'dlmb_v10' of module 'mb_ctrl_dlmb_v10_0' has 25 connections declared, but only 24 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1806]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_ilmb_bram_if_cntlr_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_ilmb_bram_if_cntlr_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_ilmb_bram_if_cntlr_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_ilmb_bram_if_cntlr_0_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_ilmb_v10_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_ilmb_v10_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_ilmb_v10_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_ilmb_v10_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'LMB_Rst' of module 'mb_ctrl_ilmb_v10_0' is unconnected for instance 'ilmb_v10' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1852]
+WARNING: [Synth 8-7023] instance 'ilmb_v10' of module 'mb_ctrl_ilmb_v10_0' has 25 connections declared, but only 24 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1852]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_lmb_bram_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_lmb_bram_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_lmb_bram_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_lmb_bram_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'rsta_busy' of module 'mb_ctrl_lmb_bram_0' is unconnected for instance 'lmb_bram' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1877]
+WARNING: [Synth 8-7071] port 'rstb_busy' of module 'mb_ctrl_lmb_bram_0' is unconnected for instance 'lmb_bram' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1877]
+WARNING: [Synth 8-7023] instance 'lmb_bram' of module 'mb_ctrl_lmb_bram_0' has 16 connections declared, but only 14 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1877]
+INFO: [Synth 8-6155] done synthesizing module 'microblaze_0_local_memory_imp_LM4N4C' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1660]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_rst_100m_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_rst_100m_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_rst_100m_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/mb_ctrl_rst_100m_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'peripheral_reset' of module 'mb_ctrl_rst_100m_0' is unconnected for instance 'rst_100m' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1083]
+WARNING: [Synth 8-7071] port 'interconnect_aresetn' of module 'mb_ctrl_rst_100m_0' is unconnected for instance 'rst_100m' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1083]
+WARNING: [Synth 8-7023] instance 'rst_100m' of module 'mb_ctrl_rst_100m_0' has 10 connections declared, but only 8 given [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:1083]
+INFO: [Synth 8-6157] synthesizing module 'mb_ctrl_xlconstant_1_0' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_xlconstant_1_0_10/synth/mb_ctrl_xlconstant_1_0.v:53]
+INFO: [Synth 8-6157] synthesizing module 'xlconstant_v1_1_7_xlconstant' [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ipshared/b0f2/hdl/xlconstant_v1_1_vl_rfs.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'xlconstant_v1_1_7_xlconstant' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ipshared/b0f2/hdl/xlconstant_v1_1_vl_rfs.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl_xlconstant_1_0' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_xlconstant_1_0_10/synth/mb_ctrl_xlconstant_1_0.v:53]
+INFO: [Synth 8-6155] done synthesizing module 'mb_ctrl' (0#1) [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v:395]
+WARNING: [Synth 8-7071] port 'M_AXI_S2MM_0_awcache' of module 'mb_ctrl' is unconnected for instance 'u_mb_ctrl' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:710]
+WARNING: [Synth 8-7071] port 'M_AXI_S2MM_0_awprot' of module 'mb_ctrl' is unconnected for instance 'u_mb_ctrl' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:710]
+WARNING: [Synth 8-7023] instance 'u_mb_ctrl' of module 'mb_ctrl' has 72 connections declared, but only 70 given [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:710]
+INFO: [Synth 8-6157] synthesizing module 'frame_fifo_pump' [D:/FPGA/prj/project_11/rtl/frame_fifo_pump.v:24]
+INFO: [Synth 8-6155] done synthesizing module 'frame_fifo_pump' (0#1) [D:/FPGA/prj/project_11/rtl/frame_fifo_pump.v:24]
+INFO: [Synth 8-6157] synthesizing module 'frame_mem_if' [D:/FPGA/prj/project_11/rtl/frame_mem_if.v:30]
+	Parameter SLOT_BASE bound to: 1048576 - type: integer 
+	Parameter MAX_LEN bound to: 16'b0000011000000010 
+INFO: [Synth 8-6157] synthesizing module 'async_fifo' [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+	Parameter DW bound to: 8 - type: integer 
+	Parameter AW bound to: 12 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'async_fifo' (0#1) [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+INFO: [Synth 8-6157] synthesizing module 'async_fifo__parameterized0' [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+	Parameter DW bound to: 16 - type: integer 
+	Parameter AW bound to: 3 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'async_fifo__parameterized0' (0#1) [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+INFO: [Synth 8-6157] synthesizing module 'async_fifo__parameterized1' [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+	Parameter DW bound to: 9 - type: integer 
+	Parameter AW bound to: 2 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'async_fifo__parameterized1' (0#1) [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+INFO: [Synth 8-6157] synthesizing module 'async_fifo__parameterized2' [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+	Parameter DW bound to: 25 - type: integer 
+	Parameter AW bound to: 2 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'async_fifo__parameterized2' (0#1) [D:/FPGA/prj/project_11/rtl/async_fifo.v:18]
+INFO: [Synth 8-226] default block is never used [D:/FPGA/prj/project_11/rtl/frame_mem_if.v:384]
+INFO: [Synth 8-6157] synthesizing module 'axi4_master_bridge' [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:59]
+	Parameter SLOT_BASE bound to: 1048576 - type: integer 
+	Parameter MAX_LEN bound to: 16'b0000011000000010 
+	Parameter HAS_DMA bound to: 1 - type: integer 
+INFO: [Synth 8-226] default block is never used [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:686]
+INFO: [Synth 8-6157] synthesizing module 'dma_rd_shim_v2' [D:/FPGA/prj/project_11/rtl/dma_rd_shim_v2.v:42]
+	Parameter DROP_BYTES bound to: 0 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'dma_rd_shim_v2' (0#1) [D:/FPGA/prj/project_11/rtl/dma_rd_shim_v2.v:42]
+INFO: [Synth 8-6155] done synthesizing module 'axi4_master_bridge' (0#1) [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:59]
+INFO: [Synth 8-6155] done synthesizing module 'frame_mem_if' (0#1) [D:/FPGA/prj/project_11/rtl/frame_mem_if.v:30]
+INFO: [Synth 8-6157] synthesizing module 'frame_mem_if__parameterized0' [D:/FPGA/prj/project_11/rtl/frame_mem_if.v:30]
+	Parameter SLOT_BASE bound to: 2097152 - type: integer 
+	Parameter MAX_LEN bound to: 16'b0000011000000010 
+	Parameter HAS_DMA bound to: 0 - type: integer 
+INFO: [Synth 8-226] default block is never used [D:/FPGA/prj/project_11/rtl/frame_mem_if.v:384]
+INFO: [Synth 8-6157] synthesizing module 'axi4_master_bridge__parameterized0' [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:59]
+	Parameter SLOT_BASE bound to: 2097152 - type: integer 
+	Parameter MAX_LEN bound to: 16'b0000011000000010 
+	Parameter HAS_DMA bound to: 0 - type: integer 
+INFO: [Synth 8-6155] done synthesizing module 'axi4_master_bridge__parameterized0' (0#1) [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:59]
+INFO: [Synth 8-6155] done synthesizing module 'frame_mem_if__parameterized0' (0#1) [D:/FPGA/prj/project_11/rtl/frame_mem_if.v:30]
+WARNING: [Synth 8-7071] port 'ro_lat_w' of module 'frame_mem_if' is unconnected for instance 'u_mem2' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:974]
+WARNING: [Synth 8-7071] port 'ro_lat_r' of module 'frame_mem_if' is unconnected for instance 'u_mem2' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:974]
+WARNING: [Synth 8-7023] instance 'u_mem2' of module 'frame_mem_if' has 96 connections declared, but only 94 given [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:974]
+INFO: [Synth 8-6157] synthesizing module 'axi_arb_3to1' [D:/FPGA/prj/project_11/rtl/axi_arb_3to1.v:20]
+INFO: [Synth 8-6155] done synthesizing module 'axi_arb_3to1' (0#1) [D:/FPGA/prj/project_11/rtl/axi_arb_3to1.v:20]
+INFO: [Synth 8-6157] synthesizing module 'dma_sink' [D:/FPGA/prj/project_11/rtl/dma_sink.v:21]
+INFO: [Synth 8-226] default block is never used [D:/FPGA/prj/project_11/rtl/dma_sink.v:85]
+INFO: [Synth 8-6155] done synthesizing module 'dma_sink' (0#1) [D:/FPGA/prj/project_11/rtl/dma_sink.v:21]
+INFO: [Synth 8-6157] synthesizing module 'ddr4_0' [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/ddr4_0_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'ddr4_0' (0#1) [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/.Xil/Vivado-17028-Xuegulin/realtime/ddr4_0_stub.v:6]
+WARNING: [Synth 8-7071] port 'o_hs_busy' of module 'frame_fifo_pump' is unconnected for instance 'u_pump_rev' [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:1268]
+WARNING: [Synth 8-7023] instance 'u_pump_rev' of module 'frame_fifo_pump' has 12 connections declared, but only 11 given [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:1268]
+INFO: [Synth 8-6155] done synthesizing module 'aurora_mem_bridge' (0#1) [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:43]
+WARNING: [Synth 8-6014] Unused sequential element stg6_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:196]
+WARNING: [Synth 8-6014] Unused sequential element stg7_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:197]
+WARNING: [Synth 8-6014] Unused sequential element stg8_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:198]
+WARNING: [Synth 8-6014] Unused sequential element stg9_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:199]
+WARNING: [Synth 8-6014] Unused sequential element stg10_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:200]
+WARNING: [Synth 8-6014] Unused sequential element stg11_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:201]
+WARNING: [Synth 8-6014] Unused sequential element stg12_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:202]
+WARNING: [Synth 8-6014] Unused sequential element stg13_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:203]
+WARNING: [Synth 8-6014] Unused sequential element stg14_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:204]
+WARNING: [Synth 8-6014] Unused sequential element stg15_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:205]
+WARNING: [Synth 8-6014] Unused sequential element stg16_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:206]
+WARNING: [Synth 8-6014] Unused sequential element stg17_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:207]
+WARNING: [Synth 8-6014] Unused sequential element stg18_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:208]
+WARNING: [Synth 8-6014] Unused sequential element stg19_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:209]
+WARNING: [Synth 8-6014] Unused sequential element stg20_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:210]
+WARNING: [Synth 8-6014] Unused sequential element stg21_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:211]
+WARNING: [Synth 8-6014] Unused sequential element stg22_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:212]
+WARNING: [Synth 8-6014] Unused sequential element stg23_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:213]
+WARNING: [Synth 8-6014] Unused sequential element stg24_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:214]
+WARNING: [Synth 8-6014] Unused sequential element stg25_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:215]
+WARNING: [Synth 8-6014] Unused sequential element stg26_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:216]
+WARNING: [Synth 8-6014] Unused sequential element stg27_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:217]
+WARNING: [Synth 8-6014] Unused sequential element stg28_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:218]
+WARNING: [Synth 8-6014] Unused sequential element stg29_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:219]
+WARNING: [Synth 8-6014] Unused sequential element stg30_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:220]
+WARNING: [Synth 8-6014] Unused sequential element stg31_reg was removed.  [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:221]
+INFO: [Synth 8-3936] Found unconnected internal register 'dly_gt_rst_r_reg' and it is trimmed from '20' to '19' bits. [D:/FPGA/prj/project_11/rtl/shared_logic/aurora_64b66b_0_support_reset_logic.v:132]
+WARNING: [Synth 8-6014] Unused sequential element en_reg was removed.  [D:/FPGA/prj/project_11/rtl/axis_word_pack.v:102]
+WARNING: [Synth 8-6014] Unused sequential element en_word_reg was removed.  [D:/FPGA/prj/project_11/rtl/axis_word_pack.v:102]
+WARNING: [Synth 8-6014] Unused sequential element en_keep_reg was removed.  [D:/FPGA/prj/project_11/rtl/axis_word_pack.v:102]
+WARNING: [Synth 8-6014] Unused sequential element en_last_reg was removed.  [D:/FPGA/prj/project_11/rtl/axis_word_pack.v:102]
+WARNING: [Synth 8-6014] Unused sequential element icmp_code_reg was removed.  [D:/FPGA/prj/project_11/rtl/icmp/icmp_rx.v:166]
+WARNING: [Synth 8-6014] Unused sequential element icmp_checksum_reg was removed.  [D:/FPGA/prj/project_11/rtl/icmp/icmp_rx.v:167]
+WARNING: [Synth 8-6014] Unused sequential element rec_en_cnt_reg was removed.  [D:/FPGA/prj/project_11/rtl/icmp/icmp_rx.v:177]
+WARNING: [Synth 8-7137] Register ip_head_reg[6] in module icmp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:217]
+WARNING: [Synth 8-7137] Register ip_head_reg[5] in module icmp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:217]
+WARNING: [Synth 8-7137] Register ip_head_reg[4] in module icmp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:217]
+WARNING: [Synth 8-7137] Register ip_head_reg[3] in module icmp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:217]
+WARNING: [Synth 8-7137] Register ip_head_reg[2] in module icmp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:217]
+WARNING: [Synth 8-7137] Register ip_head_reg[0] in module icmp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/icmp/icmp_tx.v:217]
+WARNING: [Synth 8-6014] Unused sequential element ip_head_byte_num_reg was removed.  [D:/FPGA/prj/project_11/rtl/udp/udp_rx.v:145]
+WARNING: [Synth 8-7137] Register ip_head_reg[6] in module udp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:229]
+WARNING: [Synth 8-7137] Register ip_head_reg[5] in module udp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:229]
+WARNING: [Synth 8-7137] Register ip_head_reg[4] in module udp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:229]
+WARNING: [Synth 8-7137] Register ip_head_reg[3] in module udp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:229]
+WARNING: [Synth 8-7137] Register ip_head_reg[2] in module udp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:229]
+WARNING: [Synth 8-7137] Register ip_head_reg[0] in module udp_tx has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/FPGA/prj/project_11/rtl/udp/udp_tx.v:229]
+WARNING: [Synth 8-6014] Unused sequential element cmd_claim_reg was removed.  [D:/FPGA/prj/project_11/rtl/cmd_channel.v:422]
+WARNING: [Synth 8-6014] Unused sequential element ucmd_reg was removed.  [D:/FPGA/prj/project_11/rtl/cmd_channel.v:836]
+WARNING: [Synth 8-6014] Unused sequential element u_op_reg was removed.  [D:/FPGA/prj/project_11/rtl/cmd_channel.v:837]
+WARNING: [Synth 8-6014] Unused sequential element u_a0_reg was removed.  [D:/FPGA/prj/project_11/rtl/cmd_channel.v:838]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[0] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[1] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[2] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[3] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[4] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[5] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[6] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[7] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[8] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[9] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[10] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[11] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[12] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[13] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[14] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[15] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[16] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[17] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[18] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[19] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[20] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[21] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[22] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[23] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[24] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[25] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[26] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[27] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[28] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[29] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[30] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[31] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[32] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[33] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[34] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[35] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[36] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[37] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[38] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[39] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[40] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[41] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[42] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[43] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[44] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[45] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[46] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[47] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[48] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[49] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[50] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[51] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[52] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[53] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[54] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[55] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[56] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[57] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[58] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[59] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[60] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+WARNING: [Synth 8-6014] Unused sequential element len_beats_tab_reg[61] was removed.  [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:243]
+INFO: [Common 17-14] Message 'Synth 8-6014' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+WARNING: [Synth 8-3848] Net cq_cnt in module/entity axi4_master_bridge does not have driver. [D:/FPGA/prj/project_11/rtl/axi4_master_bridge.v:314]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_mb_ctrl'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:710]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_aurora'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:392]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_pack'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:1233]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_unpack'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:1250]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_pump_rev'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:1268]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_mem'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:817]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_cmd'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:662]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_pump_fwd'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:799]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_eth_ctrl'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:619]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_gmii_to_rgmii'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:517]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_arp'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:538]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_udp'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:584]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_icmp'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:560]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_aurora_b'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:483]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_pack_b'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:469]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_unpack_b'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:454]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_ddr4'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:1190]
+INFO: [Synth 8-6071] Mark debug on the nets applies keep_hierarchy on instance 'u_mem2'. This will prevent further optimization [D:/FPGA/prj/project_11/rtl/aurora_mem_bridge.v:974]
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfp_tx_disable driven by constant 0
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfp_rs0 driven by constant 1
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfp_rs1 driven by constant 1
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfpb_tx_disable driven by constant 0
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfpb_rs0 driven by constant 1
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfpb_rs1 driven by constant 1
+WARNING: [Synth 8-7129] Port s_tdata[511] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[510] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[509] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[508] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[507] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[506] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[505] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[504] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[503] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[502] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[501] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[500] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[499] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[498] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[497] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[496] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[495] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[494] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[493] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[492] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[491] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[490] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[489] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[488] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[487] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[486] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[485] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[484] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[483] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[482] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[481] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[480] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[479] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[478] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[477] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[476] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[475] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[474] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[473] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[472] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[471] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[470] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[469] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[468] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[467] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[466] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[465] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[464] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[463] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[462] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[461] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[460] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[459] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[458] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[457] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[456] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[455] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[454] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[453] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[452] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[451] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[450] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[449] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[448] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[447] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[446] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[445] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[444] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[443] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[442] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[441] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[440] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[439] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[438] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[437] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[436] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[435] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[434] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[433] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[432] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[431] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[430] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[429] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[428] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[427] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[426] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[425] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[424] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[423] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[422] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[421] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[420] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[419] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[418] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[417] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[416] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[415] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[414] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[413] in module dma_sink is either unconnected or has no load
+WARNING: [Synth 8-7129] Port s_tdata[412] in module dma_sink is either unconnected or has no load
+INFO: [Common 17-14] Message 'Synth 8-7129' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+---------------------------------------------------------------------------------
+Finished RTL Elaboration : Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 3154.566 ; gain = 837.004
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:13 ; elapsed = 00:00:15 . Memory (MB): peak = 3170.922 ; gain = 853.359
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:13 ; elapsed = 00:00:15 . Memory (MB): peak = 3170.922 ; gain = 853.359
+---------------------------------------------------------------------------------
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.395 . Memory (MB): peak = 3182.957 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 21 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-570] Preparing netlist for logic optimization
+
+Processing XDC Constraints
+Initializing timing engine
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_microblaze_0_0_10/mb_ctrl_microblaze_0_0/mb_ctrl_microblaze_0_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_microblaze_0_0_10/mb_ctrl_microblaze_0_0/mb_ctrl_microblaze_0_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_dlmb_v10_0_10/mb_ctrl_dlmb_v10_0/mb_ctrl_dlmb_v10_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/dlmb_v10'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_dlmb_v10_0_10/mb_ctrl_dlmb_v10_0/mb_ctrl_dlmb_v10_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/dlmb_v10'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_ilmb_v10_0_10/mb_ctrl_ilmb_v10_0/mb_ctrl_dlmb_v10_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/ilmb_v10'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_ilmb_v10_0_10/mb_ctrl_ilmb_v10_0/mb_ctrl_dlmb_v10_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/ilmb_v10'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_dlmb_bram_if_cntlr_0_10/mb_ctrl_dlmb_bram_if_cntlr_0/mb_ctrl_dlmb_bram_if_cntlr_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/dlmb_bram_if_cntlr'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_dlmb_bram_if_cntlr_0_10/mb_ctrl_dlmb_bram_if_cntlr_0/mb_ctrl_dlmb_bram_if_cntlr_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/dlmb_bram_if_cntlr'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_ilmb_bram_if_cntlr_0_10/mb_ctrl_ilmb_bram_if_cntlr_0/mb_ctrl_ilmb_bram_if_cntlr_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/ilmb_bram_if_cntlr'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_ilmb_bram_if_cntlr_0_10/mb_ctrl_ilmb_bram_if_cntlr_0/mb_ctrl_ilmb_bram_if_cntlr_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/ilmb_bram_if_cntlr'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_lmb_bram_0_10/mb_ctrl_lmb_bram_0/mb_ctrl_lmb_bram_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/lmb_bram'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_lmb_bram_0_10/mb_ctrl_lmb_bram_0/mb_ctrl_lmb_bram_0_in_context.xdc] for cell 'u_mb_ctrl/microblaze_0_local_memory/lmb_bram'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_mdm_1_0_10/mb_ctrl_mdm_1_0/mb_ctrl_mdm_1_0_in_context.xdc] for cell 'u_mb_ctrl/mdm_1'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_mdm_1_0_10/mb_ctrl_mdm_1_0/mb_ctrl_mdm_1_0_in_context.xdc] for cell 'u_mb_ctrl/mdm_1'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0/mb_ctrl_rst_100m_0_in_context.xdc] for cell 'u_mb_ctrl/rst_100m'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0/mb_ctrl_rst_100m_0_in_context.xdc] for cell 'u_mb_ctrl/rst_100m'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_xbar_0_7/mb_ctrl_xbar_0/mb_ctrl_xbar_0_in_context.xdc] for cell 'u_mb_ctrl/axi_interconnect_0/xbar'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_xbar_0_7/mb_ctrl_xbar_0/mb_ctrl_xbar_0_in_context.xdc] for cell 'u_mb_ctrl/axi_interconnect_0/xbar'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0/mb_ctrl_axi_uartlite_0_0_in_context.xdc] for cell 'u_mb_ctrl/axi_uartlite_0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0/mb_ctrl_axi_uartlite_0_0_in_context.xdc] for cell 'u_mb_ctrl/axi_uartlite_0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_lite_regs_0_0_10/mb_ctrl_axi_lite_regs_0_0/mb_ctrl_axi_lite_regs_0_0_in_context.xdc] for cell 'u_mb_ctrl/axi_lite_regs_0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_lite_regs_0_0_10/mb_ctrl_axi_lite_regs_0_0/mb_ctrl_axi_lite_regs_0_0_in_context.xdc] for cell 'u_mb_ctrl/axi_lite_regs_0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0/mb_ctrl_axi_dma_0_0_in_context.xdc] for cell 'u_mb_ctrl/axi_dma_0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0/mb_ctrl_axi_dma_0_0_in_context.xdc] for cell 'u_mb_ctrl/axi_dma_0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1/aurora_64b66b_1_in_context.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1/aurora_64b66b_1_in_context.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ddr4_0/ddr4_0_in_context.xdc] for cell 'u_ddr4'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ddr4_0/ddr4_0_in_context.xdc] for cell 'u_ddr4'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b/async_fifo_2048x8b_in_context.xdc] for cell 'u_async_fifo_2048x8b'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b/async_fifo_2048x8b_in_context.xdc] for cell 'u_async_fifo_2048x8b'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0/aurora_64b66b_0_in_context.xdc] for cell 'u_aurora/aurora_64b66b_0_i'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0/aurora_64b66b_0_in_context.xdc] for cell 'u_aurora/aurora_64b66b_0_i'
+Parsing XDC File [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc]
+INFO: [Timing 38-2] Deriving generated clocks [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc:92]
+Finished Parsing XDC File [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc]
+INFO: [Project 1-236] Implementation specific constraints were found while reading constraint file [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc]. These constraints will be ignored for synthesis but will be used in implementation. Impacted constraints are listed in the file [.Xil/aurora_mem_bridge_propImpl.xdc].
+Resolution: To avoid this warning, move constraints listed in [.Xil/aurora_mem_bridge_propImpl.xdc] to another XDC file and exclude this new file from synthesis with the used_in_synthesis property (File Properties dialog in GUI) and re-run elaboration/synthesis.
+Parsing XDC File [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/dont_touch.xdc]
+Finished Parsing XDC File [D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/dont_touch.xdc]
+Completed Processing XDC Constraints
+
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.008 . Memory (MB): peak = 3298.930 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 15 instances were transformed.
+  BUFG => BUFGCE: 3 instances
+  BUFIO => BUFGCE: 1 instance 
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IDDRE1 => ISERDESE3 (inverted pins: CLK_B): 5 instances
+  ODDRE1 => OSERDESE3: 5 instances
+
+Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.230 . Memory (MB): peak = 3298.930 ; gain = 0.000
+WARNING: [Timing 38-316] Clock period '10.000' specified during out-of-context synthesis of instance 'u_async_fifo_2048x8b' at clock pin 'rd_clk' is different from the actual clock period '8.000', this can lead to different synthesis results.
+WARNING: [Timing 38-316] Clock period '20.000' specified during out-of-context synthesis of instance 'u_mb_ctrl/microblaze_0_local_memory/lmb_bram' at clock pin 'clka' is different from the actual clock period '10.000', this can lead to different synthesis results.
+INFO: [Designutils 20-5440] No compile time benefit to using incremental synthesis; A full resynthesis will be run
+INFO: [Designutils 20-4379] Flow is switching to default flow due to incremental criteria not met. If you would like to alter this behaviour and have the flow terminate instead, please set the following parameter config_implementation {autoIncr.Synth.RejectBehavior Terminate}
+---------------------------------------------------------------------------------
+Finished Constraint Validation : Time (s): cpu = 00:00:25 ; elapsed = 00:00:27 . Memory (MB): peak = 3298.930 ; gain = 981.367
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Loading Part and Timing Information
+---------------------------------------------------------------------------------
+Loading part: xcku060-ffva1156-2-i
+INFO: [Synth 8-6742] Reading net delay rules and data
+INFO: [Synth 8-802] inferred FSM for state register 'rstate_reg' in module 'axi4_master_bridge'
+INFO: [Synth 8-802] inferred FSM for state register 'est_reg' in module 'frame_mem_if'
+INFO: [Synth 8-802] inferred FSM for state register 'g_wr_hw.wst_reg' in module 'axi4_master_bridge__parameterized0'
+INFO: [Synth 8-802] inferred FSM for state register 'rstate_reg' in module 'axi4_master_bridge__parameterized0'
+INFO: [Synth 8-802] inferred FSM for state register 'est_reg' in module 'frame_mem_if__parameterized0'
+INFO: [Synth 8-6904] The RAM "axis_word_unpack:/wf_last_reg" of size (depth=512 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "axis_word_pack:/q_word_reg" of size (depth=16 x width=64) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "axis_word_pack:/q_keep_reg" of size (depth=16 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "axis_word_pack:/q_last_reg" of size (depth=16 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+*
+                 st_idle |                            00001 |                            00001
+             st_preamble |                            00010 |                            00010
+             st_eth_head |                            00100 |                            00100
+             st_arp_data |                            01000 |                            01000
+               st_rx_end |                            10000 |                            10000
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3898] No Re-encoding of one hot register 'cur_state_reg' in module 'arp_rx'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+*
+                 st_idle |                            00001 |                            00001
+             st_preamble |                            00010 |                            00010
+             st_eth_head |                            00100 |                            00100
+             st_arp_data |                            01000 |                            01000
+                  st_crc |                            10000 |                            10000
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3898] No Re-encoding of one hot register 'cur_state_reg' in module 'arp_tx'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+*
+                 st_idle |                          0000001 |                          0000001
+             st_preamble |                          0000010 |                          0000010
+             st_eth_head |                          0000100 |                          0000100
+              st_ip_head |                          0001000 |                          0001000
+            st_icmp_head |                          0010000 |                          0010000
+              st_rx_data |                          0100000 |                          0100000
+               st_rx_end |                          1000000 |                          1000000
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3898] No Re-encoding of one hot register 'cur_state_reg' in module 'icmp_rx'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+*
+                 st_idle |                         00000001 |                         00000001
+            st_check_sum |                         00000010 |                         00000010
+           st_check_icmp |                         00000100 |                         00000100
+             st_preamble |                         00001000 |                         00001000
+             st_eth_head |                         00010000 |                         00010000
+              st_ip_head |                         00100000 |                         00100000
+              st_tx_data |                         01000000 |                         01000000
+                  st_crc |                         10000000 |                         10000000
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3898] No Re-encoding of one hot register 'cur_state_reg' in module 'icmp_tx'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+*
+                 st_idle |                          0000001 |                          0000001
+             st_preamble |                          0000010 |                          0000010
+             st_eth_head |                          0000100 |                          0000100
+              st_ip_head |                          0001000 |                          0001000
+             st_udp_head |                          0010000 |                          0010000
+              st_rx_data |                          0100000 |                          0100000
+               st_rx_end |                          1000000 |                          1000000
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3898] No Re-encoding of one hot register 'cur_state_reg' in module 'udp_rx'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+*
+                 st_idle |                          0000001 |                          0000001
+            st_check_sum |                          0000010 |                          0000010
+             st_preamble |                          0000100 |                          0000100
+             st_eth_head |                          0001000 |                          0001000
+              st_ip_head |                          0010000 |                          0010000
+              st_tx_data |                          0100000 |                          0100000
+                  st_crc |                          1000000 |                          1000000
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3898] No Re-encoding of one hot register 'cur_state_reg' in module 'udp_tx'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  P_IDLE |                              000 |                              000
+                   P_PRE |                              001 |                              001
+                   P_ETH |                              010 |                              010
+                    P_IP |                              011 |                              011
+                P_UDPCHK |                              100 |                              100
+                   P_UDP |                              101 |                              101
+                   P_PAY |                              110 |                              110
+                   P_END |                              111 |                              111
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'pst_reg' using encoding 'sequential' in module 'cmd_channel'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  U_IDLE |                              000 |                              000
+                 U_PULSE |                              001 |                              001
+                U_PULSE2 |                              010 |                              010
+                  U_RESP |                              011 |                              011
+                 U_WREQL |                              100 |                              100
+                 U_WBACK |                              101 |                              101
+                U_WBACKL |                              110 |                              110
+                  iSTATE |                              111 |                              111
+*
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'ust_reg' using encoding 'sequential' in module 'cmd_channel'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  E_IDLE |                      00000000001 |                             0000
+                  E_ACKW |                      00000000010 |                             0001
+                  E_ACKL |                      00000000100 |                             0010
+                    E_BW |                      00000001000 |                             0011
+                    E_BL |                      00000010000 |                             0100
+                   E_CHK |                      00000100000 |                             0101
+                   E_CRC |                      00001000000 |                             0110
+                   E_TXW |                      00010000000 |                             0111
+                 E_TXPRE |                      00100000000 |                             1000
+                    E_TX |                      01000000000 |                             1001
+                   E_TXE |                      10000000000 |                             1010
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'est_reg' using encoding 'one-hot' in module 'cmd_channel'
+INFO: [Synth 8-7030] Implemented Non-Cascaded Block Ram (cascade_height = 1) of width 8 for RAM "frame_fifo_pump:/ram_reg"
+INFO: [Synth 8-6904] The RAM "async_fifo__parameterized0:/ram_reg" of size (depth=8 x width=16) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "async_fifo__parameterized1:/ram_reg" of size (depth=4 x width=9) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "async_fifo__parameterized2:/ram_reg" of size (depth=4 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                 ST_IDLE |                              001 |                               00
+                 ST_UNPK |                              010 |                               01
+                 ST_LAST |                              100 |                               10
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'st_reg' using encoding 'one-hot' in module 'dma_rd_shim_v2'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  R_IDLE |                              001 |                              000
+                   R_PRE |                              010 |                              101
+                  R_DRET |                              100 |                              110
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'rstate_reg' using encoding 'one-hot' in module 'axi4_master_bridge'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  iSTATE |                               00 |                               00
+                 iSTATE0 |                               01 |                               11
+                 iSTATE1 |                               10 |                               01
+                 iSTATE2 |                               11 |                               10
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'est_reg' using encoding 'sequential' in module 'frame_mem_if'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  W_IDLE |                           000001 |                              000
+                 W_DRAIN |                           000010 |                              110
+                  W_WAIT |                           000100 |                              001
+                    W_AW |                           001000 |                              010
+                  W_FILL |                           010000 |                              011
+                  W_PUSH |                           100000 |                              100
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'g_wr_hw.wst_reg' using encoding 'one-hot' in module 'axi4_master_bridge__parameterized0'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  R_IDLE |                           000001 |                              000
+                   R_PRE |                           000010 |                              101
+                    R_AR |                           000100 |                              001
+                     R_R |                           001000 |                              010
+                R_UNPACK |                           010000 |                              011
+                   R_FIN |                           100000 |                              100
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'rstate_reg' using encoding 'one-hot' in module 'axi4_master_bridge__parameterized0'
+---------------------------------------------------------------------------------------------------
+                   State |                     New Encoding |                Previous Encoding 
+---------------------------------------------------------------------------------------------------
+                  iSTATE |                               00 |                               00
+                 iSTATE0 |                               01 |                               11
+                 iSTATE1 |                               10 |                               01
+                 iSTATE2 |                               11 |                               10
+---------------------------------------------------------------------------------------------------
+INFO: [Synth 8-3354] encoded FSM with state register 'est_reg' using encoding 'sequential' in module 'frame_mem_if__parameterized0'
+---------------------------------------------------------------------------------
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:59 ; elapsed = 00:01:08 . Memory (MB): peak = 3298.930 ; gain = 981.367
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start RTL Component Statistics 
+---------------------------------------------------------------------------------
+Detailed RTL Component Info : 
++---Adders : 
+	   2 Input   32 Bit       Adders := 3     
+	   4 Input   32 Bit       Adders := 1     
+	   2 Input   24 Bit       Adders := 2     
+	   2 Input   22 Bit       Adders := 1     
+	  10 Input   20 Bit       Adders := 2     
+	   4 Input   19 Bit       Adders := 1     
+	   3 Input   17 Bit       Adders := 3     
+	   2 Input   17 Bit       Adders := 4     
+	   2 Input   16 Bit       Adders := 113   
+	   2 Input   13 Bit       Adders := 17    
+	   3 Input   13 Bit       Adders := 8     
+	   2 Input   12 Bit       Adders := 1     
+	   2 Input   11 Bit       Adders := 4     
+	   2 Input   10 Bit       Adders := 6     
+	   2 Input    9 Bit       Adders := 2     
+	   2 Input    8 Bit       Adders := 20    
+	   2 Input    7 Bit       Adders := 3     
+	   2 Input    6 Bit       Adders := 3     
+	   2 Input    5 Bit       Adders := 11    
+	   2 Input    4 Bit       Adders := 20    
+	   3 Input    4 Bit       Adders := 4     
+	   8 Input    4 Bit       Adders := 2     
+	   2 Input    3 Bit       Adders := 14    
+	   3 Input    3 Bit       Adders := 8     
+	   2 Input    2 Bit       Adders := 2     
++---XORs : 
+	   2 Input     16 Bit         XORs := 4     
+	   2 Input     13 Bit         XORs := 8     
+	   2 Input      9 Bit         XORs := 2     
+	   2 Input      4 Bit         XORs := 4     
+	   2 Input      3 Bit         XORs := 8     
+	   2 Input      1 Bit         XORs := 232   
+	   3 Input      1 Bit         XORs := 24    
+	   6 Input      1 Bit         XORs := 28    
+	   8 Input      1 Bit         XORs := 4     
+	   5 Input      1 Bit         XORs := 16    
+	   7 Input      1 Bit         XORs := 28    
+	  10 Input      1 Bit         XORs := 8     
+	   9 Input      1 Bit         XORs := 12    
+	  12 Input      1 Bit         XORs := 4     
+	   4 Input      1 Bit         XORs := 4     
++---Registers : 
+	              512 Bit    Registers := 4     
+	              128 Bit    Registers := 1     
+	               64 Bit    Registers := 13    
+	               56 Bit    Registers := 1     
+	               48 Bit    Registers := 10    
+	               32 Bit    Registers := 50    
+	               25 Bit    Registers := 2     
+	               24 Bit    Registers := 2     
+	               22 Bit    Registers := 1     
+	               19 Bit    Registers := 2     
+	               16 Bit    Registers := 674   
+	               13 Bit    Registers := 32    
+	               12 Bit    Registers := 1     
+	               11 Bit    Registers := 4     
+	               10 Bit    Registers := 4     
+	                9 Bit    Registers := 8     
+	                8 Bit    Registers := 420   
+	                7 Bit    Registers := 3     
+	                6 Bit    Registers := 3     
+	                5 Bit    Registers := 11    
+	                4 Bit    Registers := 33    
+	                3 Bit    Registers := 33    
+	                2 Bit    Registers := 23    
+	                1 Bit    Registers := 1252  
++---RAMs : 
+	              32K Bit	(4096 X 8 bit)          RAMs := 6     
+	              32K Bit	(512 X 64 bit)          RAMs := 2     
+	               4K Bit	(512 X 8 bit)          RAMs := 2     
+	             1024 Bit	(16 X 64 bit)          RAMs := 2     
+	              512 Bit	(512 X 1 bit)          RAMs := 2     
+	              128 Bit	(8 X 16 bit)          RAMs := 2     
+	              128 Bit	(16 X 8 bit)          RAMs := 2     
+	              100 Bit	(4 X 25 bit)          RAMs := 2     
+	               36 Bit	(4 X 9 bit)          RAMs := 2     
+	               16 Bit	(16 X 1 bit)          RAMs := 2     
++---Muxes : 
+	   8 Input  512 Bit        Muxes := 2     
+	   2 Input  512 Bit        Muxes := 5     
+	   6 Input  512 Bit        Muxes := 2     
+	   8 Input   64 Bit        Muxes := 2     
+	   2 Input   64 Bit        Muxes := 29    
+	   6 Input   64 Bit        Muxes := 2     
+	   5 Input   48 Bit        Muxes := 1     
+	   2 Input   48 Bit        Muxes := 2     
+	   8 Input   48 Bit        Muxes := 2     
+	   2 Input   32 Bit        Muxes := 21    
+	   7 Input   32 Bit        Muxes := 4     
+	   8 Input   32 Bit        Muxes := 6     
+	  11 Input   32 Bit        Muxes := 1     
+	   3 Input   25 Bit        Muxes := 1     
+	   6 Input   25 Bit        Muxes := 1     
+	   2 Input   25 Bit        Muxes := 2     
+	   2 Input   24 Bit        Muxes := 4     
+	   8 Input   24 Bit        Muxes := 2     
+	   3 Input   22 Bit        Muxes := 1     
+	   3 Input   16 Bit        Muxes := 3     
+	   8 Input   16 Bit        Muxes := 8     
+	   2 Input   16 Bit        Muxes := 72    
+	   4 Input   16 Bit        Muxes := 4     
+	   6 Input   16 Bit        Muxes := 7     
+	   5 Input   16 Bit        Muxes := 2     
+	   7 Input   16 Bit        Muxes := 9     
+	   6 Input   12 Bit        Muxes := 1     
+	   2 Input   12 Bit        Muxes := 1     
+	   2 Input   11 Bit        Muxes := 6     
+	   8 Input    8 Bit        Muxes := 3     
+	   2 Input    8 Bit        Muxes := 64    
+	   3 Input    8 Bit        Muxes := 2     
+	   6 Input    8 Bit        Muxes := 7     
+	   4 Input    8 Bit        Muxes := 8     
+	   5 Input    8 Bit        Muxes := 1     
+	   9 Input    8 Bit        Muxes := 2     
+	   7 Input    8 Bit        Muxes := 2     
+	  11 Input    8 Bit        Muxes := 1     
+	   2 Input    7 Bit        Muxes := 33    
+	   3 Input    7 Bit        Muxes := 7     
+	   8 Input    7 Bit        Muxes := 6     
+	  11 Input    7 Bit        Muxes := 2     
+	   2 Input    6 Bit        Muxes := 15    
+	   3 Input    6 Bit        Muxes := 1     
+	   6 Input    6 Bit        Muxes := 2     
+	   4 Input    6 Bit        Muxes := 1     
+	   5 Input    6 Bit        Muxes := 1     
+	   2 Input    5 Bit        Muxes := 62    
+	   4 Input    5 Bit        Muxes := 4     
+	   5 Input    5 Bit        Muxes := 1     
+	   3 Input    5 Bit        Muxes := 3     
+	   6 Input    5 Bit        Muxes := 4     
+	   8 Input    5 Bit        Muxes := 3     
+	   7 Input    5 Bit        Muxes := 3     
+	   8 Input    4 Bit        Muxes := 1     
+	   2 Input    4 Bit        Muxes := 25    
+	   6 Input    4 Bit        Muxes := 1     
+	   3 Input    3 Bit        Muxes := 6     
+	   2 Input    3 Bit        Muxes := 42    
+	   6 Input    3 Bit        Muxes := 4     
+	   9 Input    3 Bit        Muxes := 2     
+	   8 Input    3 Bit        Muxes := 2     
+	   2 Input    2 Bit        Muxes := 85    
+	   4 Input    2 Bit        Muxes := 2     
+	   8 Input    2 Bit        Muxes := 1     
+	   7 Input    2 Bit        Muxes := 1     
+	   3 Input    2 Bit        Muxes := 25    
+	   2 Input    1 Bit        Muxes := 4953  
+	   3 Input    1 Bit        Muxes := 31    
+	   8 Input    1 Bit        Muxes := 91    
+	   4 Input    1 Bit        Muxes := 41    
+	   6 Input    1 Bit        Muxes := 42    
+	   5 Input    1 Bit        Muxes := 20    
+	   7 Input    1 Bit        Muxes := 42    
+	  10 Input    1 Bit        Muxes := 2     
+	  11 Input    1 Bit        Muxes := 14    
+---------------------------------------------------------------------------------
+Finished RTL Component Statistics 
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Part Resource Summary
+---------------------------------------------------------------------------------
+Part Resources:
+DSPs: 2760 (col length:120)
+BRAMs: 2160 (col length: RAMB18 120 RAMB36 60)
+---------------------------------------------------------------------------------
+Finished Part Resource Summary
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Cross Boundary and Area Optimization
+---------------------------------------------------------------------------------
+WARNING: [Synth 8-7080] Parallel synthesis criteria is not met
+INFO: [Synth 8-6904] The RAM "u_mem/u_wr_desc/ram_reg" of size (depth=8 x width=16) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u_mem/u_rd_cmd/ram_reg" of size (depth=4 x width=9) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u_mem/u_rd_desc/ram_reg" of size (depth=4 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u_mem2/u_wr_desc/ram_reg" of size (depth=8 x width=16) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u_mem2/u_rd_cmd/ram_reg" of size (depth=4 x width=9) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u_mem2/u_rd_desc/ram_reg" of size (depth=4 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-7030] Implemented Non-Cascaded Block Ram (cascade_height = 1) of width 8 for RAM "u_mem2/u_rd_bytes/ram_reg"
+INFO: [Synth 8-6904] The RAM "i_0/u_unpack_b/wf_last_reg" of size (depth=512 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_pack_b/q_word_reg" of size (depth=16 x width=64) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_pack_b/q_keep_reg" of size (depth=16 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_pack_b/q_last_reg" of size (depth=16 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_pack/q_word_reg" of size (depth=16 x width=64) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_pack/q_keep_reg" of size (depth=16 x width=8) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_pack/q_last_reg" of size (depth=16 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_unpack/wf_last_reg" of size (depth=512 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfp_tx_disable driven by constant 0
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfp_rs0 driven by constant 1
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfp_rs1 driven by constant 1
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfpb_tx_disable driven by constant 0
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfpb_rs0 driven by constant 1
+WARNING: [Synth 8-3917] design aurora_mem_bridge has port sfpb_rs1 driven by constant 1
+INFO: [Synth 8-6904] The RAM "u_mem/u_rd_desc/ram_reg" of size (depth=4 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "u_mem2/u_rd_desc/ram_reg" of size (depth=4 x width=25) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-7030] Implemented Non-Cascaded Block Ram (cascade_height = 1) of width 8 for RAM "u_mem2/u_rd_bytes/ram_reg"
+INFO: [Synth 8-6904] The RAM "i_0/u_unpack_b/wf_last_reg" of size (depth=512 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-6904] The RAM "i_0/u_unpack/wf_last_reg" of size (depth=512 x width=1) is automatically implemented using LUTRAM. BRAM implementation would be inefficient 
+INFO: [Synth 8-7030] Implemented Non-Cascaded Block Ram (cascade_height = 1) of width 8 for RAM "i_1/u_pump_rev/ram_reg"
+INFO: [Synth 8-7030] Implemented Non-Cascaded Block Ram (cascade_height = 1) of width 8 for RAM "i_1/u_pump_fwd/ram_reg"
+---------------------------------------------------------------------------------
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:03:17 ; elapsed = 00:03:37 . Memory (MB): peak = 3299.020 ; gain = 981.457
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+Block RAM: Preliminary Mapping Report (see note below)
++---------------+--------------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|Module Name    | RTL Object         | PORT A (Depth x Width) | W | R | PORT B (Depth x Width) | W | R | Ports driving FF | RAMB18 | RAMB36 | Cascade Heights | 
++---------------+--------------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|u_mem2         | u_rd_bytes/ram_reg | 4 K x 8(NO_CHANGE)     | W |   | 4 K x 8(WRITE_FIRST)   |   | R | Port A and B     | 0      | 1      | 1               | 
+|i_0/u_unpack_b | wf_data_reg        | 512 x 64(READ_FIRST)   | W |   | 512 x 64(WRITE_FIRST)  |   | R | Port A and B     | 0      | 1      |                 | 
+|i_0/u_unpack   | wf_data_reg        | 512 x 64(READ_FIRST)   | W |   | 512 x 64(WRITE_FIRST)  |   | R | Port A and B     | 0      | 1      |                 | 
+|i_1/u_pump_rev | ram_reg            | 4 K x 8(NO_CHANGE)     | W |   | 4 K x 8(WRITE_FIRST)   |   | R | Port A and B     | 0      | 1      | 1               | 
+|i_1/u_pump_fwd | ram_reg            | 4 K x 8(NO_CHANGE)     | W |   | 4 K x 8(WRITE_FIRST)   |   | R | Port A and B     | 0      | 1      | 1               | 
++---------------+--------------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+
+Note: The table above is a preliminary report that shows the Block RAMs at the current stage of the synthesis flow. Some Block RAMs may be reimplemented as non Block RAM primitives later in the synthesis flow. Multiple instantiated Block RAMs are reported only once. 
+
+Distributed RAM: Preliminary Mapping Report (see note below)
++---------------+--------------------+-----------+----------------------+----------------+
+|Module Name    | RTL Object         | Inference | Size (Depth x Width) | Primitives     | 
++---------------+--------------------+-----------+----------------------+----------------+
+|u_mem          | u_wr_desc/ram_reg  | Implied   | 8 x 16               | RAM32M16 x 2   | 
+|u_mem          | u_rd_cmd/ram_reg   | Implied   | 4 x 9                | RAM32M16 x 1   | 
+|u_mem          | u_rd_desc/ram_reg  | Implied   | 4 x 25               | RAM32M16 x 2   | 
+|u_mem          | u_wr_bytes/ram_reg | Implied   | 4 K x 8              | RAM64M8 x 128  | 
+|u_mem          | u_rd_bytes/ram_reg | Implied   | 4 K x 8              | RAM64M8 x 128  | 
+|u_mem2         | u_wr_bytes/ram_reg | Implied   | 4 K x 8              | RAM64M8 x 128  | 
+|u_mem2         | u_wr_desc/ram_reg  | Implied   | 8 x 16               | RAM32M16 x 2   | 
+|u_mem2         | u_rd_desc/ram_reg  | Implied   | 4 x 25               | RAM32M16 x 2   | 
+|i_0/u_unpack_b | wf_keep_reg        | Implied   | 512 x 8              | RAM64M8 x 16   | 
+|i_0/u_unpack_b | wf_last_reg        | Implied   | 512 x 1              | RAM256X1D x 2  | 
+|i_0/u_pack_b   | q_word_reg         | Implied   | 16 x 64              | RAM32M16 x 5   | 
+|i_0/u_pack_b   | q_keep_reg         | Implied   | 16 x 8               | RAM32M16 x 1   | 
+|i_0/u_pack_b   | q_last_reg         | Implied   | 16 x 1               | RAM16X1D x 1   | 
+|i_0/u_pack     | q_word_reg         | Implied   | 16 x 64              | RAM32M16 x 5   | 
+|i_0/u_pack     | q_keep_reg         | Implied   | 16 x 8               | RAM32M16 x 1   | 
+|i_0/u_pack     | q_last_reg         | Implied   | 16 x 1               | RAM16X1D x 1   | 
+|i_0/u_unpack   | wf_keep_reg        | Implied   | 512 x 8              | RAM64M8 x 16   | 
+|i_0/u_unpack   | wf_last_reg        | Implied   | 512 x 1              | RAM256X1D x 2  | 
++---------------+--------------------+-----------+----------------------+----------------+
+
+Note: The table above is a preliminary report that shows the Distributed RAMs at the current stage of the synthesis flow. Some Distributed RAMs may be reimplemented as non Distributed RAM primitives later in the synthesis flow. Multiple instantiated RAMs are reported only once.
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Applying XDC Timing Constraints
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:03:24 ; elapsed = 00:03:46 . Memory (MB): peak = 3312.352 ; gain = 994.789
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Timing Optimization
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Timing Optimization : Time (s): cpu = 00:03:28 ; elapsed = 00:03:50 . Memory (MB): peak = 3324.754 ; gain = 1007.191
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+Block RAM: Final Mapping Report
++---------------+--------------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|Module Name    | RTL Object         | PORT A (Depth x Width) | W | R | PORT B (Depth x Width) | W | R | Ports driving FF | RAMB18 | RAMB36 | Cascade Heights | 
++---------------+--------------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+|u_mem2         | u_rd_bytes/ram_reg | 4 K x 8(NO_CHANGE)     | W |   | 4 K x 8(WRITE_FIRST)   |   | R | Port A and B     | 0      | 1      | 1               | 
+|i_0/u_unpack_b | wf_data_reg        | 512 x 64(READ_FIRST)   | W |   | 512 x 64(WRITE_FIRST)  |   | R | Port A and B     | 0      | 1      |                 | 
+|i_0/u_unpack   | wf_data_reg        | 512 x 64(READ_FIRST)   | W |   | 512 x 64(WRITE_FIRST)  |   | R | Port A and B     | 0      | 1      |                 | 
+|i_1/u_pump_rev | ram_reg            | 4 K x 8(NO_CHANGE)     | W |   | 4 K x 8(WRITE_FIRST)   |   | R | Port A and B     | 0      | 1      | 1               | 
+|i_1/u_pump_fwd | ram_reg            | 4 K x 8(NO_CHANGE)     | W |   | 4 K x 8(WRITE_FIRST)   |   | R | Port A and B     | 0      | 1      | 1               | 
++---------------+--------------------+------------------------+---+---+------------------------+---+---+------------------+--------+--------+-----------------+
+
+
+Distributed RAM: Final Mapping Report
++---------------+--------------------+-----------+----------------------+----------------+
+|Module Name    | RTL Object         | Inference | Size (Depth x Width) | Primitives     | 
++---------------+--------------------+-----------+----------------------+----------------+
+|u_mem          | u_wr_desc/ram_reg  | Implied   | 8 x 16               | RAM32M16 x 2   | 
+|u_mem          | u_rd_cmd/ram_reg   | Implied   | 4 x 9                | RAM32M16 x 1   | 
+|u_mem          | u_rd_desc/ram_reg  | Implied   | 4 x 25               | RAM32M16 x 2   | 
+|u_mem          | u_wr_bytes/ram_reg | Implied   | 4 K x 8              | RAM64M8 x 128  | 
+|u_mem          | u_rd_bytes/ram_reg | Implied   | 4 K x 8              | RAM64M8 x 128  | 
+|u_mem2         | u_wr_bytes/ram_reg | Implied   | 4 K x 8              | RAM64M8 x 128  | 
+|u_mem2         | u_wr_desc/ram_reg  | Implied   | 8 x 16               | RAM32M16 x 2   | 
+|u_mem2         | u_rd_desc/ram_reg  | Implied   | 4 x 25               | RAM32M16 x 2   | 
+|i_0/u_unpack_b | wf_keep_reg        | Implied   | 512 x 8              | RAM64M8 x 16   | 
+|i_0/u_unpack_b | wf_last_reg        | Implied   | 512 x 1              | RAM256X1D x 2  | 
+|i_0/u_pack_b   | q_word_reg         | Implied   | 16 x 64              | RAM32M16 x 5   | 
+|i_0/u_pack_b   | q_keep_reg         | Implied   | 16 x 8               | RAM32M16 x 1   | 
+|i_0/u_pack_b   | q_last_reg         | Implied   | 16 x 1               | RAM16X1D x 1   | 
+|i_0/u_pack     | q_word_reg         | Implied   | 16 x 64              | RAM32M16 x 5   | 
+|i_0/u_pack     | q_keep_reg         | Implied   | 16 x 8               | RAM32M16 x 1   | 
+|i_0/u_pack     | q_last_reg         | Implied   | 16 x 1               | RAM16X1D x 1   | 
+|i_0/u_unpack   | wf_keep_reg        | Implied   | 512 x 8              | RAM64M8 x 16   | 
+|i_0/u_unpack   | wf_last_reg        | Implied   | 512 x 1              | RAM256X1D x 2  | 
++---------------+--------------------+-----------+----------------------+----------------+
+
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Technology Mapping
+---------------------------------------------------------------------------------
+INFO: [Synth 8-7052] The timing for the instance u_mem2/u_rd_bytes/ram_reg_bram_0 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance u_pump_rev/ram_reg_bram_0 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+INFO: [Synth 8-7052] The timing for the instance u_pump_fwd/ram_reg_bram_0 (implemented as a Block RAM) might be sub-optimal as no optional output register could be merged into the ram block. Providing additional output register may help in improving timing.
+---------------------------------------------------------------------------------
+Finished Technology Mapping : Time (s): cpu = 00:03:38 ; elapsed = 00:04:01 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Flattening Before IO Insertion
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Final Netlist Cleanup
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished IO Insertion : Time (s): cpu = 00:03:43 ; elapsed = 00:04:06 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Instances
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Instances : Time (s): cpu = 00:03:43 ; elapsed = 00:04:06 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Rebuilding User Hierarchy
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:03:44 ; elapsed = 00:04:07 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Ports
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Ports : Time (s): cpu = 00:03:44 ; elapsed = 00:04:07 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Handling Custom Attributes
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Handling Custom Attributes : Time (s): cpu = 00:03:45 ; elapsed = 00:04:08 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Renaming Generated Nets
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Finished Renaming Generated Nets : Time (s): cpu = 00:03:45 ; elapsed = 00:04:08 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+
+Static Shift Register Report:
++-------------------------------+--------------------------------------------+--------+-------+--------------+--------------------+-------------------+--------+---------+
+|Module Name                    | RTL Name                                   | Length | Width | Reset Signal | Pull out first Reg | Pull out last Reg | SRL16E | SRLC32E | 
++-------------------------------+--------------------------------------------+--------+-------+--------------+--------------------+-------------------+--------+---------+
+|aurora_64b66b_0_support_ext    | support_reset_logic_i/dly_gt_rst_r_reg[18] | 19     | 1     | NO           | NO                 | YES               | 0      | 1       | 
+|aurora_64b66b_1_support_shared | support_reset_logic_i/dly_gt_rst_r_reg[18] | 19     | 1     | NO           | NO                 | YES               | 0      | 1       | 
+|gmii_to_rgmii                  | u_rgmii_rx/lock_sr_reg[3]                  | 4      | 1     | NO           | NO                 | YES               | 1      | 0       | 
+|aurora_mem_bridge              | pma_init_stage_reg[127]                    | 128    | 1     | NO           | NO                 | YES               | 0      | 4       | 
+|aurora_mem_bridge              | rst_sync_reg[2]                            | 3      | 1     | NO           | NO                 | YES               | 1      | 0       | 
++-------------------------------+--------------------------------------------+--------+-------+--------------+--------------------+-------------------+--------+---------+
+
+---------------------------------------------------------------------------------
+Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
+---------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
+Start Writing Synthesis Report
+---------------------------------------------------------------------------------
+
+Report BlackBoxes: 
++------+-----------------------------+----------+
+|      |BlackBox name                |Instances |
++------+-----------------------------+----------+
+|1     |aurora_64b66b_0              |         1|
+|2     |aurora_64b66b_1              |         1|
+|3     |mb_ctrl_xbar_0               |         1|
+|4     |mb_ctrl_axi_dma_0_0          |         1|
+|5     |mb_ctrl_axi_lite_regs_0_0    |         1|
+|6     |mb_ctrl_axi_uartlite_0_0     |         1|
+|7     |mb_ctrl_mdm_1_0              |         1|
+|8     |mb_ctrl_microblaze_0_0       |         1|
+|9     |mb_ctrl_rst_100m_0           |         1|
+|10    |mb_ctrl_dlmb_bram_if_cntlr_0 |         1|
+|11    |mb_ctrl_dlmb_v10_0           |         1|
+|12    |mb_ctrl_ilmb_bram_if_cntlr_0 |         1|
+|13    |mb_ctrl_ilmb_v10_0           |         1|
+|14    |mb_ctrl_lmb_bram_0           |         1|
+|15    |async_fifo_2048x8b           |         1|
+|16    |ddr4_0                       |         1|
++------+-----------------------------+----------+
+
+Report Cell Usage: 
++------+---------------------------+------+
+|      |Cell                       |Count |
++------+---------------------------+------+
+|1     |async_fifo_2048x8b         |     1|
+|2     |aurora_64b66b              |     2|
+|4     |ddr4                       |     1|
+|5     |mb_ctrl_axi_dma_0          |     1|
+|6     |mb_ctrl_axi_lite_regs_0    |     1|
+|7     |mb_ctrl_axi_uartlite_0     |     1|
+|8     |mb_ctrl_dlmb_bram_if_cntlr |     1|
+|9     |mb_ctrl_dlmb_v10           |     1|
+|10    |mb_ctrl_ilmb_bram_if_cntlr |     1|
+|11    |mb_ctrl_ilmb_v10           |     1|
+|12    |mb_ctrl_lmb_bram           |     1|
+|13    |mb_ctrl_mdm_1              |     1|
+|14    |mb_ctrl_microblaze_0       |     1|
+|15    |mb_ctrl_rst_100m           |     1|
+|16    |mb_ctrl_xbar               |     1|
+|17    |BUFG                       |     3|
+|18    |BUFG_GT                    |     4|
+|19    |BUFIO                      |     1|
+|20    |CARRY8                     |   211|
+|21    |GTHE3_COMMON               |     1|
+|22    |IBUFDS_GTE3                |     1|
+|23    |IDDRE1                     |     5|
+|24    |IDELAYCTRL                 |     1|
+|25    |IDELAYE3                   |     5|
+|26    |LUT1                       |   273|
+|27    |LUT2                       |  1053|
+|28    |LUT3                       |  1066|
+|29    |LUT4                       |  2595|
+|30    |LUT5                       |  2458|
+|31    |LUT6                       |  7976|
+|32    |MMCME3_ADV                 |     1|
+|33    |MUXF7                      |  1298|
+|34    |MUXF8                      |   629|
+|35    |ODDRE1                     |     5|
+|36    |RAM16X1D                   |     2|
+|37    |RAM256X1D                  |     4|
+|38    |RAM32M16                   |    19|
+|39    |RAM32X1D                   |     4|
+|40    |RAM64M8                    |   208|
+|41    |RAM64X1D                   |   208|
+|42    |RAMB36E2                   |     5|
+|44    |SRL16E                     |     2|
+|45    |SRLC32E                    |     6|
+|46    |FDCE                       | 18307|
+|47    |FDPE                       |   303|
+|48    |FDRE                       |  1150|
+|49    |FDSE                       |    28|
+|50    |IBUF                       |     9|
+|51    |IBUFDS                     |     1|
+|52    |OBUF                       |    16|
++------+---------------------------+------+
+---------------------------------------------------------------------------------
+Finished Writing Synthesis Report : Time (s): cpu = 00:03:45 ; elapsed = 00:04:09 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+---------------------------------------------------------------------------------
+Synthesis finished with 0 errors, 0 critical warnings and 600 warnings.
+Synthesis Optimization Runtime : Time (s): cpu = 00:03:26 ; elapsed = 00:04:04 . Memory (MB): peak = 3324.785 ; gain = 879.215
+Synthesis Optimization Complete : Time (s): cpu = 00:03:45 ; elapsed = 00:04:10 . Memory (MB): peak = 3324.785 ; gain = 1007.223
+INFO: [Project 1-571] Translating synthesized netlist
+Netlist sorting complete. Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.271 . Memory (MB): peak = 3324.785 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 2613 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+INFO: [Opt 31-326] The CLKFBOUT to CLKFBIN net for instance u_gmii_to_rgmii/u_rgmii_rx/u_mmcm_200m with COMPENSATION=INTERNAL is optimized away to aid design routability
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.008 . Memory (MB): peak = 3345.562 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 469 instances were transformed.
+  BUFG => BUFGCE: 3 instances
+  BUFIO => BUFGCE: 1 instance 
+  IBUF => IBUF (IBUFCTRL, INBUF): 9 instances
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IDDRE1 => ISERDESE3 (inverted pins: CLK_B): 5 instances
+  ODDRE1 => OSERDESE3: 5 instances
+  RAM16X1D => RAM32X1D (RAMD32(x2)): 2 instances
+  RAM256X1D => RAM256X1D (MUXF7(x4), MUXF8(x2), RAMD64E(x8)): 4 instances
+  RAM32M16 => RAM32M16 (RAMD32(x14), RAMS32(x2)): 19 instances
+  RAM32X1D => RAM32X1D (RAMD32(x2)): 4 instances
+  RAM64M8 => RAM64M8 (RAMD64E(x8)): 208 instances
+  RAM64X1D => RAM64X1D (RAMD64E(x2)): 208 instances
+
+Synth Design complete | Checksum: 6084b682
+INFO: [Common 17-83] Releasing license: Synthesis
+271 Infos, 267 Warnings, 0 Critical Warnings and 0 Errors encountered.
+synth_design completed successfully
+synth_design: Time (s): cpu = 00:03:55 ; elapsed = 00:04:21 . Memory (MB): peak = 3345.562 ; gain = 1790.941
+INFO: [Common 17-1381] The checkpoint 'D:/FPGA/prj/project_11/vivado/prj11.runs/synth_1/aurora_mem_bridge.dcp' has been generated.
+INFO: [runtcl-4] Executing : report_utilization -file aurora_mem_bridge_utilization_synth.rpt -pb aurora_mem_bridge_utilization_synth.pb
+INFO: [Common 17-206] Exiting Vivado at Mon Oct 19 13:39:04 2026...
+[Mon Oct 19 13:39:10 2026] synth_1 finished
+wait_on_runs: Time (s): cpu = 00:00:00 ; elapsed = 00:05:11 . Memory (MB): peak = 2403.773 ; gain = 0.000
+SYNTH_STATUS: synth_design Complete!
+Design is defaulting to impl run constrset: constrs_1
+Design is defaulting to synth run part: xcku060-ffva1156-2-i
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b.dcp' for cell 'u_async_fifo_2048x8b'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ddr4_0.dcp' for cell 'u_ddr4'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0.dcp' for cell 'u_aurora/aurora_64b66b_0_i'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1.dcp' for cell 'u_aurora_b/aurora_64b66b_1_i'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0.dcp' for cell 'u_mb_ctrl/axi_dma_0'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_lite_regs_0_0_10/mb_ctrl_axi_lite_regs_0_0.dcp' for cell 'u_mb_ctrl/axi_lite_regs_0'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0.dcp' for cell 'u_mb_ctrl/axi_uartlite_0'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_mdm_1_0_10/mb_ctrl_mdm_1_0.dcp' for cell 'u_mb_ctrl/mdm_1'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_microblaze_0_0_10/mb_ctrl_microblaze_0_0.dcp' for cell 'u_mb_ctrl/microblaze_0'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0.dcp' for cell 'u_mb_ctrl/rst_100m'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_xbar_0_7/mb_ctrl_xbar_0.dcp' for cell 'u_mb_ctrl/axi_interconnect_0/xbar'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_dlmb_bram_if_cntlr_0_10/mb_ctrl_dlmb_bram_if_cntlr_0.dcp' for cell 'u_mb_ctrl/microblaze_0_local_memory/dlmb_bram_if_cntlr'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_dlmb_v10_0_10/mb_ctrl_dlmb_v10_0.dcp' for cell 'u_mb_ctrl/microblaze_0_local_memory/dlmb_v10'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_ilmb_bram_if_cntlr_0_10/mb_ctrl_ilmb_bram_if_cntlr_0.dcp' for cell 'u_mb_ctrl/microblaze_0_local_memory/ilmb_bram_if_cntlr'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_ilmb_v10_0_10/mb_ctrl_ilmb_v10_0.dcp' for cell 'u_mb_ctrl/microblaze_0_local_memory/ilmb_v10'
+INFO: [Project 1-454] Reading design checkpoint 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_lmb_bram_0_10/mb_ctrl_lmb_bram_0.dcp' for cell 'u_mb_ctrl/microblaze_0_local_memory/lmb_bram'
+Netlist sorting complete. Time (s): cpu = 00:00:01 ; elapsed = 00:00:01 . Memory (MB): peak = 2648.102 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 3716 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-479] Netlist was created with Vivado 2023.1
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Chipscope 16-324] Core: u_ddr4 UUID: be77b94c-6b62-5435-9417-a480a194404e 
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_microblaze_0_0_10/mb_ctrl_microblaze_0_0.xdc] for cell 'u_mb_ctrl/microblaze_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_microblaze_0_0_10/mb_ctrl_microblaze_0_0.xdc] for cell 'u_mb_ctrl/microblaze_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0_board.xdc] for cell 'u_mb_ctrl/rst_100m/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0_board.xdc] for cell 'u_mb_ctrl/rst_100m/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0.xdc] for cell 'u_mb_ctrl/rst_100m/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_rst_100m_0_10/mb_ctrl_rst_100m_0.xdc] for cell 'u_mb_ctrl/rst_100m/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0_board.xdc] for cell 'u_mb_ctrl/axi_uartlite_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0_board.xdc] for cell 'u_mb_ctrl/axi_uartlite_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0.xdc] for cell 'u_mb_ctrl/axi_uartlite_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_uartlite_0_0_10/mb_ctrl_axi_uartlite_0_0.xdc] for cell 'u_mb_ctrl/axi_uartlite_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0.xdc] for cell 'u_mb_ctrl/axi_dma_0/U0'
+WARNING: [Vivado_Tcl 4-919] Waiver ID 'CDC-1' -from list should not be empty. [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0.xdc:61]
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0.xdc] for cell 'u_mb_ctrl/axi_dma_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/ip_1/aurora_64b66b_1_fifo_gen_master.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/ip_1/aurora_64b66b_1_fifo_gen_master.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/ip_0/synth/aurora_64b66b_1_gt.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/aurora_64b66b_1_multi_gt_i/aurora_64b66b_1_gt_i/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/ip_0/synth/aurora_64b66b_1_gt.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/aurora_64b66b_1_multi_gt_i/aurora_64b66b_1_gt_i/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst'
+WARNING: [Vivado_Tcl 4-921] Waiver ID 'CDC-10' -to list should not be empty. [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1.xdc:125]
+WARNING: [Vivado_Tcl 4-921] Waiver ID 'CDC-11' -to list should not be empty. [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1.xdc:126]
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_0/bd_9054_microblaze_I_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/microblaze_I/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_0/bd_9054_microblaze_I_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/microblaze_I/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_1/bd_9054_rst_0_0_board.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/rst_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_1/bd_9054_rst_0_0_board.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/rst_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_1/bd_9054_rst_0_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/rst_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_1/bd_9054_rst_0_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/rst_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_2/bd_9054_ilmb_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/ilmb/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_2/bd_9054_ilmb_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/ilmb/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_3/bd_9054_dlmb_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/dlmb/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_3/bd_9054_dlmb_0.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/dlmb/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_10/bd_9054_iomodule_0_0_board.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/iomodule_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/bd_0/ip/ip_10/bd_9054_iomodule_0_0_board.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst/iomodule_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ip_0/ddr4_0_microblaze_mcs_board.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ip_0/ddr4_0_microblaze_mcs_board.xdc] for cell 'u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_riu/mcs0/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/par/ddr4_0.xdc] for cell 'u_ddr4/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/par/ddr4_0.xdc] for cell 'u_ddr4/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b.xdc] for cell 'u_async_fifo_2048x8b/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b.xdc] for cell 'u_async_fifo_2048x8b/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/ip_1/aurora_64b66b_0_fifo_gen_master.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/ip_1/aurora_64b66b_0_fifo_gen_master.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/ip_0/synth/aurora_64b66b_0_gt.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/aurora_64b66b_0_multi_gt_i/aurora_64b66b_0_gt_i/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/ip_0/synth/aurora_64b66b_0_gt.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/aurora_64b66b_0_multi_gt_i/aurora_64b66b_0_gt_i/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst'
+WARNING: [Vivado_Tcl 4-921] Waiver ID 'CDC-10' -to list should not be empty. [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0.xdc:125]
+WARNING: [Vivado_Tcl 4-921] Waiver ID 'CDC-11' -to list should not be empty. [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0.xdc:126]
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst'
+Parsing XDC File [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc]
+INFO: [Timing 38-35] Done setting XDC timing constraints. [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc:92]
+INFO: [Timing 38-2] Deriving generated clocks [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc:92]
+get_clocks: Time (s): cpu = 00:00:08 ; elapsed = 00:00:06 . Memory (MB): peak = 3232.168 ; gain = 340.988
+Finished Parsing XDC File [D:/FPGA/prj/project_11/xdc/aurora_mem_bridge.xdc]
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_mdm_1_0_10/mb_ctrl_mdm_1_0.xdc] for cell 'u_mb_ctrl/mdm_1/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_mdm_1_0_10/mb_ctrl_mdm_1_0.xdc] for cell 'u_mb_ctrl/mdm_1/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0_clocks.xdc] for cell 'u_mb_ctrl/axi_dma_0/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_axi_dma_0_0_6/mb_ctrl_axi_dma_0_0_clocks.xdc] for cell 'u_mb_ctrl/axi_dma_0/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/ip_1/aurora_64b66b_1_fifo_gen_master_clocks.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/ip_1/aurora_64b66b_1_fifo_gen_master_clocks.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1_clocks.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_1/aurora_64b66b_1_clocks.xdc] for cell 'u_aurora_b/aurora_64b66b_1_i/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ddr4_0_board.xdc] for cell 'u_ddr4/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/ddr4_0_board.xdc] for cell 'u_ddr4/inst'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b_clocks.xdc] for cell 'u_async_fifo_2048x8b/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/async_fifo_2048x8b/async_fifo_2048x8b_clocks.xdc] for cell 'u_async_fifo_2048x8b/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/ip_1/aurora_64b66b_0_fifo_gen_master_clocks.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/ip_1/aurora_64b66b_0_fifo_gen_master_clocks.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/cbcc_gtx0_i/master_fifo.data_fifo/U0'
+Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0_clocks.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst'
+Finished Parsing XDC File [d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/aurora_64b66b_0/aurora_64b66b_0_clocks.xdc] for cell 'u_aurora/aurora_64b66b_0_i/inst'
+WARNING: [XPM_CDC_GRAY: TCL-1000] The source and destination clocks are the same. 
+     Instance: u_async_fifo_2048x8b/U0/inst_fifo_gen/gconvfifo.rf/grf.rf/gntv_or_sync_fifo.gcx.clkx/rd_pntr_cdc_inst 
+  This will add unnecessary latency to the design. Please check the design for the following: 
+ 1) Manually instantiated XPM_CDC modules: Xilinx recommends that you remove these modules. 
+ 2) Xilinx IP that contains XPM_CDC modules: Verify the connections to the IP to determine whether you can safely ignore this message.
+ [D:/Xilinx/Vivado/2023.1/data/ip/xpm/xpm_cdc/tcl/xpm_cdc_gray.tcl:16]
+WARNING: [XPM_CDC_GRAY: TCL-1000] The source and destination clocks are the same. 
+     Instance: u_async_fifo_2048x8b/U0/inst_fifo_gen/gconvfifo.rf/grf.rf/gntv_or_sync_fifo.gcx.clkx/wr_pntr_cdc_inst 
+  This will add unnecessary latency to the design. Please check the design for the following: 
+ 1) Manually instantiated XPM_CDC modules: Xilinx recommends that you remove these modules. 
+ 2) Xilinx IP that contains XPM_CDC modules: Verify the connections to the IP to determine whether you can safely ignore this message.
+ [D:/Xilinx/Vivado/2023.1/data/ip/xpm/xpm_cdc/tcl/xpm_cdc_gray.tcl:16]
+INFO: [Project 1-1714] 38 XPM XDC files have been applied to the design.
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+INFO: [Opt 31-441] Inserted BUFG_GT_SYNC u_aurora/aurora_64b66b_0_i/inst/aurora_64b66b_0_wrapper_i/aurora_64b66b_0_multi_gt_i/aurora_64b66b_0_gt_i/inst/gen_gtwizard_gthe3_top.aurora_64b66b_0_gt_gtwizard_gthe3_inst/gen_gtwizard_gthe3.gen_channel_container[26].gen_enabled_channel.gthe3_channel_wrapper_inst/channel_inst/BUFG_GT_SYNC_1 for BUFG_GT u_aurora/clock_module_i/ultrascale_tx_userclk_1/gen_gtwiz_userclk_tx_main.bufg_gt_usrclk2_inst
+INFO: [Opt 31-441] Inserted BUFG_GT_SYNC u_aurora_b/aurora_64b66b_1_i/inst/aurora_64b66b_1_wrapper_i/aurora_64b66b_1_multi_gt_i/aurora_64b66b_1_gt_i/inst/gen_gtwizard_gthe3_top.aurora_64b66b_1_gt_gtwizard_gthe3_inst/gen_gtwizard_gthe3.gen_channel_container[26].gen_enabled_channel.gthe3_channel_wrapper_inst/channel_inst/BUFG_GT_SYNC_1 for BUFG_GT u_aurora_b/clock_module_i/ultrascale_tx_userclk_1/gen_gtwiz_userclk_tx_main.bufg_gt_usrclk2_inst
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_async_fifo_2048x8b/U0/inst_fifo_gen/gconvfifo.rf/grf.rf/gntv_or_sync_fifo.mem/gbm.gbmg.gbmga.ngecc.bmg/inst_blk_mem_gen/gnbram.gnativebmg.native_blk_mem_gen/valid.cstr/ramloop[0].ram.r/prim_noinit.ram/DEVICE_8SERIES.NO_BMM_INFO.SDP.SIMPLE_PRIM18.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[0].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[10].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[11].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[12].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[13].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[14].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[15].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[1].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[2].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[3].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[4].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[5].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[6].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[7].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[8].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+INFO: [Opt 31-422] The CLOCK_DOMAINS attribute on the BRAM cell u_mb_ctrl/microblaze_0_local_memory/lmb_bram/U0/inst_blk_mem_gen/gnbram.gnative_mem_map_bmg.native_mem_map_blk_mem_gen/valid.cstr/ramloop[9].ram.r/prim_noinit.ram/DEVICE_8SERIES.WITH_BMM_INFO.TRUE_DP.SIMPLE_PRIM36.SERIES8_TDP_SP36_NO_ECC_ATTR.ram has been changed from INDEPENDENT to COMMON to match the clocking topology used for the BRAM.
+Generating merged BMM file for the design top 'aurora_mem_bridge'...
+Generating merged BMM file for the design top 'ddr4_0'...
+INFO: [Memdata 28-144] Successfully populated the BRAM INIT strings from the following elf files: d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/ip/ddr4_0/sw/calibration_0/Debug/calibration_ddr.elf d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/ip/mb_ctrl_microblaze_0_0_10/data/mb_bootloop_le.elf 
+INFO: [Project 1-1687] 8 scoped IP constraints or related sub-commands were skipped due to synthesis logic optimizations usually triggered by constant connectivity or unconnected output pins. To review the skipped constraints and messages, run the command 'set_param netlist.IPMsgFiltering false' before opening the design.
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.025 . Memory (MB): peak = 3234.691 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 877 instances were transformed.
+  DSP48E1 => DSP48E2 (DSP_ALU, DSP_A_B_DATA, DSP_C_DATA, DSP_MULTIPLIER, DSP_M_DATA, DSP_OUTPUT, DSP_PREADD, DSP_PREADD_DATA): 3 instances
+  IBUF => IBUF (IBUFCTRL, INBUF): 9 instances
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IOBUFDS => IOBUFDS (DIFFINBUF, IBUFCTRL, INV, OBUFT(x2)): 8 instances
+  IOBUFE3 => IOBUFE3 (IBUFCTRL, INBUF, OBUFT_DCIEN): 72 instances
+  LUT6_2 => LUT6_2 (LUT5, LUT6): 111 instances
+  OBUFDS => OBUFDS_DUAL_BUF (INV, OBUF(x2)): 1 instance 
+  RAM16X1D => RAM32X1D (RAMD32(x2)): 2 instances
+  RAM256X1D => RAM256X1D (MUXF7(x4), MUXF8(x2), RAMD64E(x8)): 4 instances
+  RAM32M => RAM32M (RAMD32(x6), RAMS32(x2)): 221 instances
+  RAM32M16 => RAM32M16 (RAMD32(x14), RAMS32(x2)): 25 instances
+  RAM32X1D => RAM32X1D (RAMD32(x2)): 4 instances
+  RAM64M8 => RAM64M8 (RAMD64E(x8)): 208 instances
+  RAM64X1D => RAM64X1D (RAMD64E(x2)): 208 instances
+
+open_run: Time (s): cpu = 00:00:33 ; elapsed = 00:00:36 . Memory (MB): peak = 3234.691 ; gain = 830.918
+ILA0_CLK_NET: user_clk
+ILA0_PROBE1_EMIT_BYTES: 9 nets
+ILA3_CLK_NET: ui_clk
+DBG_NET_FUZZY(dbg_wd_go_ui): u_mem/gen_wr_dma_obs.dbg_wd_go_ui
+DBG_NET_FUZZY(dbg_wd_ack_ui): u_mem/gen_wr_dma_obs.dbg_wd_ack_ui
+DBG_NET_FUZZY(dbg_wd_intr_ui): u_mem/gen_wr_dma_obs.dbg_wd_intr_ui
+DBG_NET_FUZZY(dbg_wd_go_ok): u_mem/u_bridge/g_wr_dma.dbg_wd_go_ok
+ILA5_PROBE5: 7 nets (go_ui/ack_ui/intr_ui/go_ok/state)
+ILA5_PROBES: tdata64=64 tkeep8=8 + tvalid/tready/tlast + probe5=7
+ILA4_SKIPPED: env R3C_SKIP_ILA4 set (timing fallback, ltx = 3 cores)
+INFO: [Timing 38-480] Writing timing data to binary archive.
+Writing XDEF routing.
+Writing XDEF routing logical nets.
+Writing XDEF routing special nets.
+Write XDEF Complete: Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.369 . Memory (MB): peak = 3234.691 ; gain = 0.000
+INFO: [Common 17-1381] The checkpoint 'D:/FPGA/prj/project_11/scripts/pre_impl_debug.dcp' has been generated.
+write_checkpoint: Time (s): cpu = 00:00:15 ; elapsed = 00:00:11 . Memory (MB): peak = 3234.691 ; gain = 0.000
+SYNTH_ONLY_DONE
+INFO: [Common 17-206] Exiting Vivado at Mon Oct 19 13:40:00 2026...

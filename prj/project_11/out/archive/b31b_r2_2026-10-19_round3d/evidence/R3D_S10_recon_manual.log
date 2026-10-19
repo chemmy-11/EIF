@@ -1,0 +1,46 @@
+﻿# R3D S10 manual recon evidence (2026-10-19 16:3x, script-tools offline re-run)
+# reason: r2_board.ps1 S10 判 NOT_OBTAINED 系 wrapper 标记缺口（Invoke-ReconJudge 只认 R2_RECON_RESULT:，recon-only 分支不打印该标记）; 本文件是判据本体输出的等价取证。
+# command: py out\r2_counter_recon.py --mode recon --ui-post <R2_ila_r2_20261019_162914_ui_post.csv> --user-post <R2_ila_r2_20261019_162914_user_post.csv> --json-out R3D_S10_recon_manual.json
+# exit_code: 
+0
+==============================================================================
+S10 双桥计数对账 (J4 口径, 累计值)
+==============================================================================
+J4 口径: 每桥独立对账 wm==wr_frm==rd_frm(累计计数相等) + ost(在途)归零 + 错误计数全 0; 两桥分别判, 不得用一桥的相等掩盖另一桥的失配 (W4/J4 原始判据)。
+
+  bridge  wm  wr_frm  rd_frm  三计数  ost  stall  len_err  bresp                verdict
+  ------  --  ------  ------  ---  ---  -----  -------  -------------------  -------
+  mem     9   9       9       相等   0    0      0        无探针(INFO/round2b 裁)  PASS   
+  mem2    9   9       9       相等   0    n/a    n/a      无探针(INFO)            PASS   
+
+全局 R2 错误计数(故障/超时):
+  counter     last  verdict                                                
+  ----------  ----  -------------------------------------------------------
+  wr_timeout  缺失    缺失(不可观测: ILA 无该探针且 stat_wr_timeout 无 Lite 读回路径; 仅 INFO)
+  wr_fault    0     PASS                                                   
+
+R2 S2MM 观测探针存在性: 5/5 命中: s2mm_state, s2mm_tvalid, s2mm_tready, s2mm_reqpend, wr_fault_user
+  dbg_s2mm_state(last) = IDLE (raw 0)
+  dbg_s2mm_state 编码: 0=IDLE 1=WAITGO 2=STREAM 3=PUSH 4=WAITDONE 5=DRAIN 6=HALT
+  s2mm_tvalid(last) = 0
+  s2mm_tready(last) = 1
+  s2mm_reqpend(last) = 0
+  wr_fault_user(last) = 0
+
+观测能力说明(INFO, 不作判据):
+  - round2b ILA 裁剪: ILA1/ILA2 整核移除(判据不用, 缺失不报错); dbg_mem_bresp/wslot/rslot 未挂 ⇒ INFO/NOT_OBTAINED, 不判 FAIL
+  - 桥① dbg_mem_bresp 在 S2MM 写路径恒 0(IP 内部 BRESP 不可见) ⇒ 仅 INFO; round2b 已裁该探针 ⇒ 缺失亦 INFO
+  - 桥②(HAS_DMA=0, RTL 本轮未动) stall/len_err/bresp 无 ILA 探针 ⇒ 仅 INFO(不可观测)
+  - wslot/rslot(调试槽号) round2b 未挂 ILA ⇒ INFO(判据不使用)
+  - timeout: dbg_wr_timeout 未挂 ILA 且 stat_wr_timeout 无 Lite 读回路径(+0x40/+0x44 不含) ⇒ 仅 INFO
+  - 可观测替代: dbg_s2mm_state/dbg_wr_fault + 'U' 的 wreq/wdbg/s2sr + ro_wm 是否推进
+
+INFO: mem.bresp 本轮 round2b ILA 裁剪未挂 dbg_mem_bresp(S2MM 下恒 0) ⇒ INFO, 不判 FAIL/NOT_OBTAINED
+INFO: mem2.stall 无 ILA 探针(不可观测) —— 桥② 错误计数硬判需新增 dbg_mem2_stall 探针
+INFO: mem2.len_err 无 ILA 探针(不可观测) —— 桥② 错误计数硬判需新增 dbg_mem2_len_err 探针
+INFO: mem2.bresp 无 ILA 探针(不可观测) —— 若需硬判需新增 dbg_mem2_bresp 探针
+
+判据明细(PASS): mem/mem2 各自 wm==wr_frm==rd_frm、ost=0; mem stall/len_err=0 (mem.bresp 恒 0 仅 INFO: S2MM 下 BRESP 不可见); mem2 错误计数无 ILA 探针(仅 INFO, 不可观测); R2 dbg_wr_fault=0/timeout 无 ILA 探针且无 Lite 读回路径(仅 INFO)
+R2_COUNTER_RECON: PASS mem/mem2 各自 wm==wr_frm==rd_frm、ost=0; mem stall/len_err=0 (mem.bresp 恒 0 仅 INFO: S2MM 下 BRESP 不可见); mem2 错误计数无 ILA 探针(仅 INFO, 不可观测); R2 dbg_wr_fault=0/timeout 无 ILA 探针且无 Lite 读回路径(仅 INFO)
+JSON_OUT: D:\FPGA\prj\project_11\out\evidence_2026-10-19\R3D_S10_recon_manual.json
+

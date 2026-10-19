@@ -1,0 +1,62 @@
+
+****** Vivado v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source {D:\FPGA\prj\project_11\scripts\create_bd_b.tcl} -notrace
+WARNING: [filemgmt 56-3] IPUserFilesDir: Could not find the directory 'D:/FPGA/prj/project_11/vivado/prj11.ip_user_files'.
+Scanning sources...
+Finished scanning sources
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1704] No user IP repositories specified
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository 'D:/Xilinx/Vivado/2023.1/data/ip'.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+open_project: Time (s): cpu = 00:00:06 ; elapsed = 00:00:08 . Memory (MB): peak = 1555.586 ; gain = 248.312
+Wrote  : <D:\FPGA\prj\project_11\vivado\prj11.srcs\sources_1\bd\mb_ctrl\mb_ctrl.bd> 
+WARNING: [BD 5-670] It is required to provide a frequency value for a user created input clock port. Please use the <-freq_hz $freq_val> argument of the create_bd_port command. ie create_bd_port -dir I -type clk -freq_hz 100000000 clkin
+INFO: [IP_Flow 19-5107] Inferred bus interface 's_axi' of definition 'xilinx.com:interface:aximm:1.0' (from Xilinx Repository).
+INFO: [IP_Flow 19-5107] Inferred bus interface 'aresetn' of definition 'xilinx.com:signal:reset:1.0' (from Xilinx Repository).
+INFO: [IP_Flow 19-5107] Inferred bus interface 'aclk' of definition 'xilinx.com:signal:clock:1.0' (from Xilinx Repository).
+INFO: [IP_Flow 19-4728] Bus Interface 'aresetn': Added interface parameter 'POLARITY' with value 'ACTIVE_LOW'.
+INFO: [IP_Flow 19-4728] Bus Interface 'aclk': Added interface parameter 'ASSOCIATED_BUSIF' with value 's_axi'.
+INFO: [IP_Flow 19-4728] Bus Interface 'aclk': Added interface parameter 'ASSOCIATED_RESET' with value 'aresetn'.
+WARNING: [IP_Flow 19-11770] Clock interface 'aclk' has no FREQ_HZ parameter.
+WARNING: [BD 5-670] It is required to provide a frequency value for a user created input clock port. Please use the <-freq_hz $freq_val> argument of the create_bd_port command. ie create_bd_port -dir I -type clk -freq_hz 100000000 clkin
+BD_STEP: cells created
+BD_STEP: interfaces connected
+WARNING: [BD 5-235] No pins matched 'get_bd_pins mdm_1/CLK'
+BD_DMA_UICLK_PIN: m_axi_mm2s_aclk
+BD_DMA_UICLK_MISS: m_axis_mm2s_aclk (该时钟引脚在�?配置下不存在/已并�?)
+BD_DMA_UICLK_PIN: m_axi_s2mm_aclk
+BD_DMA_UICLK_MISS: s_axis_s2mm_aclk (该时钟引脚在�?配置下不存在/已并�?)
+BD_STEP: nets connected
+BD_STEP: user-domain pins externalized
+BD_STEP: round3c dbg_l_bus[35:0] connected
+Slave segment '/axi_uartlite_0/S_AXI/Reg' is being assigned into address space '/microblaze_0/Data' at <0x4060_0000 [ 64K ]>.
+Slave segment '/microblaze_0_local_memory/dlmb_bram_if_cntlr/SLMB/Mem' is being assigned into address space '/microblaze_0/Data' at <0x0000_0000 [ 64K ]>.
+Slave segment '/microblaze_0_local_memory/ilmb_bram_if_cntlr/SLMB/Mem' is being assigned into address space '/microblaze_0/Instruction' at <0x0000_0000 [ 64K ]>.
+BD_STEP: lite_regs addr segs = /axi_lite_regs_0/s_axi/reg0
+Slave segment '/axi_lite_regs_0/s_axi/reg0' is being assigned into address space '/microblaze_0/Data' at <0x44A0_0000 [ 4K ]>.
+Slave segment '/axi_dma_0/S_AXI_LITE/Reg' is being assigned into address space '/microblaze_0/Data' at <0x44A1_0000 [ 4K ]>.
+BD_STEP: addresses assigned
+CRITICAL WARNING: [BD 41-1356] Slave segment </M_AXI_MM2S_0/Reg> is not assigned into address space </axi_dma_0/Data_MM2S>. Please use Address Editor to either assign or exclude it.
+CRITICAL WARNING: [BD 41-1356] Slave segment </M_AXI_S2MM_0/Reg> is not assigned into address space </axi_dma_0/Data_S2MM>. Please use Address Editor to either assign or exclude it.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+INFO: [xilinx.com:ip:axi_dma:7.1-14] /axi_dma_0 
+                    ##########################################################################################
+                    Clocks connected to AXI DMA are not same. Configuring AXI DMA in ASYNC mode ..........
+                    ##########################################################################################
+Wrote  : <D:\FPGA\prj\project_11\vivado\prj11.srcs\sources_1\bd\mb_ctrl\mb_ctrl.bd> 
+INFO: [BD 41-1662] The design 'mb_ctrl.bd' is already validated. Therefore parameter propagation will not be re-run.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+WARNING: [filemgmt 56-443] The ECC Algorithm string is empty. Setting the Memory Map to default ECC value to ECC_NONE.
+Verilog Output written to : D:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/synth/mb_ctrl.v
+Verilog Output written to : D:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/sim/mb_ctrl.v
+Verilog Output written to : D:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/hdl/mb_ctrl_wrapper.v
+WARNING: [filemgmt 56-12] File 'd:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/hdl/mb_ctrl_wrapper.v' cannot be added to the project because it already exists in the project, skipping this file
+BD_DONE: wrapper=d:/FPGA/prj/project_11/vivado/prj11.gen/sources_1/bd/mb_ctrl/hdl/mb_ctrl_wrapper.v top=aurora_mem_bridge
+INFO: [Common 17-206] Exiting Vivado at Mon Oct 19 12:04:03 2026...

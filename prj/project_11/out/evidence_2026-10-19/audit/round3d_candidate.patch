@@ -1,0 +1,322 @@
+# =============================================================================
+# round3d_candidate.patch  ——  DRAFT / 未编译 / 未仿真  (rtl-auditor, 2026-10-19)
+# =============================================================================
+# 目的：修复静态审计发现的、fix2 之后仍存在的**确定性结构缺陷**（不是板端现象根因）：
+#   1) 4 相邮箱无超时 + 两侧复位不同源（aresetn vs ~aurora_rst）⇒ 单侧复位/时钟停 =
+#      对侧永久死等 ⇒ AXI 事务永不响应 ⇒ MicroBlaze lwi 永久挂（本次现象级）。
+#   2) 关键 2FF 缺 ASYNC_REG（规范缺口，AGENTS §5.1 形态②）。
+#   3) 卡死检测缺 4 个形态：bvalid&&!bready / awvalid&&!awready / wvalid&&!wready /
+#      aw_pending|w_pending 悬置（这些会让"AR 根本没被受理/写通道半锁存"静默无触发）。
+# 设计约束：
+#   * 不新增 FSM 状态（lwst/lrst 仍 2bit）⇒ dbg_o 36b 位图不变 ⇒ **无需 BD regen、无需改
+#     build_debug.tcl / ltx 期望**（集成面零改动，仅 OOC run 会因 RTL 变更重综合）。
+#   * 超时只兜"异常死等"：4096 aclk = 41us；正常 4 相往返 <100 拍（40x 余量）。
+#   * 超时后：返回 SLVERR（读 rresp=2'b10 / 写 bresp=2'b10）+ sticky mbox_fault，并用
+#     翻转事件（mbox_clr_tog，2FF 同步）复位 user 侧邮箱 FSM——只复位 ust/urst/a_ack/
+#     r_ack/d_req，不动 cfg_mode/cfg_rd_slot/cfg_rd_engine/cfg_wr_go/cfg_wr_ack/lite_*_cnt。
+#   * 新增只读寄存器 +0x50 = {30'd0, mbox_fault[1:0]}（bit0=读超时, bit1=写超时, sticky）。
+#   * **单驱动纪律（坑 #25/#34）**：两个 FSM 只置"错误请求"单拍脉冲 lr_err_req/lw_err_req；
+#     mbox_fault/mbox_clr_tog 由一个**独立 always 块**统一驱动（禁止在读写 FSM 里直接写它们，
+#     否则 mbox_fault[0]/[1] 与 mbox_clr_tog 会构成多驱动——本草案已按单驱动改写）。
+# 基线（本 patch 预期 apply 的 round3c 工作树快照）：
+#   rtl/axi_lite_regs.v     git blob 631d45ec (FECCEC0F, 643 行, 含 round3c dbg_o)
+#   sw/j3_soft/src/main.c   43211 B (ELF F5E0F1F3 基线)
+# 说明：本文件是"候选实现草案"，非可 git-apply 的严格 diff；合入前需在 RTL 上人工 rebase
+#       并跑回归（见 R3C_round3d_impact.md）。
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# [A1] 2FF 补 ASYNC_REG（rtl/axi_lite_regs.v, round3c 的 :590）
+# ---------------------------------------------------------------------------
+-    reg l_rstuser_s1, l_rstuser_s2, l_rstuser_evt;
++    (* ASYNC_REG = "TRUE" *) reg l_rstuser_s1, l_rstuser_s2;
++    reg l_rstuser_evt;
+
+# ---------------------------------------------------------------------------
+# [A2] 邮箱看门狗 + 单驱动错误脉冲（插在写通道 localparam 之前, 约 :163）
+# ---------------------------------------------------------------------------
++    //=========================================================================
++    // round3d: 4 相邮箱看门狗（DRAFT）。正常往返 <100 aclk；4096 aclk=41us 判死等。
++    //=========================================================================
++    localparam [11:0] MBOX_WD_MAX = 12'hFFF;
++    reg [11:0] lr_wd, lw_wd;           // 读/写通道非 IDLE 停留计数
++    reg        lr_to, lw_to;           // 超时单拍标志（IDLE 清）
++    reg        lr_err_req, lw_err_req; // 单拍"错误请求"，由本 FSM 置、错误块消费
++    reg        mbox_clr_tog;           // aclk -> clk_user 清邮箱翻转事件（单驱动块）
++    reg  [1:0] mbox_fault;             // sticky: [0]=读超时 [1]=写超时（单驱动块）
++
++    // round3d: 单驱动错误聚合块（坑 #25：同一 reg 不得被两个 always 写）
++    always @(posedge aclk) begin
++        if (!aresetn) begin
++            mbox_fault   <= 2'd0;
++            mbox_clr_tog <= 1'b0;
++        end else begin
++            if (lr_err_req) mbox_fault[0] <= 1'b1;
++            if (lw_err_req) mbox_fault[1] <= 1'b1;
++            // 两个通道同拍出错只翻转一次（XOR 合并，避免 ++ 再 ++ 相互抵消）
++            mbox_clr_tog <= mbox_clr_tog ^ (lr_err_req ^ lw_err_req);
++        end
++    end
+
+# ---------------------------------------------------------------------------
+# [A3] 写通道超时（rtl/axi_lite_regs.v, :189-251 的 always 块内）
+# ---------------------------------------------------------------------------
+     else begin
++        // round3d: 写通道看门狗
++        if (lwst != LW_IDLE) begin
++            if (lw_wd == MBOX_WD_MAX) lw_to <= 1'b1;
++            else                      lw_wd <= lw_wd + 12'd1;
++        end else begin
++            lw_wd <= 12'd0;
++            lw_to <= 1'b0;
++        end
++        lw_err_req <= 1'b0;                 // 默认单拍
+         // ★FIX(2026-10-18): AXI 要求握手后下一拍立即撤销 VALID。
+         if (s_axi_bvalid && s_axi_bready) s_axi_bvalid <= 1'b0;
+@@
+             LW_EXEC: begin
+                 s_axi_awready <= 1'b0;
+                 s_axi_wready  <= 1'b0;
+-                if (a_ack_s[1]) begin
++                if (lw_to) begin
++                    // round3d: user 侧死等 -> 放弃该写、返回 SLVERR、请求清邮箱
++                    lw_err_req   <= 1'b1;
++                    a_req        <= 1'b0;
++                    s_axi_bresp  <= 2'b10;          // SLVERR
++                    s_axi_bvalid <= 1'b1;
++                    lwst         <= LW_CLOSE;
++                end else if (a_ack_s[1]) begin
+                     a_req        <= 1'b0;
+                     s_axi_bvalid <= 1'b1;
+                     lwst         <= LW_CLOSE;
+@@
+             LW_CLOSE: begin
+                 s_axi_awready <= 1'b0;
+                 s_axi_wready  <= 1'b0;
+-                if (!a_ack_s[1]) lwst <= LW_IDLE;
++                if (lw_to) begin
++                    // round3d: ack 回程永不撤 -> 强制清邮箱回 IDLE（bvalid 由握手撤销）
++                    lw_err_req <= 1'b1;
++                    a_req      <= 1'b0;
++                    lwst       <= LW_IDLE;
++                end else if (!a_ack_s[1]) lwst <= LW_IDLE;
+             end
+@@
+             lwst          <= LW_IDLE;
+             s_axi_awready <= 1'b0;
+             ...
++            lw_wd         <= 12'd0;
++            lw_to         <= 1'b0;
++            lw_err_req    <= 1'b0;
+
+# ---------------------------------------------------------------------------
+# [A4] 读通道超时（rtl/axi_lite_regs.v, :278-331 的 always 块内）
+# ---------------------------------------------------------------------------
+     else begin
++        // round3d: 读通道看门狗
++        if (lrst != LR_IDLE) begin
++            if (lr_wd == MBOX_WD_MAX) lr_to <= 1'b1;
++            else                      lr_wd <= lr_wd + 12'd1;
++        end else begin
++            lr_wd <= 12'd0;
++            lr_to <= 1'b0;
++        end
++        lr_err_req <= 1'b0;                 // 默认单拍
+         d_ack <= d_ack;
+         if (s_axi_rvalid && s_axi_rready) s_axi_rvalid <= 1'b0;
+@@
+             LR_RACK: begin
+                 s_axi_arready <= 1'b0;
+-                if (r_ack_s[1]) begin
++                if (lr_to) begin
++                    // round3d: r_ack 永不到 -> 放弃、返回 SLVERR、请求清邮箱
++                    lr_err_req   <= 1'b1;
++                    r_req        <= 1'b0;
++                    s_axi_rdata  <= 32'd0;
++                    s_axi_rresp  <= 2'b10;          // SLVERR
++                    s_axi_rvalid <= 1'b1;
++                    lrst         <= LR_DACK;
++                end else if (r_ack_s[1]) begin
+                     r_req <= 1'b0;
+                     lrst  <= LR_DRQ;
+                 end
+@@
+             LR_DRQ: begin
+-                if (d_req_s[1]) begin
++                if (lr_to) begin
++                    lr_err_req   <= 1'b1;
++                    r_req        <= 1'b0;
++                    s_axi_rdata  <= 32'd0;
++                    s_axi_rresp  <= 2'b10;          // SLVERR
++                    s_axi_rvalid <= 1'b1;
++                    lrst         <= LR_DACK;
++                end else if (d_req_s[1]) begin
+                     s_axi_rdata  <= d_data;
+                     s_axi_rvalid <= 1'b1;
+@@
+             LR_DACK: begin
+-                if (!d_req_s[1]) begin
++                if (lr_to) begin
++                    // round3d: d_req 永不撤 -> 强制复位邮箱
++                    lr_err_req <= 1'b1;
++                    d_ack      <= 1'b0;
++                    r_req      <= 1'b0;
++                    lrst       <= LR_IDLE;
++                end else if (!d_req_s[1]) begin
+                     d_ack <= 1'b0;
+                     lrst  <= LR_IDLE;
+                 end
+@@
+             lrst          <= LR_IDLE;
+             s_axi_arready <= 1'b0;
+             ...
++            lr_wd         <= 12'd0;
++            lr_to         <= 1'b0;
++            lr_err_req    <= 1'b0;
+
+# ---------------------------------------------------------------------------
+# [A5] user 侧：清邮箱事件同步 + mbox_fault 读回同步（插在 user 命令 FSM 之前, 约 :340）
+# ---------------------------------------------------------------------------
++    //=========================================================================
++    // round3d: mbox_clr_tog -- aclk -> clk_user 2FF + 边沿检测（只复位邮箱 FSM）
++    //=========================================================================
++    (* ASYNC_REG = "TRUE" *) reg mbox_clr_s1, mbox_clr_s2;
++    reg mbox_clr_last;
++    always @(posedge clk_user) begin
++        if (!rst_user_n) begin
++            mbox_clr_s1 <= 1'b0; mbox_clr_s2 <= 1'b0; mbox_clr_last <= 1'b0;
++        end else begin
++            mbox_clr_s1   <= mbox_clr_tog;
++            mbox_clr_s2   <= mbox_clr_s1;
++            mbox_clr_last <= mbox_clr_s2;
++        end
++    end
++    wire mbox_clr_evt = mbox_clr_s2 ^ mbox_clr_last;   // 单拍
++
++    // mbox_fault -> clk_user 2FF（准静态 sticky, 供 Lite 读回 +0x50）
++    (* ASYNC_REG = "TRUE" *) reg [1:0] mbox_fault_s1, mbox_fault_s2;
++    always @(posedge clk_user) begin
++        if (!rst_user_n) begin mbox_fault_s1 <= 2'd0; mbox_fault_s2 <= 2'd0; end
++        else begin mbox_fault_s1 <= mbox_fault; mbox_fault_s2 <= mbox_fault_s1; end
++    end
+
+# （user 命令 FSM :344-469 与 user 读 FSM :477-532 各加 else-if 分支：）
+     always @(posedge clk_user) begin
+         if (!rst_user_n) begin
+             ...
++        end
++        else if (mbox_clr_evt) begin
++            // round3d: aclk 超时放弃 -> 只复位邮箱 FSM/应答, 不动功能寄存器
++            ust   <= U_IDLE;
++            a_ack <= 1'b0;
+         end
+         else begin
+@@
+     always @(posedge clk_user) begin
+         if (!rst_user_n) begin
+             ...
++        end
++        else if (mbox_clr_evt) begin
++            urst  <= UR_IDLE;
++            r_ack <= 1'b0;
++            d_req <= 1'b0;
+         end
+         else begin
+@@
+-                        6'h11: d_data <= dma_wr_dbg;
++                        6'h11: d_data <= dma_wr_dbg;
++                        6'h14: d_data <= {30'd0, mbox_fault_s2};   // round3d: +0x50 邮箱故障粘滞
+                         default: d_data <= 32'd0;
+
+# ---------------------------------------------------------------------------
+# [A6] 卡死检测扩到 8 形态（rtl/axi_lite_regs.v round3c 段 :607-641）
+#      dbg_o 位图/宽度不变：bit31-34 语义不变，bit35 = |l_stuck_r[7:0]。
+#      bit4-7 通过新增 +0x50? 不——它们只进 OR 触发；如需逐位区分请下轮扩 dbg_o。
+# ---------------------------------------------------------------------------
+-    reg [9:0] hg_r_cnt, hg_w_cnt, hg_ar_cnt, hg_rr_cnt;
+-    reg [3:0] l_stuck_r;
++    reg [9:0] hg_r_cnt, hg_w_cnt, hg_ar_cnt, hg_rr_cnt;
++    reg [9:0] hg_b_cnt, hg_aw_cnt, hg_ww_cnt, hg_pd_cnt;
++    reg [7:0] l_stuck_r;
+@@
+-            l_stuck_r <= 4'd0;
++            hg_b_cnt <= 10'd0; hg_aw_cnt <= 10'd0;
++            hg_ww_cnt <= 10'd0; hg_pd_cnt <= 10'd0;
++            l_stuck_r <= 8'd0;
+@@
+             if (s_axi_rvalid && !s_axi_rready) begin
+                 if (hg_rr_cnt == 10'd255) l_stuck_r[3] <= 1'b1;
+                 else                      hg_rr_cnt <= hg_rr_cnt + 10'd1;
+             end else hg_rr_cnt <= 10'd0;
++            // [4] B 已回、主端不取（fix2 读门控含 !bvalid -> 会把后续读整个冰封）
++            if (s_axi_bvalid && !s_axi_bready) begin
++                if (hg_b_cnt == 10'd255) l_stuck_r[4] <= 1'b1;
++                else                     hg_b_cnt <= hg_b_cnt + 10'd1;
++            end else hg_b_cnt <= 10'd0;
++            // [5] 主端举 AWVALID 而从机不受理
++            if (s_axi_awvalid && !s_axi_awready) begin
++                if (hg_aw_cnt == 10'd255) l_stuck_r[5] <= 1'b1;
++                else                      hg_aw_cnt <= hg_aw_cnt + 10'd1;
++            end else hg_aw_cnt <= 10'd0;
++            // [6] 主端举 WVALID 而从机不受理
++            if (s_axi_wvalid && !s_axi_wready) begin
++                if (hg_ww_cnt == 10'd255) l_stuck_r[6] <= 1'b1;
++                else                      hg_ww_cnt <= hg_ww_cnt + 10'd1;
++            end else hg_ww_cnt <= 10'd0;
++            // [7] 写事务半锁存（AW 已收 W 永不到 / 反之）悬置
++            if (aw_pending | w_pending) begin
++                if (hg_pd_cnt == 10'd255) l_stuck_r[7] <= 1'b1;
++                else                      hg_pd_cnt <= hg_pd_cnt + 10'd1;
++            end else hg_pd_cnt <= 10'd0;
+@@
+-    assign dbg_o[35] = |l_stuck_r;
++    assign dbg_o[35] = |l_stuck_r;   // round3d: 8 形态的 or（bit4-7 无独立输出）
+
+# =============================================================================
+# [B] 固件（sw/j3_soft/src/main.c）
+# =============================================================================
+--- a/sw/j3_soft/src/main.c
++++ b/sw/j3_soft/src/main.c
+@@
+ #define S2MM_SA      (*(volatile unsigned *)(DMA_BASE + 0x48u))
+ #define S2MM_LENGTH  (*(volatile unsigned *)(DMA_BASE + 0x58u))
++/* round3d: lite_regs +0x50 邮箱超时粘滞 {30'd0,[1]=写超时,[0]=读超时} */
++#define R_MBOX       (*(volatile unsigned *)(REGS_BASE + 0x50u))
+ #define DMA_CR_RESET 0x00000004u
+@@
+             uputs("[B2] U wdbg:");
+             {
+                 unsigned w1 = dread(&R_WRDBG), w2 = dread(&R_WRDBG), w3 = dread(&R_WRDBG);
+                 uputc(' '); uputh(w3); uputc(' '); uputh(w2); uputc(' '); uputh(w1);
+             }
++            {   /* round3d: 邮箱超时粘滞，先读后打印（坑 #44） */
++                unsigned m1 = dread(&R_MBOX);
++                uputs("\r\n[B2] U mbox: ");
++                uputh(m1);
++            }
+             uputs("\r\n");
+@@
+     S2MM_LENGTH = len;                          /* 写 LENGTH = 启动传输 */
++    /* round3d 纪律（写成注释防回归）: LENGTH 之后必须"立即"写 GO；
++     * 所有诊断读（C/DMA 寄存器）一律放到 GO + busy_ms(20) 之后。
++     * 反例: round3b 16D06BD3 把 5 个 rd_reg 插在 LENGTH 与 GO 之间，
++     * 板端实测 WA_CNT=0 + 零 commit（R2_official_tool_diagnosis_20261018.md §3）。 */
+     g_wr_last_toggle = tog;
+*** End Patch (draft) ***
+
+# =============================================================================
+# 变更清单（对齐上面 hunk 的意图；合入前必须人工 rebase + 编译 + 回归）：
+#   A1  2FF ASYNC_REG: l_rstuser_s1/s2（round3c 新增, 本轮遗漏）
+#   A2  邮箱看门狗公共件 + **单驱动错误聚合块**（mbox_fault/mbox_clr_tog 唯一驱动者）
+#   A3  写通道: LW_EXEC/LW_CLOSE 超时 -> SLVERR(bresp=2'b10)+bvalid, 清 a_req
+#   A4  读通道: LR_RACK/LR_DRQ 超时 -> SLVERR(rresp=2'b10)+rvalid, 清 r_req;
+#        LR_DACK 超时 -> 强制清 d_ack/r_req 回 IDLE
+#   A5  mbox_clr_tog(a c lk)-> clk_user 2FF 边沿 -> 复位 ust/urst/a_ack/r_ack/d_req（仅邮箱）
+#       新增只读 +0x50 = mbox_fault（经 2FF 进 clk_user 快照 mux，6'h14）
+#   A6  l_stuck_r 4->8：新增 [4]bvalid&!bready / [5]awvalid&!awready / [6]wvalid&!wready /
+#        [7]aw_pending|w_pending；dbg_o[35]=|8bit（位图不变，BD/ILA/build 零改动）
+#   B1  main.c: R_MBOX(+0x50) 定义 + 'U' 打印 + LENGTH→GO 顺序纪律注释
+# 资源: lite_regs(OOC,100MHz) +≈80 FF + 少量 LUT（<0.1% 器件；100MHz 无压力）。
+# 时序: 不新增 300MHz 路径；OOC 100MHz 域最差路径远未饱和。
+# 兼容: BD 端口/地址/ILA 位图/lite 读寄存器 R1 之前的地址全不变；+0x50 为新增只读。
+# =============================================================================

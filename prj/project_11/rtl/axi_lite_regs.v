@@ -92,7 +92,11 @@ module axi_lite_regs (
     input  wire [31:0] dma_wr_req,       // {pending,6'b0,toggle,slot,len} (user 域镜像)
     input  wire [31:0] dma_wr_dbg,       // {fault,7'b0,last_alloc_slot,last_commit_len}
     output reg         cfg_wr_go,        // 软核 S2MM 编程完成后翻转 (桥见翻转才放流)
-    output reg         cfg_wr_ack        // 软核 fault 恢复确认翻转 (桥 WD_HALT 出口)
+    output reg         cfg_wr_ack,       // 软核 fault 恢复确认翻转 (桥 WD_HALT 出口)
+    // ---- round3c (2026-10-19): AXI 楔死只读观测总线 ----
+    //   BD 外部端口 (mb_ctrl/dbg_l_bus) -> 顶层 -> u_ila_4 @clk_100m。
+    //   位定义见文件末尾 DBG 段；纯观测，不参与任何协议/功能逻辑。
+    output wire [35:0] dbg_o
 );
 
     localparam [7:0] OP_SET_MODE   = 8'h01;   // same codes as cmd_channel
@@ -526,5 +530,114 @@ module axi_lite_regs (
             endcase
         end
     end
+
+    //=========================================================================
+    // round3c (2026-10-19): AXI-Lite 楔死只读观测（去往 u_ila_4 @clk_100m）
+    //---------------------------------------------------------------------
+    // WHY: lite fix2 合入后板上仍复现"写后读楔死"（记录 2026-10-19：固件
+    //      g_step=11 挂在读 +0x40 WR_REQ）。板上没有 aclk 域 ILA，必须把
+    //      lite_regs 的 AXI 握手 / FSM 状态 / 邮箱同步等级引出到顶层观测。
+    // 约束: 本段只读——dbg_o 不反馈进任何 FSM，功能逻辑零改动。
+    // 总线位定义 (u_ila_4 probe0, LSB first):
+    //   [0]  s_axi_arvalid        [1]  s_axi_arready
+    //   [2]  s_axi_rvalid         [3]  s_axi_rready
+    //   [4]  s_axi_awvalid        [5]  s_axi_awready
+    //   [6]  s_axi_wvalid         [7]  s_axi_wready
+    //   [8]  s_axi_bvalid         [9]  s_axi_bready
+    //   [10] araddr==+0x34        [11] araddr==+0x40
+    //   [12] araddr==+0x44        [13] araddr=其它
+    //   [14] awaddr==+0x0C        [15] awaddr==+0x48
+    //   [16] awaddr==+0x4C        [17] awaddr=其它
+    //   [18] lwst[0]  [19] lwst[1]  [20] lrst[0]  [21] lrst[1]
+    //   [22] a_req    [23] a_ack_s[1]   [24] r_req   [25] r_ack_s[1]
+    //   [26] d_req_s[1]  [27] d_ack
+    //   [28] aresetn  [29] rst_user_n(2FF 进 aclk)  [30] rst_user 曾拉低(sticky)
+    //   [31..34] 卡死 sticky: lrst 悬置 / lwst 悬置 / arvalid&!arready / rvalid&!rready
+    //   [35] |stuck (u_ila_4 触发位)
+    //=========================================================================
+    assign dbg_o[0]  = s_axi_arvalid;
+    assign dbg_o[1]  = s_axi_arready;
+    assign dbg_o[2]  = s_axi_rvalid;
+    assign dbg_o[3]  = s_axi_rready;
+    assign dbg_o[4]  = s_axi_awvalid;
+    assign dbg_o[5]  = s_axi_awready;
+    assign dbg_o[6]  = s_axi_wvalid;
+    assign dbg_o[7]  = s_axi_wready;
+    assign dbg_o[8]  = s_axi_bvalid;
+    assign dbg_o[9]  = s_axi_bready;
+    assign dbg_o[10] = (s_axi_araddr[7:2] == 6'h0D);   // +0x34 DMA_REQ
+    assign dbg_o[11] = (s_axi_araddr[7:2] == 6'h10);   // +0x40 WR_REQ (挂死地址)
+    assign dbg_o[12] = (s_axi_araddr[7:2] == 6'h11);   // +0x44 WR_DBG
+    assign dbg_o[13] = !(dbg_o[10] | dbg_o[11] | dbg_o[12]);
+    assign dbg_o[14] = (s_axi_awaddr[7:2] == 6'h03);   // +0x0C SET_ENGINE
+    assign dbg_o[15] = (s_axi_awaddr[7:2] == 6'h12);   // +0x48 SET_WRGO
+    assign dbg_o[16] = (s_axi_awaddr[7:2] == 6'h13);   // +0x4C SET_WRACK
+    assign dbg_o[17] = !(dbg_o[14] | dbg_o[15] | dbg_o[16]);
+    assign dbg_o[18] = lwst[0];
+    assign dbg_o[19] = lwst[1];
+    assign dbg_o[20] = lrst[0];
+    assign dbg_o[21] = lrst[1];
+    assign dbg_o[22] = a_req;
+    assign dbg_o[23] = a_ack_s[1];
+    assign dbg_o[24] = r_req;
+    assign dbg_o[25] = r_ack_s[1];
+    assign dbg_o[26] = d_req_s[1];
+    assign dbg_o[27] = d_ack;
+    assign dbg_o[28] = aresetn;
+
+    // rst_user_n (clk_user 域) 2FF 进 aclk + sticky "曾被拉低"：
+    //   判别"邮箱两侧复位失配导致 aclk 侧等待永不到达"假说（aresetn vs ~aurora_rst）。
+    reg l_rstuser_s1, l_rstuser_s2, l_rstuser_evt;
+    always @(posedge aclk) begin
+        if (!aresetn) begin
+            l_rstuser_s1  <= 1'b1;
+            l_rstuser_s2  <= 1'b1;
+            l_rstuser_evt <= 1'b0;
+        end else begin
+            l_rstuser_s1 <= rst_user_n;
+            l_rstuser_s2 <= l_rstuser_s1;
+            if (!l_rstuser_s2) l_rstuser_evt <= 1'b1;
+        end
+    end
+    assign dbg_o[29] = l_rstuser_s2;
+    assign dbg_o[30] = l_rstuser_evt;
+
+    // 卡死检测：纯观测计数器。正常 4 相邮箱往返 ≈ 10–30 aclk 拍；
+    // 门限 256 拍（2.56us @100MHz）留 8x 余量，避免把正常背压误判成卡死。
+    reg [9:0] hg_r_cnt, hg_w_cnt, hg_ar_cnt, hg_rr_cnt;
+    reg [3:0] l_stuck_r;
+    always @(posedge aclk) begin
+        if (!aresetn) begin
+            hg_r_cnt <= 10'd0; hg_w_cnt <= 10'd0;
+            hg_ar_cnt <= 10'd0; hg_rr_cnt <= 10'd0;
+            l_stuck_r <= 4'd0;
+        end else begin
+            // [31] 读 FSM 停在非 IDLE
+            if (lrst != LR_IDLE) begin
+                if (hg_r_cnt == 10'd255) l_stuck_r[0] <= 1'b1;
+                else                     hg_r_cnt <= hg_r_cnt + 10'd1;
+            end else hg_r_cnt <= 10'd0;
+            // [32] 写 FSM 停在非 IDLE
+            if (lwst != LW_IDLE) begin
+                if (hg_w_cnt == 10'd255) l_stuck_r[1] <= 1'b1;
+                else                     hg_w_cnt <= hg_w_cnt + 10'd1;
+            end else hg_w_cnt <= 10'd0;
+            // [33] 主端一直举 ARVALID 但从机不受理
+            if (s_axi_arvalid && !s_axi_arready) begin
+                if (hg_ar_cnt == 10'd255) l_stuck_r[2] <= 1'b1;
+                else                      hg_ar_cnt <= hg_ar_cnt + 10'd1;
+            end else hg_ar_cnt <= 10'd0;
+            // [34] 从机一直举 RVALID 但主端不取
+            if (s_axi_rvalid && !s_axi_rready) begin
+                if (hg_rr_cnt == 10'd255) l_stuck_r[3] <= 1'b1;
+                else                      hg_rr_cnt <= hg_rr_cnt + 10'd1;
+            end else hg_rr_cnt <= 10'd0;
+        end
+    end
+    assign dbg_o[31] = l_stuck_r[0];
+    assign dbg_o[32] = l_stuck_r[1];
+    assign dbg_o[33] = l_stuck_r[2];
+    assign dbg_o[34] = l_stuck_r[3];
+    assign dbg_o[35] = |l_stuck_r;
 
 endmodule

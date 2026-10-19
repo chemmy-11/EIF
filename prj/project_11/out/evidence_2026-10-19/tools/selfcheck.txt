@@ -1,0 +1,536 @@
+===============================================================================
+ R2 round3c 板验工具链 · 自检报告（selfcheck.txt）
+===============================================================================
+ 工程      : prj11 路线 B / R2 round3c（4-ILA 板验工具链）
+ 交付者    : Team 成员 script-tools（PC/离线侧）
+ 生成时间  : 2026-10-19 12:1x (Asia/Shanghai)
+ 工作机    : Windows / PowerShell 5.1.26100.9711 / Python 3.14.6 (full path)
+ Vivado    : 2023.1（本报告未启动任何 Vivado/xsct/串口/JTAG —— 纪律：不碰板）
+ 输出目录  : D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
+ 结论      : 全部静态自检 PASS；分析器三套 profile 干跑 PASS；
+             r3c_seq.ps1 各步 dry-run 正常；未验证项见 §7（均为“需板上执行”项，
+             按设计由 Lead 执行，工具作者离线交付）
+
+===============================================================================
+ §1 交付物清单与指纹（sha256 前 8；first3 = 文件前 3 字节十进制）
+===============================================================================
+ * .ps1 约定：first3 = 239,187,191（EF BB BF / UTF-8 BOM，坑 #17/#18）
+ * .tcl 约定：ASCII-only、无 BOM（Vivado 按主机 ANSI 码页解码，见坑 #1/#19）
+ * .py  约定：first3 = 35,33,47（"#!" shebang），py_compile 通过
+
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_cap.tcl
+    size=25,863  first3=35,32,61  sha8=A876EEC3   (A: 4 核 ILA 采集)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_diag.tcl
+    size=12,001  first3=35,32,61  sha8=7EE22D6D   (B: 楔死后 JTAG/LMB 读取)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_seq.ps1
+    size=32,371  first3=239,187,191  sha8=EC748C15  (C: 板验序列编排 + runbook 配套)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_runbook.md
+    size=19,251  first3=35,32,82  sha8=FD2B1D42   (C: 执行手册；含假设签名速查 §6)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py
+    size=58,655  first3=35,33,47  sha8=6FFF80B8   (D: CSV 判读器，纯标准库；
+                                                   2026-10-19 增 HYPOTHESIS 签名，见 §9)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_board_session_template.md
+    size=11,520  first3=35,32,82  sha8=8BE34D07   (板验会话记录模板，Lead 后续任务 3)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_pin.md
+    size=12,118  first3=35,32,82  sha8=D3EFE5F6   (E: S0 钉 hash 计划/4 核 LTX 期望)
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selfcheck.txt
+    (本文件, F: 自检结果)
+辅助（非 A–F 交付物，供复现）：
+D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\tcl_selfcheck.py
+    size=11,308  sha8=DF320DD5  (Tcl 静态检查器：括号/引号平衡 + 坑 #66 清单)
+D:\...\tools\selftest\gen_selftest_csv.py  size=7,535 sha8=D0EA7EE8
+D:\...\tools\selftest\r3c_selftest_ila4_wedge.csv     size=4,401 sha8=C8EC6A3B  (ILA4 named 布局)
+D:\...\tools\selftest\r3c_selftest_ila4_bus_wedge.csv size=5,963 sha8=1A07C696  (ILA4 打包总线布局)
+D:\...\tools\selftest\r3c_selftest_ila5_go.csv        size=3,095 sha8=8A7C8BC0  (ILA5 GO/ACK/intr/state)
+D:\...\tools\selftest\analyzer_dryrun.txt  size=12,020 sha8=640EFC21 (分析器全量干跑输出)
+D:\...\tools\selftest\seq_dryrun.txt       size=7,827  sha8=2E839FF0 (seq.ps1 Plan/All dry-run 输出)
+D:\...\tools\selftest\seqout\*.log  (r3c_seq.ps1 dry-run 自身日志 7 份，UTF-8 BOM)
+
+===============================================================================
+ §2 .ps1 自检（r3c_seq.ps1）
+===============================================================================
+[2.1] BOM 校验（PowerShell 5.1 下 -File 的真实读法；坑 #17/#18）
+  before edit : 239,187,191  (OK)
+  实测踩坑    : 用 edit 工具修改 r3c_seq.ps1 后，BOM 被静默剥掉 →
+                首 3 字节变为 35,32,61（"# ="），与坑 #18 描述完全一致；
+                重新用 python 追加 EF BB BF 后恢复 239,187,191。
+  结论        : 本文件最终状态 first3=239,187,191。**任何人再改此文件必须重验 BOM。**
+
+[2.2] 语法解析（Windows PowerShell 5.1，非 pwsh 7）
+  命令：powershell.exe -NoProfile -Command "$e=$null;$t=$null;
+        [System.Management.Automation.Language.Parser]::ParseFile('<path>',[ref]$t,[ref]$e);
+        Write-Output ('ParseErrors=' + $e.Count)"
+  结果：ParseErrors = 0     (PASS)
+
+[2.3] 分步 dry-run（默认无 -Run，不碰硬件；OutDir 用 selftest/seqout 隔离）
+  -Step Plan : R3C_STEP_RESULT: step=Plan result=PASS
+               TOOL_OK 8/8（python 全路径/uart_probe.py/xsct.bat/vivado.bat/
+               jb31b_burn_pair.tcl/r3c_cap.tcl/r3c_diag.tcl/r3c_ila_analyze.py）
+               PY_PYSERIAL: pyserial 3.5
+               SERIAL_PORTS: COM3,COM4,COM5 | wanted=COM5 present=True
+               ARTIFACT: ELF size=54224 sha8=F5E0F1F3 / HASH_OK（== -ExpectElfHash8）
+               ARTIFACT_MISSING: BIT/LTX = 空（round3c 产物未归档，属预期）
+  -Step Burn : BURN_PIN_WARN（干跑提示；-Run 下未钉 bit hash 会 BURN_REFUSED=设计）
+               R3C_STEP_RESULT: step=Burn result=DRYRUN
+  -Step Serial/Cap/Diag/SerialPost : 均 result=DRYRUN，打印将执行的完整命令行
+  -Step Status: 离线汇总最新 R3C_* 日志，result=PASS
+  -Step All   : 5 步全 DRYRUN，R3C_SEQ_RESULT: PASS (steps=5)
+  -Step 拼写检查：ValidateSet 限定 Plan/Burn/Serial/Ping/Cap/Diag/SerialPost/
+               Status/All，非法值在参数绑定阶段即拒绝。
+  （完整输出：selftest\seq_dryrun.txt、selftest\seqout\R3C_*_seq.log）
+
+===============================================================================
+ §3 .py 自检（py_compile，Python 3.14.6 全路径）
+===============================================================================
+  py_compile r3c_ila_analyze.py     exit=0  PASS
+  py_compile tcl_selfcheck.py       exit=0  PASS
+  py_compile gen_selftest_csv.py    exit=0  PASS
+  （编译缓存 __pycache__ 已清理，交付目录不含构建产物）
+
+===============================================================================
+ §4 .tcl 自检（本机无 tclsh；用 tcl_selfcheck.py 做静态检查）
+===============================================================================
+ 说明：任务要求“至少做引号/括号平衡自检 + 关键 API 逐条对照坑 #66 清单”。
+ 本机 `tclsh` 不存在（实测 NOT FOUND），因此无法做真正的 Tcl 解析；改用
+ tcl_selfcheck.py 做：
+   (a) 花括号 {}/方括号 []/双引号 " 平衡扫描（支持反斜杠转义、整行注释剥离、
+       引号内 [] 按 Tcl 替换规则计数、花括号内 '#' 字面量）；
+   (b) 坑 #66 三项 API 口径清单；
+   (c) 项目约定：ASCII-only、无硬编码 hw_ila_N、无 get_property VALUE、
+       行尾 '#' 检查（坑 #19）。
+
+[4.1] 实测结果（命令见 §8）
+  TCL_CHECK: r3c_cap.tcl   lines=668 bytes=25,863
+    -> RESULT: PASS（括号/引号平衡 0 错误；ASCII-only 0 非 ASCII 字节）
+  TCL_CHECK: r3c_diag.tcl  lines=304 bytes=12,001
+    -> RESULT: PASS
+  TCL_SELFCHECK_DONE: files=2 result=PASS
+
+[4.2] 坑 #66 三项口径核对表（检查器自动给出 NOTE 行，逐条均可核对）
+  ┌────────────┬─────────────────────────────────────────────────────────────┐
+  │ 坑 #66 条目 │ 本工具落实（r3c_cap.tcl 行号）                              │
+  ├────────────┼─────────────────────────────────────────────────────────────┤
+  │ ① BASIC     │ L312 set_prop_catch CONTROL.TRIGGER_MODE BASIC_ONLY $core    │
+  │   _ONLY +   │ L313 set_prop_catch CONTROL.TRIGGER_CONDITION AND $core      │
+  │   AND       │ （arm_core：先 reset → 显式模式/条件 → 再逐个 probe 设        │
+  │             │   TRIGGER_COMPARE_VALUE；多条件用 ';' 串联按 AND 合成）      │
+  ├────────────┼─────────────────────────────────────────────────────────────┤
+  │ ② wait_on_  │ L371 wait_on_hw_ila -timeout $waitmin $core                  │
+  │   hw_ila    │ $waitmin 默认 2（单位=分钟）；env：R2_WAIT_MIN /              │
+  │   -timeout  │ R2_TRIG_TIMEOUT_MIN / R3C_TRIG_TIMEOUT_MIN；r3c_seq.ps1      │
+  │   = 分钟    │ 的 -TrigTimeoutMin 直传 R2_WAIT_MIN。快照路径 L353 用 1 分钟。│
+  ├────────────┼─────────────────────────────────────────────────────────────┤
+  │ ③ write_hw_ │ L360/L384 write_hw_ila_data -force -csv_file $csvbase $d     │
+  │   ila_data  │ $csvbase = <outdir>/R3C_<tag>_<label>_<pre|post>（无 .csv）； │
+  │   -csv_file │ 随后 csv_rows 读 "${csvbase}.csv" 校验行数（Vivado 自动补后缀）│
+  │   = 基名    │                                                             │
+  ├────────────┼─────────────────────────────────────────────────────────────┤
+  │ #40 三连坑 │ ① 同会话 arm→stim→upload：L… 单 batch 内完成；               │
+  │             │ ② 不读 get_property VALUE（检查器确认 0 处），全部 CSV 落盘离线 │
+  │             │ ③ ILA 核定位一律 get_hw_probes -of_objects 反查（L243/252/281）│
+  │             │    无任何 hw_ila_N 硬编码（检查器确认）                      │
+  ├────────────┼─────────────────────────────────────────────────────────────┤
+  │ #44/#54     │ #44：串口步骤与 JTAG/ILA 步骤严格串行（r3c_seq.ps1 注释+实现）│
+  │             │ #54：r3c_diag.tcl 每地址 2 次哑读 + 同址复读至连续两值相等    │
+  │             │      （L131-137），并输出 stable=0/1 供审计                   │
+  └────────────┴─────────────────────────────────────────────────────────────┘
+
+[4.3] 检查器“非恒真”对照（防工具自身静默失效，坑 #43 思想）
+  对既有参考脚本跑同一检查器：
+    evidence_2026-10-18\tools\r2_ila5_capture.tcl  -> PASS（其确实有 BASIC_ONLY/AND）
+    evidence_2026-10-18\tools\r2_ilacap.tcl        -> FAIL
+        pitfall #66(1): CONTROL.TRIGGER_MODE BASIC_ONLY not found
+        pitfall #66(1): CONTROL.TRIGGER_CONDITION AND not found
+  即：round2d 的旧触发脚本确实缺坑 #66①（README 只提到 set TRIGGER_COMPARE_VALUE），
+  新 r3c_cap.tcl 已显式补齐 → 检查器能区分“合规/不合规”，不是恒 PASS。
+
+===============================================================================
+ §5 r3c_ila_analyze.py 干跑（离线，输入为真实 round3b wed2 CSV + 合成样例）
+===============================================================================
+[5.1] 真实 CSV（D:\...\evidence_2026-10-19\R2_ila_wed2_{ui,user}_pre.csv）
+  ANALYZE_FILE: ...\R2_ila_wed2_ui_pre.csv
+    PROFILE: LEGACY_UI (rows=1024 cols=17)
+    LEGACY_UI_VERDICT:
+      [L1] bridge1 ui counters are STATIC (wm=wr_frm=rd_frm=ost unchanged over
+           the window): no commit/read activity was captured -- consistent with
+           the round3b zero-commit wedge (user-side count stopped at the
+           pre-wedge value)
+  ANALYZE_FILE: ...\R2_ila_wed2_user_pre.csv
+    PROFILE: LEGACY_USER (rows=2048 cols=16)
+    LEGACY_USER_VERDICT:
+      [L1] user-side read counter did NOT advance: no frame was read out of
+           frame_mem_if in this window
+  ANALYZE_DONE: files=2 ok=2 failed=0
+  注：wed2 是 round3b 的 ILA3/ILA0 3 核抓取，不是 round3c ILA4/5；此处只证明
+      “真实 Vivado CSV 格式可被解析、legacy profile 结论可读”。
+
+[5.2] 合成 ILA4 · named 布局（audit-plan 布局，若构建改为独立命名 net 时用）
+  PROFILE: ILA4 (rows=64 cols=28) / ILA4_LAYOUT: named dbg_l_* alias nets
+  HANDSHAKE_COUNTS: AR=2 R=1 AW=0 W=0 B=0
+  LAST_AR: sample=17 word=0x11 byte=0x44 WR_DBG / R_AFTER_LAST_AR: count=0
+  STATE_LAST: lwst=0(LW_IDLE) lrst=1(LR_RACK) stuck=0x1 stuck_or=1
+  ILA4_VERDICT:
+    [L1] STUCK_OR=1 ... set bits=[0] (lrst != LR_IDLE)
+    [L1] READ FSM stuck in LR_RACK: r_req fired but the user-domain ack
+         (r_ack_s1) never came => cross-domain mailbox/user side did not answer
+    [L1] AR accepted (sample 17, word=0x11 byte=0x44 WR_DBG) but NO R beat after
+         it: the read data phase never completed
+    [L1] LAST_AR reads +0x44 WR_DBG: consistent with the firmware g_step=11
+         wedge (dread(R_WRDBG 0x44) never returns) -- cross-check with
+         r3c_diag.tcl G_STEP
+
+[5.3] 合成 ILA4 · PACKED 布局（round3c 实做 u_ila_4 形状：dbg_l_bus[0..35]
+      + dbg_l_bus[35]_1 重复列；分析器按 rtl/axi_lite_regs.v 位图自动还原）
+  PROFILE: ILA4 (rows=64 cols=40)
+  ILA4_LAYOUT: PACKED round3c dbg_l_bus[35:0] (u_ila_4 probe0=36b + probe1=bit35)
+  ILA4_BITMAP: 0=arvalid ... 35=stuck_or（全表见运行输出）
+  HANDSHAKE_COUNTS: AR=2 R=1 AW=0 W=0 B=0
+  AR_ADDR_SEQ: sample=10 byte=0x34 DMA_REQ / sample=17 byte=0x44 WR_DBG
+  LAST_AR: sample=17 byte=0x44 WR_DBG / R_AFTER_LAST_AR: count=0
+  STATE_LAST: lwst=0(LW_IDLE) lrst=1(LR_RACK) stuck=0x1 stuck_or=1
+  ILA4_VERDICT: 同上 4 条（结论与 named 布局一致 → 两种布局判读等价）
+  -> 这是 round3c 真实布局的判读路径，**Lead 的 ILA4 CSV 将走这条路径**。
+
+[5.4] 合成 ILA5 · round3c probe5
+  PROFILE: ILA5 (rows=64 cols=13)
+  GO_UI: rising=1 falling=1 first_rise=8；ACK_UI: rising=1
+  INTR_UI: rising=1 last_value=1 sticky_at_end=YES
+  S2MM_STATE: first=0(IDLE) last=4(WAITDONE) hist=[IDLE=7, WAITGO=4, STREAM=8,
+              WAITDONE=45]
+  S2MM_BEATS: count=2 / S2MM_FIRST_BEAT: sample=12 tdata=0xD555555555555555
+              tkeep=0xFF tlast=0
+  ILA5_VERDICT:
+    [L1] GO_UI reached the bridge at sample 8 (1 pulse(s))
+    [L1] S2MM introut is STICKY: asserted at sample 20 and never deasserted
+         (no retirement seen)
+    [L1] S2MM entered STREAM (state=2) at sample 11 => the write stream started
+    [L1] first S2MM beat tdata=0xD555555555555555 (= 8B preamble + SFD ...)
+  （合成样例仅验证解析/判读代码路径，属离线自证，不是板卡证据；[L1] 表示
+    与假想数据相容的结论，不构成对真实板卡的判定。）
+
+===============================================================================
+ §6 r3c_seq.ps1 / r3c_diag.tcl / r3c_pin.md 的静态核对要点
+===============================================================================
+[6.1] 路径存在性（r3c_seq.ps1 -Step Plan 已实测，2026-10-19 12:12）
+  python(全路径) OK；uart_probe.py OK；xsct.bat OK；vivado.bat OK；
+  jb31b_burn_pair.tcl OK；r3c_cap.tcl / r3c_diag.tcl / r3c_ila_analyze.py OK；
+  pyserial 3.5；COM5 在枚举列表（COM3,COM4,COM5）。
+[6.2] r3c_diag.tcl 符号表与 ELF 核对（离线实算，mb-nm）
+  ELF = D:\FPGA\prj\project_11\sw\j3_soft\Debug\j3_soft.elf
+        size=54,224  sha256=F5E0F1F3BC581B68B38EB665ABA555D7C6D050B07E4573483CFDF6E4AF3EFC08
+  命令：D:\Xilinx\Vitis\2023.1\gnu\microblaze\nt\bin\mb-nm.exe --print-size
+        --numeric-sort --defined-only <elf>
+  已核实（LMB base=0x0，地址=符号绝对地址；与 round3b 板上 r2_step_diag.tcl
+  读同一批地址得到 GDMA_MODE=1、G_STEP=0x0e/0x0b 的实证一致）：
+    g_dma_service 0x4508 / g_dma_mode 0x450c / g_wa_s2cr 0x4510 /
+    g_wa_s2sr 0x4514 / g_wa_s2len 0x4518 / g_wa_s2sr2 0x451c /
+    g_wa_s2len2 0x4520 / g_wa_wreq 0x4524 / g_wa_wdbg 0x4528 /
+    g_wa_cnt 0x452c / g_wa_done 0x4530 / g_step 0x4534 /
+    g_wr_last_toggle 0x4538 / __bss_end 0x453c
+  r3c_diag.tcl 把上表写入头注释 + EXPECT 数组；运行时优先用 mb-nm 从 ELF 重新解析
+  并逐条比对（不一致打印 R3C_SYMTAB_WARN/MISMATCH，绝不用错地址读数）。
+[6.3] r3c_cap.tcl 的 round3c 实做对齐（构建脚本快照 2026-10-19 12:08）
+  scripts\build_synth_only.tcl sha8=7671026E：
+    u_ila_4 probe0 = bus_nets dbg_l_bus 36（36b）+ probe1 = 同 net bit35（1b）
+    u_ila_5 probe5 = dbg_wd_go_ui / dbg_wd_ack_ui / dbg_wd_intr_ui /
+                    dbg_wd_go_ok + dbg_s2mm_state[2:0]（7b）
+  scripts\create_bd_b.tcl sha8=3F102A3E：BD 端口 dbg_l_bus[35:0] ← axi_lite_regs_0/dbg_o
+  rtl\axi_lite_regs.v sha8=FECCEC0F：dbg_o[35:0] 位图（见 r3c_pin.md §2.1）
+  => r3c_cap.tcl 默认：ILA4 匹配 pattern 'dbg_l_bus'、触发 probe 'dbg_l_bus[35]'
+    （=|stuck）、R2C_EXPECT_WIDTH_ILA4=37；ILA5 触发 'dbg_wd_go_ui'；
+    期望总位宽 ILA0=110 / ILA3=152 / ILA5=82 / ILA4=37（宽度仅 WARN 核对）。
+    探针名字面匹配（str_contains）——含 '[' ']' 的 probe 名不会被当成 glob 字符类。
+
+===============================================================================
+ §7 未验证项 / 限制（必须如实记录；均不伪装为已验证）
+===============================================================================
+ [U1] 未启动任何 Vivado / xsct 会话（纪律：不碰板、不跑 vivado.exe）。
+      因此 r3c_cap.tcl / r3c_diag.tcl 只做了静态检查；其 hw_manager / xsct API
+      调用序列以既有板上实证脚本为基线（r2_ilacap.tcl、r2_ila5_capture.tcl、
+      r2_step_diag.tcl、jb31b_burn_pair.tcl），未在本机用真硬件重放。
+ [U2] 本机无 tclsh，Tcl 仅静态平衡/API 检查，**不能替代 Vivado 的 Tcl 解析**。
+ [U3] 未执行串口 / JTAG / ping（r3c_seq.ps1 全部 -Run 分支未经真机执行；
+      只验证了 dry-run 分支、工具存在性、pyserial、COM5 枚举）。
+ [U4] round3c 位流/LTX 尚未产出（构建进行中，2026-10-19 12:08 synth 启动）：
+      r3c_pin.md 的 §1 为待回填表；r3c_seq.ps1 的 BIT/LTX 默认值留空，
+      由 -Bit/-Ltx 或 -Round3cDir 自动发现；未钉 hash 时 -Run Burn 会拒绝。
+ [U5] 合成 CSV（selftest）只验证分析器代码路径；真实判据需 Lead 用 round3c
+      CSV 跑同一命令。
+ [U6] 若 Lead 构建时改动 dbg_l_bus 位序/位宽或 ILA5 probe5 名称，需同步：
+      r3c_pin.md §2、r3c_ila_analyze.py 的 DBGL_* 映射、r3c_cap.tcl 的
+      R2_TRIG_ILA4 / R2C_EXPECT_WIDTH_ILA4（r3c_pin.md §4-5 已列清单）。
+
+===============================================================================
+ §8 复现命令（离线、可随时重跑）
+===============================================================================
+ # 0) 工具版本
+ powershell.exe ?  (PS 5.1)
+ C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe --version
+
+ # 1) .ps1 BOM + PS5.1 解析
+ $p='D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_seq.ps1'
+ $b=[System.IO.File]::ReadAllBytes($p); $b[0..2] -join ','      # 期望 239,187,191
+ powershell.exe -NoProfile -Command "$e=$null;$t=$null;
+   [System.Management.Automation.Language.Parser]::ParseFile('$p',[ref]$t,[ref]$e);
+   Write-Output ('ParseErrors=' + $e.Count)"                      # 期望 0
+
+ # 2) .py 编译
+ $py='C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe'
+ & $py -m py_compile D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py
+ & $py -m py_compile D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\tcl_selfcheck.py
+
+ # 3) Tcl 静态自检
+ & $py D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\tcl_selfcheck.py `
+   D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_cap.tcl `
+   D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_diag.tcl
+
+ # 4) 分析器干跑（wed2 真实 CSV + 合成样例）
+ $env:PYTHONUTF8='1'
+ & $py D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py `
+   --dir D:\FPGA\prj\project_11\out\evidence_2026-10-19 --pattern "R2_ila_wed2_*.csv"
+ & $py D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py `
+   D:\...\tools\selftest\r3c_selftest_ila4_bus_wedge.csv `
+   D:\...\tools\selftest\r3c_selftest_ila4_wedge.csv `
+   D:\...\tools\selftest\r3c_selftest_ila5_go.csv
+
+ # 5) 板验序列 dry-run（不碰硬件）
+ powershell -NoProfile -ExecutionPolicy Bypass -File `
+   D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_seq.ps1 -Step Plan
+ powershell -NoProfile -ExecutionPolicy Bypass -File `
+   D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_seq.ps1 -Step All
+
+===============================================================================
+ §9 追加：判读器「假设签名」HYPOTHESIS（Lead 后续任务 1，2026-10-19 12:3x）
+===============================================================================
+[9.1] 变更对象：r3c_ila_analyze.py
+  新 size=58,655 B  sha8=6FFF80B8（原 339F0142）；py_compile exit=0 PASS。
+  新增输出（全部可 grep，写在 ILA4/ILA5_VERDICT 之后）：
+
+  ILA4（取值=窗口最后样本态；括号内为窗口级守卫）：
+    R3C_ILA4_HYPOTHESIS: H-reset   | rstuser_evt(bit30)=1（sticky）⇒ 用户域复位失配优先
+    R3C_ILA4_HYPOTHESIS: H-ARnever | arvalid=0 & arready=1 & rvalid=0 & lwst=lrst=0
+                                     & 邮箱 6 位全 0 &（整窗无 AR 握手）⇒ 上游 MCU/互联
+                                     未发读，非 lite_regs 内部悬置
+    R3C_ILA4_HYPOTHESIS: H-acklost | lrst≠0 & r_req=1 & r_ack_s1=0（读邮箱 C 回程丢）
+                                     或 lwst≠0 & a_req=1 & a_ack_s1=0（写邮箱 A 回程丢）
+    R3C_ILA4_HYPOTHESIS: H-bstuck  | bvalid=1 & bready=0 & lwst≠0 & arvalid=1 & arready=0
+                                     （B 响应未被消费 ⇒ 读被冰封）
+    R3C_ILA4_HYPOTHESIS: H-rvalid  | rvalid=1 & rready=0 & lrst≠0
+    R3C_ILA4_HYPOTHESIS: H-false-hs| AR/AW/W 握手与 FSM 非 IDLE 同拍（fix2 后不应出现；
+                                     指示旧网表/探针布局不符）
+    无匹配：R3C_ILA4_HYPOTHESIS: UNCLASSIFIED | ...
+            随后 R3C_ILA4_BITS_LAST:（全部解码信号最后值）
+            以及 R3C_ILA4_RAW_BITS_LAST:（打包布局时 b0..b35 原始位值）
+    输出顺序 = ILA4_HYP_ORDER（H-reset 优先，其后按 Lead 清单顺序）；可多条同时命中。
+
+  ILA5：
+    R3C_ILA5_HYPOTHESIS: GO_NOT_AT_BRIDGE | go_ui 全程无上升沿 **且** 其他 S2MM 活动
+                          （state/ack/intr/go_ok 任一非 0）存在
+    R3C_ILA5_HYPOTHESIS: GO_AT_BRIDGE_GO_OK_0 | go_ui 有上升沿但 go_ok 从未为 1
+    R3C_ILA5_HYPOTHESIS: GO_AT_BRIDGE_GO_OK_1_NOT_STREAM | GO+go_ok 已见但 state 从未 2(STREAM)
+    R3C_ILA5_HYPOTHESIS: INTR_STICKY | intr_ui 上升后从未回落、last=1
+    R3C_ILA5_HYPOTHESIS: ENTERED_STREAM | state=2 出现在某样本（给出样本号与直方图）
+    （防御变体：GO_AT_BRIDGE_GO_OK_UNKNOWN / GO_UI_PROBE_MISSING，仅在旧 CSV 缺探针时出现）
+    无匹配：UNCLASSIFIED + R3C_ILA5_BITS_LAST。
+
+[9.2] 正/负向自检：selftest\hypothesis_selftest.py（size=11,613 B，sha8=E4BE9A48）
+  方法：为每个标签生成合成 CSV（round3c 打包 dbg_l_bus 布局 / ILA5 probe5 布局），
+        以子进程方式真实执行 r3c_ila_analyze.py，greps HYPOTHESIS 行；
+        每个场景断言 expected ⊆ found 且 found ∩ forbidden = ∅；
+        再统计覆盖矩阵：每标签 positive≥1 且 negative≥1。
+  结果：13 场景全部 PASS；failures=0；coverage_fail=0；HYP_SELFTEST_RESULT: PASS
+  日志：selftest\hypothesis_selftest_log.txt（size=3,562 B，sha8=3D6189C7）
+
+  场景 / 期望 / 实际：
+    ila4_arnever            H-ARnever                          -> H-ARnever            PASS
+    ila4_idle_normal        UNCLASSIFIED                       -> UNCLASSIFIED         PASS
+    ila4_acklost_read       H-acklost                          -> H-acklost            PASS
+    ila4_acklost_write      H-acklost                          -> H-acklost            PASS
+    ila4_bstuck             H-bstuck                           -> H-bstuck             PASS
+    ila4_rvalid             H-rvalid                           -> H-rvalid             PASS
+    ila4_falsehs            H-false-hs                         -> H-false-hs           PASS
+    ila4_reset              H-reset                            -> H-reset              PASS
+    ila5_gonone             GO_NOT_AT_BRIDGE                   -> GO_NOT_AT_BRIDGE     PASS
+    ila5_gonook             GO_AT_BRIDGE_GO_OK_0               -> 同                   PASS
+    ila5_gooknostream       GO_AT_BRIDGE_GO_OK_1_NOT_STREAM    -> 同                   PASS
+    ila5_stream_sticky      ENTERED_STREAM,INTR_STICKY         -> 同（两标签）         PASS
+    ila5_healthy_idle       UNCLASSIFIED                       -> UNCLASSIFIED         PASS
+  覆盖矩阵（每个标签正/反例计数，全部 OK）：H-reset 1/12、H-ARnever 1/12、
+    H-acklost 2/11、H-bstuck 1/12、H-rvalid 1/12、H-false-hs 1/12、
+    GO_NOT_AT_BRIDGE 1/12、GO_AT_BRIDGE_GO_OK_0 1/12、
+    GO_AT_BRIDGE_GO_OK_1_NOT_STREAM 1/12、INTR_STICKY 1/12、
+    ENTERED_STREAM 1/12、UNCLASSIFIED 2/11。
+
+[9.3] 判读边界（重要，写入 runbook §6.1）
+  - GO_NOT_AT_BRIDGE 仅在“无 GO 且其他 S2MM 活动存在”时给出：整窗全静默 ⇒ UNCLASSIFIED，
+    避免把「没采到东西」误报成「GO 未到桥」（自检 ila5_healthy_idle 即此反例）。
+  - H-ARnever 额外要求整窗无 AR 握手，避免「读完成后回到 idle」误判为上游从未发读。
+  - 所有 HYPOTHESIS 按构造为 [L1]（单窗口状态签名），须与 g_step/串口/其他核互证后才升级。
+
+[9.4] 分析器干跑（更新版）
+  selftest\analyzer_dryrun.txt 重新生成（size=12,611 B，sha8=539769E2）：
+   - wed2 真实 CSV 2/2 PASS（legacy profile 结论不变，不受 HYPOTHESIS 影响）
+   - 合成 packed ILA4 wedge -> R3C_ILA4_HYPOTHESIS: H-acklost
+   - 合成 named ILA4 wedge -> R3C_ILA4_HYPOTHESIS: H-acklost
+   - 合成 ILA5 go -> R3C_ILA5_HYPOTHESIS: INTR_STICKY + ENTERED_STREAM
+
+[9.5] 本节新增/更新文件
+  .\r3c_ila_analyze.py（更新，sha8=6FFF80B8）
+  .\r3c_runbook.md（更新，sha8=FD2B1D42；§6 增假设签名速查表）
+  .\r3c_board_session_template.md（新增，sha8=8BE34D07；Lead 后续任务 3）
+  .\selftest\hypothesis_selftest.py（sha8=E4BE9A48）
+  .\selftest\hypothesis_selftest_log.txt（sha8=3D6189C7）
+  .\selftest\hyp_*.csv（13 个场景 CSV，各 ~448–2,031 B，仅自检用，非板卡证据）
+  .\selftest\analyzer_dryrun.txt（更新，sha8=539769E2）
+
+[9.6] 复核命令（新增文件的离线自检，可随时重跑）
+  $py='C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe'
+  & $py -m py_compile D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py
+  & $py -m py_compile D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\hypothesis_selftest.py
+  & $py D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\hypothesis_selftest.py
+      # 期望末行 HYP_SELFTEST_RESULT: PASS，13/13 场景，coverage_fail=0
+  & $py D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py `
+       D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\selftest\r3c_selftest_ila4_bus_wedge.csv
+      # 期望 R3C_ILA4_HYPOTHESIS: H-acklost
+
+===============================================================================
+ §10 追加（2026-10-19 16:0x，Lead 跟办：round3d 回填准备 + 证据索引）
+===============================================================================
+[10.1] r3c_pin.md 重写（round3c-diag 实测身份 + round3d 待回填 + 运行模板）
+  size≈18,684 B  sha8≈B0AE6824（本轮末次；以磁盘复算为准）  lines=201
+  - §1 round3c-diag 身份表（bit 9852016C 10,010,456 B / ltx DE94D05F 61,674 B /
+    xsa BEB97199 / 构建日志/ELF 清单，全部全量 SHA256）
+  - §2 round3d 待回填表 + 3 核 LTX 期望：ILA0=110b/13probes、ILA3=152b/14、
+    ILA5=47b/9（R3C_LITE_ILA5=1 无 state；用户原有 "12" 对应含 state 的 82b 全版）
+  - §3 `r2_board.ps1 -Run` 完整命令行（-Bit/-Elf/-BuildLog/-Expect*/-Xsa/
+    -IlaCapture/-IlaLtx/-IlaOutDir/-IlaExpectPing/-Port），含分步复跑与
+    r3c_cap 显式 CSV 替代路径
+  - §4 **S0 兼容预警**：round3d 成功标记 V5_SWEEP1_OK 不被 r2_board.ps1 S0 正则识别
+    （L1037-1045 只认 SWEEP2_/V5_SWEEP2_OK）⇒ 方案 A 五处正则补丁 / 方案 B 适配日志
+  - §5 S6/S10 探针表（ILA3 152b 全量、ILA0 110b、ILA5 47b；按 batch 名+宽度+用途）
+  - §6 `R2CAP_EXPECT_PROBES` 补丁草案（5→9：+dbg_wd_go_ui/ack_ui/intr_ui/go_ok；
+    round3d 不需要 dbg_l_bus）+ recon 所需列核对
+  - §7 round3d 归档 5 步 / §8 风险表
+
+[10.2] 新增 tools/r3d_s0_buildlog_adapter.py（S0 适配日志生成器，不改 r2_board.ps1）
+  size=9,434 B  sha8=C0ABA8CA；py_compile exit=0 PASS
+  离线验证（用 round3c 实产日志 build_r3c3_one.log + 9852016C.bit）：
+    S0_ADAPTER_MARKER: directive=ExtraTimingOpt wns=0.004 whs=0.004
+    S0_ADAPTER_SELFCHECK: WNS PASS / WHS PASS / okMarker PASS /
+                          failMarker_absent PASS / bitInLog PASS /
+                          bitLeafMatch PASS / drc0 PASS
+    S0_ADAPTER_RESULT: PASS
+  样例：tools\selftest\R3C_diag_s0_adapter_sample.log（1,095 B）
+  用法写在脚本头注释 + r3c_pin.md §4 方案 B。
+  说明：adapter 只搬运真实值（wns/whs/directive/bit 从日志解析、DRC/bitstream
+  行复制），wns/whs<0 或找不到成功标记则 exit 2。
+
+[10.3] 新增 out\evidence_2026-10-19\EVIDENCE_INDEX_r3c.md（证据索引，Lead 跟办 2）
+  lines=149（初版 148 + R2CAP 落地/out 根 r2_ilacap.tcl 行；size≈17 KB；sha8 以磁盘
+  复算为准，因索引本身仍在随证据补充而更新）
+  - §1 数据面判据（fourtier×2 / mb10×2 / recomposed）/ §2 ILA 彩排与 round3c-diag
+    CSV 全表（含行数/sha8；r3cA 的 ILA3=63b 标注“不可用于 S10”）/ §3 串口/
+    §4 固件·事件环·JTAG（evt2_dump 549 行等）/ §5 烧录 / §6 构建（attempt1/2 +
+    round3d synth 15:58 PASS 记录）/ §7 规划与审计 / §8 工具（含 Lead 追加的 5 个）/
+    §9 归档 / §10 缺口 / §11 R2CAP 核对 / §12 统计 + 本轮结论链
+  - 与 `R3C_board_session_20261019.md` §6（Lead 的简版索引）互补：本索引补全
+    size/sha8/行数/判据归属与缺口。
+  - 注：本文件 16:0x 两次补正（selfcheck sha8 行、round3d synth 状态行）后为
+    size=16,204 B / sha8=B8478B49；后续再增删文件需复算 §12 统计。
+
+[10.3b] round3d 构建进展核对（16:0x）
+  - `out/r3d_synth_console.log`：`Synthesis finished with 0 errors, 0 critical
+    warnings and 600 warnings` + `SYNTH_ONLY_DONE`；`R3C_LITE_ILA: 0
+    R3C_LITE_ILA5: 1`；`ILA5_PROBES: tdata64=32 tkeep8=8 + tvalid/tready/tlast +
+    probe5=4`；`ILA4_SKIPPED: env R3C_SKIP_ILA4 set (timing fallback, ltx = 3 cores)`；
+    `pre_impl_debug.dcp` 15:58:16 已出。
+  - ⇒ 与 r3c_pin.md §2.1 期望一致（ILA0 110b/13、ILA3 152b/14、ILA5 47b/9、3 核）；
+    sweep `out/r3d_one.log` 待跑/进行中，出流后按 r3c_pin.md §2/§7 回填。
+
+[10.4] 未验证项（如实记录）
+  - round3d 位流尚未出流（16:0x 时 r3d_synth.log 仍在增长）：r3c_pin.md §2 身份表为
+    待回填；S0 adapter 对 round3d 日志的最终验证需出流后跑一次（同一构建脚本，
+    round3c 实产日志已验 7/7）。
+  - 本轮新增/修改文件均未触碰 rtl/scripts/sw/docs；r2_board.ps1 未修改（仅给补丁草案）。
+  - EVIDENCE_INDEX 只读汇总，未改任何证据文件；其 sha8/行数在后续追加文件后需复算。
+
+[10.5] Lead 口径落实（2026-10-19 16:1x：方案 B + R2CAP 5→9 + S6/S10 宽度核对）
+  - **S0 口径**：采用方案 B（adapter，不改 r2_board.ps1）；r3c_pin.md §3.1/§4/§7
+    已标注“方案 B 已定”。adapter 见 [10.2]。
+  - **R2CAP_EXPECT_PROBES 5→9 已落地**（`out\r2_ilacap.tcl`；仅默认串 + 头注释，
+    判据逻辑未动）：
+      旧 sha256 = B5F2FF4CCADB53ED1F6E82208EB0BEDDAE46A03E081ABC36F0A1BCFC2B16FB72
+                 （21,443 B / 520 行，sha8 B5F2FF4C）
+      新 sha256 = C67DE6E096A325F97A8DA662DC088A3352E79580350FA9B1C01EDAE7C31A7829
+                 （22,056 B / 528 行，sha8 C67DE6E0）
+      默认串（L125）= dbg_s2mm_reqpend,dbg_wr_fault,dbg_s2mm_state,
+                     dbg_s2mm_tvalid,dbg_s2mm_tready,
+                     dbg_wd_go_ui,dbg_wd_ack_ui,dbg_wd_intr_ui,dbg_wd_go_ok（9 项；
+                     `R2CAP_EXPECT_PROBE_TOTAL` 自动 9；round3d 不加 dbg_l_bus）
+    复核：first3=35,32,61（无 BOM）；ASCII-only（0 非 ASCII 字节）；
+          tcl_selfcheck.balance_scan → 0 error / 0 warning；llength(默认串)=9。
+  - **S6/S10 宽度核对结论：无需改**。`r2_ilacap.tcl` 无任何宽度期望常量
+    （仅 L175-176 打印实测 width）；ILA3 63b→152b 只增加列/探针，发现逻辑按
+    `dbg_mem2_rd_frm` 子串反查，不受影响。唯一注意：`r2_board.ps1` L1678 在
+    `-IlaCapture` 分支显式覆盖 `R2_EXPECT_PROBES` 为旧 5 项（WARN-only，round3d
+    全存在 ⇒ 不报错、不影响判据）；**本轮不改 r2_board.ps1**，故 -IlaCapture 路径
+    presence 检查仍为 5 项，新增 4 个 dbg_wd_* 只在直接跑 r2_ilacap.tcl 时核对。
+  - **round3d sweep 已启动**：`out/r3d_one.log` 16:00:07 创建（~4.3 KB 开头，
+    尚无 V5_SWEEP1_OK 标记），预期出流后按 r3c_pin.md §2/§7 回填并跑 adapter。
+
+[10.6] 本轮对 out 根脚本的改动（唯一）
+  - `out\r2_ilacap.tcl`：见 [10.5]（旧/新 sha256 已记录，可用
+    `Get-FileHash` 复核）；其余 out 根脚本（r2_board.ps1 / r2_counter_recon.py /
+    j3_fourchains.ps1 / r2_mb10_sha.ps1）**未改动**。
+
+[10.7] round3d 回填 + S0–S11 运行结果复核（2026-10-19 16:3x）
+  - **r3c_pin.md §2 已回填（真实 hash）**：bit `F6012BA0FF8F9D7F3BCD9AC848A97F1C5E1B6DD7016DAD5BEBE93755E73C54C4`
+    （9,288,496 B）/ ltx `2F8AF49895396EBD33D08389EDE1BC2158DBA83D2398B1B8A4AE350B34BAF686`
+    （82,040 B；LTX 解析实测 ILA0 110b/13、ILA3 152b/14、ILA5 47b/9）/ xsa
+    `216839F4B6070621706D635CD9B76A9DAAED43EDADFB4AFC5B7DC66D9BB816F6`（2,579,584 B）/
+    ELF `BA3C0220`（61,296 B）/ adapter `7E705B7C`（959 B）；§3.1 命令已用真实 hash 固化
+    （16:29 Lead 已按此启动）；新增 §2.2 运行结果摘要。
+  - **S0–S11 run1 结果（`R3D_S0-S11_run1.log`，70,144 B / sha8 E18BBDF0，16:29:14–16:33:06）**：
+      S0 PASS / S1 PASS / S2 PASS / S3 PASS / S3b PASS / S4 PASS / S5 PASS /
+      **S6 PASS**（ILA3 152b 恢复：mem wm/wr_frm/rd_frm 各 +4、mem ost=0；mem2 rd_frm +4、
+      mem2 ost 前后 0）/ S7 PASS / S8 PASS / S9 PASS / **S10 NOT_OBTAINED（wrapper）** /
+      S11 PASS；`R2_RESULT: NOT_OBTAINED S10`。
+  - **S10 根因（工具标记缺口，非数据失败）**：`r2_counter_recon.py --mode recon`
+    （recon-only 分支 L1002-1014）只打印 `R2_COUNTER_RECON: PASS ...`，**不打印**
+    `R2_RECON_RESULT:`；而 `r2_board.ps1 Invoke-ReconJudge`（L827）只从
+    `R2_RECON_RESULT:` 取 verdict，缺省 NOT_OBTAINED。→ recon 本体实际 PASS。
+    离线等价取证（本工具作者执行，无板卡依赖）：
+      `py out\r2_counter_recon.py --mode recon --ui-post R2_ila_r2_20261019_162914_ui_post.csv
+       --user-post R2_ila_r2_20261019_162914_user_post.csv --json-out R3D_S10_recon_manual.json`
+      → exit 0；mem/mem2 wm==wr_frm==rd_frm=9、ost=0、mem stall/len_err=0、wr_fault=0；
+      证据 `R3D_S10_recon_manual.log`（3,795 B / `3114AAD9`，46 行）+
+      `R3D_S10_recon_manual.json`（1,186 B / `F1DDBB20`）。
+    处置（不改判据脚本，Lead 口径）：会话记录 S10 记「判据已取得（PASS，[L2] 等价取证）」，
+    wrapper NOT_OBTAINED 记为工具标记缺口；下一轮可选一行补丁（recon 分支加
+    `R2_RECON_RESULT: %s` 仿 L996，或 r2_board 加 fallback 解析）——待 Lead 决策。
+  - S6 抓取证据：`R2_ila_r2_20261019_162914_ui_post.csv`（68,835 B / `4B3F5C0C`，
+    ILA3 **152b/14 probes**）、`..._user_post.csv`（116,919 B / `134CC380`，ILA0 110b/13）；
+    `R2_ilacap_vivado_20261019_162914.log`（6,670 B / `2754A420`，`R2CAP_RESULT: PASS`）。
+  - 其余新证据：`R2_20261019_162914.log`（71,617 B / `BA0757A5`）、
+    `R2_4tier_20261019_162914.log`（1,459 B / `9B4175C1`）、
+    `R2_mb10_20261019_163149.log`（4,891 B / `720C3A38`，`R2_MB10_RESULT: PASS`）、
+    `R2_mb10_20261019_163149.recomposed.jsonl`（10,293,111 B / `4F38AF2C`）。
+  - 本轮未修改 r2_board.ps1 / r2_counter_recon.py（S10 处置只给建议与证据，不改脚本）。
+
+[10.8] 交付物最新指纹（以磁盘复算为准）
+  - tools\r3c_pin.md（本轮回填后）：见报告/索引 §9 行（约 2.4×10^4 B）
+  - EVIDENCE_INDEX_r3c.md：新增 §2b（round3d 运行/判定/证据）与 §10 round3d 归档块、
+    §11 缺口更新、S10 处置；行数随本节追加后再复算。
+  - 证据总数：本轮 S0–S11 新增顶层文件 ≥13（含 2 个 S10 等价取证文件）；索引已收。
+
+[10.9] round3d 工具补丁（Lead 决策：r2_counter_recon.py recon marker）与 run2 复核
+  - **`out\r2_counter_recon.py`**：旧 sha256 `C4AA2C3AAFB050F51161D773E468A12F8A58B7C63955FF0F8F3C3C9939AF695D`（45,947 B）→ 新 sha256 `26172AAF507D183F141D924E46C6D98DD7D4F7FB25BCB238DDC6C957672F59F4`（46,313 B）；备份 **`out\r2_counter_recon.py.bak_20261019_recon_marker`** sha256 `C4AA2C3AAFB050F51161D773E468A12F8A58B7C63955FF0F8F3C3C9939AF695D`（45,947 B，与旧全量一致）；diff 仅 2 处 marker print + 3 行注释，**判据逻辑零改动**（本工具作者逐行 diff 复核）；py_compile 由 Lead 验 exit 0。
+  - **run2（`R3D_S0-S11_run2.log`，70,856 B / `B9018AE0`，16:37–16:41）**：S0–S8 PASS、**S10 PASS（补丁生效：L846-847 `R2_COUNTER_RECON: PASS` + `R2_RECON_RESULT: PASS` → L1322 `[JUDGE] S10 PASS`）**、S11 PASS；**S9 NOT_OBTAINED**（J3 M 轮 `收帧停摆 @47/256`、`wr+256 rd+47`，`j3_fourchains_20261019_164008.log` 8,720 B/`D145375E`；现场 sticky=1、wmwr-wmrd 落后 232 帧）⇒ `R2_RESULT: NOT_OBTAINED S9`。按既有 J3 纪律：**不重试**，重烧 round3d pair 后重跑（S9 需新烧录后跑）；与 recon 补丁无关。
+  - 离线复验补丁：`py out\r2_counter_recon.py --mode recon --ui-post <run2 ui_post> --user-post <run2 user_post>` → exit 0 + `R2_RECON_RESULT: PASS`。
+  - run2 新证据（已入索引 §2b）：`R2_20261019_163712.log`（72,348 B / `4FD6F2A6`）、`R2_ilacap_vivado_20261019_163712.log`（6,670 B / `5F8C75E3`）、ILA CSV 163712（ui 68,835×2 `4B65FEC1`/`4B3F5C0C`；user 116,919×2 `09D27A80`/`FE1FCB0D`）、`R2_4tier_20261019_163712.log`（1,459 B / `9B4175C1`）、`R2_mb10_20261019_163946.log`（4,890 B / `E54BFC17`）+ recomposed（10,293,111 B / `4F38AF2C`）。
+  - **run3（重烧后最终验收，`R3D_S0-S11_run3.log`，69,821 B / sha256 `EC927EC68F8C121DCED02E4124A2BD6D098F34C89F86BD667E56E576A9A46646` / `EC927EC6`，16:42:45–16:46:35）：`R2_RESULT: PASS` —— S0–S11 全 13 步 PASS**（S9 J3 重烧后 `FOURCHAINS_RESULT: PASS`，M/A/B 全 PASS；S10 补丁 marker 复验 PASS；S11 sticky=0）。⇒ run2 的 S9 失败确认为可重烧恢复的板卡起始态问题（J3 纪律：残留态不重试、重烧后复验），与工具补丁无关。
+  - run3 新证据（已入索引 §2b.3）：`R2_20261019_164245.log`（71,294 B / `49CB7DB2`）、`R2_ilacap_vivado_20261019_164245.log`（6,670 B / `E07E3063`）、ILA CSV 164245（ui 68,835×2 `4B65FEC1`/`4B3F5C0C`；user 116,919×2 `E752B674`/`9A1961ED`）、`R2_4tier_20261019_164245.log`（1,459 B / `9B4175C1`）、`R2_mb10_20261019_164518.log`（4,892 B / `8971CEB3`）；J3 run3 日志 `out/evidence_2026-10-17/j3_fourchains_20261019_164540.log`（9,384 B / `20FCABCC`）+ `j3_m/a/b_20261019_164540.log`（800/805/800 B / `93555889`/`93C17B24`/`FD5E6303`）。
+
+===============================================================================
+ END selfcheck.txt
+===============================================================================

@@ -1004,11 +1004,16 @@ def main(argv=None):
         if not cols:
             msg = "recon 模式需要 --ui-post 或 --ui-pre CSV (判据未取得)"
             print("R2_COUNTER_RECON: NOT_OBTAINED " + msg)
+            print("R2_RECON_RESULT: NOT_OBTAINED")
             return 2
         label = "post" if ui_post_cols else "pre"
         v, r, detail = judge_recon(cols, user_post_cols or user_pre_cols, label=label,
                                    require_r2_probes=args.require_r2_probes)
         print("R2_COUNTER_RECON: %s %s" % (v, r))
+        # ★2026-10-19 工具维护: delta 模式一直打印 R2_RECON_RESULT, recon 模式漏了;
+        #   而 out/r2_board.ps1 的 Invoke-ReconJudge 只认 R2_RECON_RESULT => 真 PASS 被
+        #   汇总成 NOT_OBTAINED。此处补齐标记 (判据逻辑不变)。
+        print("R2_RECON_RESULT: %s" % v)
         if args.json_out:
             _write_json(args.json_out, {"mode": "recon", "verdict": v, "reason": r, "detail": detail})
         return 0 if v == "PASS" else (2 if v == "NOT_OBTAINED" else 1)

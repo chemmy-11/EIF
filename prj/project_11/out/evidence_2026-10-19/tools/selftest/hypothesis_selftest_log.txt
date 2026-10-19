@@ -1,0 +1,33 @@
+﻿HYP_SELFTEST_START
+HYP_SELFTEST_ANALYZER: D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\r3c_ila_analyze.py
+HYP_SELFTEST_PYTHON: C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe
+HYP_SELFTEST_SCENARIOS: 13
+HYP_SELFTEST_CASE: ila4_arnever           kind=ila4 rc=0 expected=H-ARnever                                     found=H-ARnever                                     PASS
+HYP_SELFTEST_CASE: ila4_idle_normal       kind=ila4 rc=0 expected=UNCLASSIFIED                                  found=UNCLASSIFIED                                  PASS
+HYP_SELFTEST_CASE: ila4_acklost_read      kind=ila4 rc=0 expected=H-acklost                                     found=H-acklost                                     PASS
+HYP_SELFTEST_CASE: ila4_acklost_write     kind=ila4 rc=0 expected=H-acklost                                     found=H-acklost                                     PASS
+HYP_SELFTEST_CASE: ila4_bstuck            kind=ila4 rc=0 expected=H-bstuck                                      found=H-bstuck                                      PASS
+HYP_SELFTEST_CASE: ila4_rvalid            kind=ila4 rc=0 expected=H-rvalid                                      found=H-rvalid                                      PASS
+HYP_SELFTEST_CASE: ila4_falsehs           kind=ila4 rc=0 expected=H-false-hs                                    found=H-false-hs                                    PASS
+HYP_SELFTEST_CASE: ila4_reset             kind=ila4 rc=0 expected=H-reset                                       found=H-reset                                       PASS
+HYP_SELFTEST_CASE: ila5_gonone            kind=ila5 rc=0 expected=GO_NOT_AT_BRIDGE                              found=GO_NOT_AT_BRIDGE                              PASS
+HYP_SELFTEST_CASE: ila5_gonook            kind=ila5 rc=0 expected=GO_AT_BRIDGE_GO_OK_0                          found=GO_AT_BRIDGE_GO_OK_0                          PASS
+HYP_SELFTEST_CASE: ila5_gooknostream      kind=ila5 rc=0 expected=GO_AT_BRIDGE_GO_OK_1_NOT_STREAM               found=GO_AT_BRIDGE_GO_OK_1_NOT_STREAM               PASS
+HYP_SELFTEST_CASE: ila5_stream_sticky     kind=ila5 rc=0 expected=ENTERED_STREAM,INTR_STICKY                    found=INTR_STICKY,ENTERED_STREAM                    PASS
+HYP_SELFTEST_CASE: ila5_healthy_idle      kind=ila5 rc=0 expected=UNCLASSIFIED                                  found=UNCLASSIFIED                                  PASS
+HYP_SELFTEST_COVERAGE:
+HYP_SELFTEST_TAG: H-reset                              positive=1 negative=12 OK
+HYP_SELFTEST_TAG: H-ARnever                            positive=1 negative=12 OK
+HYP_SELFTEST_TAG: H-acklost                            positive=2 negative=11 OK
+HYP_SELFTEST_TAG: H-bstuck                             positive=1 negative=12 OK
+HYP_SELFTEST_TAG: H-rvalid                             positive=1 negative=12 OK
+HYP_SELFTEST_TAG: H-false-hs                           positive=1 negative=12 OK
+HYP_SELFTEST_TAG: GO_NOT_AT_BRIDGE                     positive=1 negative=12 OK
+HYP_SELFTEST_TAG: GO_AT_BRIDGE_GO_OK_0                 positive=1 negative=12 OK
+HYP_SELFTEST_TAG: GO_AT_BRIDGE_GO_OK_1_NOT_STREAM      positive=1 negative=12 OK
+HYP_SELFTEST_TAG: INTR_STICKY                          positive=1 negative=12 OK
+HYP_SELFTEST_TAG: ENTERED_STREAM                       positive=1 negative=12 OK
+HYP_SELFTEST_TAG: UNCLASSIFIED                         positive=2 negative=11 OK
+HYP_SELFTEST_SUMMARY: scenarios=13 failures=0 coverage_fail=0
+HYP_SELFTEST_RESULT: PASS
+HYP_SELFTEST_DONE

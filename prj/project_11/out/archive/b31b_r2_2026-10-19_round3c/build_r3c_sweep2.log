@@ -1,0 +1,954 @@
+#-----------------------------------------------------------
+# Vivado v2023.1 (64-bit)
+# SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+# IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+# SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+# Start of session at: Mon Oct 19 13:42:24 2026
+# Process ID: 36856
+# Current directory: D:/FPGA
+# Command line: vivado.exe -mode batch -source D:\FPGA\prj\project_11\scripts\build_v5_sweep2.tcl -notrace -log D:\FPGA\prj\project_11\out\r3c2_sweep2.log -journal D:\FPGA\prj\project_11\out\r3c2_sweep2.jou
+# Log file: D:/FPGA/prj/project_11/out/r3c2_sweep2.log
+# Journal file: D:\FPGA\prj\project_11\out\r3c2_sweep2.jou
+# Running On: Xuegulin, OS: Windows, CPU Frequency: 2419 MHz, CPU Physical cores: 16, Host memory: 16890 MB
+#-----------------------------------------------------------
+source {D:\FPGA\prj\project_11\scripts\build_v5_sweep2.tcl} -notrace
+==================== TRY2 place -directive ExtraTimingOpt ====================
+Command: open_checkpoint D:/FPGA/prj/project_11/scripts/pre_impl_debug.dcp
+
+Starting open_checkpoint Task
+
+Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.064 . Memory (MB): peak = 1314.184 ; gain = 4.988
+INFO: [Device 21-403] Loading part xcku060-ffva1156-2-i
+Netlist sorting complete. Time (s): cpu = 00:00:02 ; elapsed = 00:00:02 . Memory (MB): peak = 2476.672 ; gain = 3.676
+INFO: [Netlist 29-17] Analyzing 3716 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 2 CPU seconds
+INFO: [Project 1-479] Netlist was created with Vivado 2023.1
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Timing 38-478] Restoring timing data from binary archive.
+INFO: [Timing 38-479] Binary timing data restore complete.
+INFO: [Project 1-856] Restoring constraints from binary archive.
+INFO: [Project 1-853] Binary constraint restore complete.
+Reading XDEF placement.
+Reading placer database...
+Reading XDEF routing.
+Read XDEF Files: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.367 . Memory (MB): peak = 2937.648 ; gain = 0.000
+Restored from archive | CPU: 0.000000 secs | Memory: 0.000000 MB |
+Finished XDEF File Restore: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.369 . Memory (MB): peak = 2937.648 ; gain = 0.000
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1704] No user IP repositories specified
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository 'D:/Xilinx/Vivado/2023.1/data/ip'.
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.029 . Memory (MB): peak = 3080.844 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 877 instances were transformed.
+  DSP48E1 => DSP48E2 (DSP_ALU, DSP_A_B_DATA, DSP_C_DATA, DSP_MULTIPLIER, DSP_M_DATA, DSP_OUTPUT, DSP_PREADD, DSP_PREADD_DATA): 3 instances
+  IBUF => IBUF (IBUFCTRL, INBUF): 9 instances
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IOBUFDS => IOBUFDS (DIFFINBUF, IBUFCTRL, INV, OBUFT(x2)): 8 instances
+  IOBUFE3 => IOBUFE3 (IBUFCTRL, INBUF, OBUFT_DCIEN): 72 instances
+  LUT6_2 => LUT6_2 (LUT5, LUT6): 111 instances
+  OBUFDS => OBUFDS_DUAL_BUF (INV, OBUF(x2)): 1 instance 
+  RAM16X1D => RAM32X1D (RAMD32(x2)): 2 instances
+  RAM256X1D => RAM256X1D (MUXF7(x4), MUXF8(x2), RAMD64E(x8)): 4 instances
+  RAM32M => RAM32M (RAMD32(x6), RAMS32(x2)): 221 instances
+  RAM32M16 => RAM32M16 (RAMD32(x14), RAMS32(x2)): 25 instances
+  RAM32X1D => RAM32X1D (RAMD32(x2)): 4 instances
+  RAM64M8 => RAM64M8 (RAMD64E(x8)): 208 instances
+  RAM64X1D => RAM64X1D (RAMD64E(x2)): 208 instances
+
+INFO: [Project 1-604] Checkpoint was created with Vivado v2023.1 (64-bit) build 3865809
+open_checkpoint: Time (s): cpu = 00:00:37 ; elapsed = 00:00:41 . Memory (MB): peak = 3080.844 ; gain = 1771.844
+INFO: [Chipscope 16-329] Generating Script for core instance : dbg_hub 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:xsdbm:3.0 for cell dbg_hub_CV.
+INFO: [Chipscope 16-329] Generating Script for core instance : u_ila_0 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:ila:6.2 for cell u_ila_0_CV.
+INFO: [Chipscope 16-329] Generating Script for core instance : u_ila_3 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:ila:6.2 for cell u_ila_3_CV.
+INFO: [Chipscope 16-329] Generating Script for core instance : u_ila_5 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:ila:6.2 for cell u_ila_5_CV.
+INFO: [Chipscope 16-78] labtools_xsdbm_v3 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/dbg_hub_CV.0/out/dcp/dbg_hub_0.edf'.
+INFO: [Chipscope 16-78] labtools_ila_v6 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/u_ila_0_CV.0/out/dcp/u_ila_0_1.edf'.
+INFO: [Chipscope 16-78] labtools_ila_v6 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/u_ila_3_CV.0/out/dcp/u_ila_3_2.edf'.
+INFO: [Chipscope 16-78] labtools_ila_v6 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/u_ila_5_CV.0/out/dcp/u_ila_5_3.edf'.
+implement_debug_core: Time (s): cpu = 00:00:14 ; elapsed = 00:03:46 . Memory (MB): peak = 3397.719 ; gain = 316.875
+Command: opt_design
+Attempting to get a license for feature 'Implementation' and/or device 'xcku060'
+INFO: [Common 17-349] Got license for feature 'Implementation' and/or device 'xcku060'
+Running DRC as a precondition to command opt_design
+
+Starting DRC Task
+INFO: [DRC 23-27] Running DRC with 2 threads
+INFO: [Project 1-461] DRC finished with 0 Errors
+INFO: [Project 1-462] Please refer to the DRC report (report_drc) for more information.
+
+Time (s): cpu = 00:00:03 ; elapsed = 00:00:02 . Memory (MB): peak = 3397.719 ; gain = 0.000
+
+Starting Cache Timing Information Task
+Ending Cache Timing Information Task | Checksum: 1cbad64e1
+
+Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.031 . Memory (MB): peak = 3397.719 ; gain = 0.000
+
+Starting Logic Optimization Task
+
+Phase 1 Generate And Synthesize MIG Cores
+ERROR: [IP_Flow 19-3805] Failed to generate and synthesize debug IP xilinx.com:ip:ddr4_phy:2.2. 
+ ERROR: [Common 17-69] Command failed: Vivado Synthesis failed
+ERROR: [Mig 66-119] Phy core regeneration & stitching failed. Please check vivado.log and debug_core_synth.log files in the directory: C:/Users/15266/AppData/Local/Temp/36856 to debug the problem.
+Phase 1 Generate And Synthesize MIG Cores | Checksum: 1cbad64e1
+
+Time (s): cpu = 00:00:08 ; elapsed = 00:00:41 . Memory (MB): peak = 3754.312 ; gain = 26.902
+INFO: [Common 17-83] Releasing license: Implementation
+44 Infos, 12 Warnings, 0 Critical Warnings and 3 Errors encountered.
+opt_design failed
+SWEEP2_ExtraTimingOpt: ABORT/TRANSIENT -> ERROR: [Opt 31-306] MIG/Advanced IO Wizard Cores generation Failed.
+
+==================== TRY2 place -directive ExtraPostPlacementOpt ====================
+Command: open_checkpoint D:/FPGA/prj/project_11/scripts/pre_impl_debug.dcp
+
+Starting open_checkpoint Task
+
+Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 3754.312 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:01 ; elapsed = 00:00:01 . Memory (MB): peak = 3754.312 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 3716 Unisim elements for replacement
+INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
+INFO: [Project 1-479] Netlist was created with Vivado 2023.1
+INFO: [Project 1-570] Preparing netlist for logic optimization
+INFO: [Timing 38-478] Restoring timing data from binary archive.
+INFO: [Timing 38-479] Binary timing data restore complete.
+INFO: [Project 1-856] Restoring constraints from binary archive.
+INFO: [Project 1-853] Binary constraint restore complete.
+Reading XDEF placement.
+Reading placer database...
+Reading XDEF routing.
+Read XDEF Files: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.316 . Memory (MB): peak = 3754.312 ; gain = 0.000
+Restored from archive | CPU: 0.000000 secs | Memory: 0.000000 MB |
+Finished XDEF File Restore: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.316 . Memory (MB): peak = 3754.312 ; gain = 0.000
+INFO: [IP_Flow 19-234] Refreshing IP repositories
+INFO: [IP_Flow 19-1704] No user IP repositories specified
+INFO: [IP_Flow 19-2313] Loaded Vivado IP repository 'D:/Xilinx/Vivado/2023.1/data/ip'.
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.020 . Memory (MB): peak = 3754.312 ; gain = 0.000
+INFO: [Project 1-111] Unisim Transformation Summary:
+  A total of 877 instances were transformed.
+  DSP48E1 => DSP48E2 (DSP_ALU, DSP_A_B_DATA, DSP_C_DATA, DSP_MULTIPLIER, DSP_M_DATA, DSP_OUTPUT, DSP_PREADD, DSP_PREADD_DATA): 3 instances
+  IBUF => IBUF (IBUFCTRL, INBUF): 9 instances
+  IBUFDS => IBUFDS (DIFFINBUF, IBUFCTRL): 1 instance 
+  IOBUFDS => IOBUFDS (DIFFINBUF, IBUFCTRL, INV, OBUFT(x2)): 8 instances
+  IOBUFE3 => IOBUFE3 (IBUFCTRL, INBUF, OBUFT_DCIEN): 72 instances
+  LUT6_2 => LUT6_2 (LUT5, LUT6): 111 instances
+  OBUFDS => OBUFDS_DUAL_BUF (INV, OBUF(x2)): 1 instance 
+  RAM16X1D => RAM32X1D (RAMD32(x2)): 2 instances
+  RAM256X1D => RAM256X1D (MUXF7(x4), MUXF8(x2), RAMD64E(x8)): 4 instances
+  RAM32M => RAM32M (RAMD32(x6), RAMS32(x2)): 221 instances
+  RAM32M16 => RAM32M16 (RAMD32(x14), RAMS32(x2)): 25 instances
+  RAM32X1D => RAM32X1D (RAMD32(x2)): 4 instances
+  RAM64M8 => RAM64M8 (RAMD64E(x8)): 208 instances
+  RAM64X1D => RAM64X1D (RAMD64E(x2)): 208 instances
+
+INFO: [Project 1-604] Checkpoint was created with Vivado v2023.1 (64-bit) build 3865809
+open_checkpoint: Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 3754.312 ; gain = 0.000
+INFO: [Chipscope 16-329] Generating Script for core instance : dbg_hub 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:xsdbm:3.0 for cell dbg_hub_CV.
+INFO: [Chipscope 16-329] Generating Script for core instance : u_ila_0 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:ila:6.2 for cell u_ila_0_CV.
+INFO: [Chipscope 16-329] Generating Script for core instance : u_ila_3 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:ila:6.2 for cell u_ila_3_CV.
+INFO: [Chipscope 16-329] Generating Script for core instance : u_ila_5 
+INFO: [IP_Flow 19-3806] Processing IP xilinx.com:ip:ila:6.2 for cell u_ila_5_CV.
+INFO: [Chipscope 16-78] labtools_xsdbm_v3 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/dbg_hub_CV.1/out/dcp/dbg_hub_4.edf'.
+INFO: [Chipscope 16-78] labtools_ila_v6 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/u_ila_0_CV.1/out/dcp/u_ila_0_5.edf'.
+INFO: [Chipscope 16-78] labtools_ila_v6 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/u_ila_3_CV.1/out/dcp/u_ila_3_6.edf'.
+INFO: [Chipscope 16-78] labtools_ila_v6 netlist file is 'd:/FPGA/.Xil/Vivado-36856-Xuegulin/u_ila_5_CV.1/out/dcp/u_ila_5_7.edf'.
+implement_debug_core: Time (s): cpu = 00:00:15 ; elapsed = 00:02:46 . Memory (MB): peak = 3796.117 ; gain = 41.805
+Command: opt_design
+Attempting to get a license for feature 'Implementation' and/or device 'xcku060'
+INFO: [Common 17-349] Got license for feature 'Implementation' and/or device 'xcku060'
+Running DRC as a precondition to command opt_design
+
+Starting DRC Task
+INFO: [DRC 23-27] Running DRC with 2 threads
+INFO: [Project 1-461] DRC finished with 0 Errors
+INFO: [Project 1-462] Please refer to the DRC report (report_drc) for more information.
+
+Time (s): cpu = 00:00:03 ; elapsed = 00:00:02 . Memory (MB): peak = 3796.117 ; gain = 0.000
+
+Starting Cache Timing Information Task
+Ending Cache Timing Information Task | Checksum: 1a686a369
+
+Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.062 . Memory (MB): peak = 3796.117 ; gain = 0.000
+
+Starting Logic Optimization Task
+
+Phase 1 Generate And Synthesize MIG Cores
+INFO: [IP_Flow 19-5647] Added synthesis output to IP cache for IP ddr4_0_phy, cache-ID = 8c5a445bed51b3aa
+read_xdc: Time (s): cpu = 00:00:11 ; elapsed = 00:00:08 . Memory (MB): peak = 3902.273 ; gain = 18.996
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.024 . Memory (MB): peak = 3903.328 ; gain = 0.000
+Phase 1 Generate And Synthesize MIG Cores | Checksum: 1e1ba42ab
+
+Time (s): cpu = 00:00:28 ; elapsed = 00:01:21 . Memory (MB): peak = 3903.328 ; gain = 33.781
+
+Phase 2 Retarget
+INFO: [Opt 31-1566] Pulled 28 inverters resulting in an inversion of 467 pins
+INFO: [Opt 31-138] Pushed 64 inverter(s) to 5337 load pin(s).
+INFO: [Opt 31-49] Retargeted 0 cell(s).
+Phase 2 Retarget | Checksum: 2032edaad
+
+Time (s): cpu = 00:00:34 ; elapsed = 00:01:27 . Memory (MB): peak = 4018.879 ; gain = 149.332
+INFO: [Opt 31-389] Phase Retarget created 810 cells and removed 5919 cells
+INFO: [Opt 31-1021] In phase Retarget, 154 netlist objects are constrained preventing optimization. Please run opt_design with -debug_log to get more detail. 
+
+Phase 3 Constant propagation
+INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
+Phase 3 Constant propagation | Checksum: 2d95f1f9e
+
+Time (s): cpu = 00:00:35 ; elapsed = 00:01:27 . Memory (MB): peak = 4018.879 ; gain = 149.332
+INFO: [Opt 31-389] Phase Constant propagation created 415 cells and removed 1249 cells
+INFO: [Opt 31-1021] In phase Constant propagation, 136 netlist objects are constrained preventing optimization. Please run opt_design with -debug_log to get more detail. 
+
+Phase 4 Sweep
+Phase 4 Sweep | Checksum: 281a9ebf6
+
+Time (s): cpu = 00:00:38 ; elapsed = 00:01:30 . Memory (MB): peak = 4018.879 ; gain = 149.332
+INFO: [Opt 31-389] Phase Sweep created 0 cells and removed 2896 cells
+INFO: [Opt 31-1021] In phase Sweep, 4953 netlist objects are constrained preventing optimization. Please run opt_design with -debug_log to get more detail. 
+
+Phase 5 BUFG optimization
+INFO: [Opt 31-194] Inserted BUFG u_mb_ctrl/mdm_1/U0/Use_E2.BSCAN_I/Dbg_Update_0_BUFG_inst to drive 39 load(s) on clock net u_mb_ctrl/mdm_1/U0/Use_E2.BSCAN_I/Dbg_Update_0_BUFGCE
+INFO: [Opt 31-193] Inserted 1 BUFG(s) on clock nets
+INFO: [Opt 31-1077] Phase BUFG optimization inserted 0 global clock buffer(s) for CLOCK_LOW_FANOUT.
+Phase 5 BUFG optimization | Checksum: 233959ae4
+
+Time (s): cpu = 00:00:40 ; elapsed = 00:01:31 . Memory (MB): peak = 4018.879 ; gain = 149.332
+INFO: [Opt 31-662] Phase BUFG optimization created 2 cells of which 2 are BUFGs and removed 3 cells.
+
+Phase 6 Shift Register Optimization
+INFO: [Opt 31-1064] SRL Remap converted 0 SRLs to 0 registers and converted 0 registers of register chains to 0 SRLs
+Phase 6 Shift Register Optimization | Checksum: 2225b3f54
+
+Time (s): cpu = 00:00:43 ; elapsed = 00:01:34 . Memory (MB): peak = 4018.879 ; gain = 149.332
+INFO: [Opt 31-389] Phase Shift Register Optimization created 0 cells and removed 0 cells
+
+Phase 7 Post Processing Netlist
+INFO: [Opt 31-1566] Pulled 1 inverters resulting in an inversion of 1 pins
+Phase 7 Post Processing Netlist | Checksum: 1d707d24a
+
+Time (s): cpu = 00:00:43 ; elapsed = 00:01:35 . Memory (MB): peak = 4018.879 ; gain = 149.332
+INFO: [Opt 31-389] Phase Post Processing Netlist created 0 cells and removed 1 cells
+INFO: [Opt 31-1021] In phase Post Processing Netlist, 198 netlist objects are constrained preventing optimization. Please run opt_design with -debug_log to get more detail. 
+Opt_design Change Summary
+=========================
+
+
+-------------------------------------------------------------------------------------------------------------------------
+|  Phase                        |  #Cells created  |  #Cells Removed  |  #Constrained objects preventing optimizations  |
+-------------------------------------------------------------------------------------------------------------------------
+|  Retarget                     |             810  |            5919  |                                            154  |
+|  Constant propagation         |             415  |            1249  |                                            136  |
+|  Sweep                        |               0  |            2896  |                                           4953  |
+|  BUFG optimization            |               2  |               3  |                                              0  |
+|  Shift Register Optimization  |               0  |               0  |                                              0  |
+|  Post Processing Netlist      |               0  |               1  |                                            198  |
+-------------------------------------------------------------------------------------------------------------------------
+
+
+
+Starting Connectivity Check Task
+
+Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.146 . Memory (MB): peak = 4018.879 ; gain = 0.000
+Ending Logic Optimization Task | Checksum: 21a2b121f
+
+Time (s): cpu = 00:00:43 ; elapsed = 00:01:35 . Memory (MB): peak = 4018.879 ; gain = 149.332
+
+Starting Power Optimization Task
+INFO: [Pwropt 34-132] Skipping clock gating for clocks with a period < 2.00 ns.
+INFO: [Power 33-23] Power model is not available for xiphy_riu_or
+INFO: [Power 33-23] Power model is not available for genVref.u_hpio_vref
+INFO: [Pwropt 34-9] Applying IDT optimizations ...
+INFO: [Pwropt 34-10] Applying ODC optimizations ...
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+Running Vector-less Activity Propagation...
+
+Finished Running Vector-less Activity Propagation
+
+
+Starting PowerOpt Patch Enables Task
+INFO: [Pwropt 34-162] WRITE_MODE attribute of 16 BRAM(s) out of a total of 85 has been updated to save power. Run report_power_opt to get a complete listing of the BRAMs updated.
+INFO: [Pwropt 34-201] Structural ODC has moved 3 WE to EN ports
+Number of BRAM Ports augmented: 29 newly gated: 3 Total Ports: 170
+Ending PowerOpt Patch Enables Task | Checksum: 2572f78c1
+
+Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.876 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Ending Power Optimization Task | Checksum: 2572f78c1
+
+Time (s): cpu = 00:01:05 ; elapsed = 00:00:46 . Memory (MB): peak = 6053.320 ; gain = 2034.441
+
+Starting Final Cleanup Task
+Ending Final Cleanup Task | Checksum: 2572f78c1
+
+Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.018 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Starting Netlist Obfuscation Task
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.074 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Ending Netlist Obfuscation Task | Checksum: 29dfc0d85
+
+Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.092 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Common 17-83] Releasing license: Implementation
+120 Infos, 126 Warnings, 0 Critical Warnings and 2 Errors encountered.
+opt_design completed successfully
+opt_design: Time (s): cpu = 00:01:54 ; elapsed = 00:02:27 . Memory (MB): peak = 6053.320 ; gain = 2257.203
+Command: place_design -directive ExtraPostPlacementOpt
+Attempting to get a license for feature 'Implementation' and/or device 'xcku060'
+INFO: [Common 17-349] Got license for feature 'Implementation' and/or device 'xcku060'
+INFO: [DRC 23-27] Running DRC with 2 threads
+INFO: [Vivado_Tcl 4-198] DRC finished with 0 Errors
+INFO: [Vivado_Tcl 4-199] Please refer to the DRC report (report_drc) for more information.
+Running DRC as a precondition to command place_design
+INFO: [DRC 23-27] Running DRC with 2 threads
+INFO: [Vivado_Tcl 4-198] DRC finished with 0 Errors
+INFO: [Vivado_Tcl 4-199] Please refer to the DRC report (report_drc) for more information.
+
+Starting Placer Task
+INFO: [Place 46-5] The placer was invoked with the 'ExtraPostPlacementOpt' directive.
+INFO: [Place 30-611] Multithreading enabled for place_design using a maximum of 2 CPUs
+
+Phase 1 Placer Initialization
+
+Phase 1.1 Placer Initialization Netlist Sorting
+Netlist sorting complete. Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.027 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 1.1 Placer Initialization Netlist Sorting | Checksum: 19fa1bc38
+
+Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.074 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.025 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 1.2 IO Placement/ Clock Placement/ Build Placer Device
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+INFO: [Place 30-1907] u_gmii_to_rgmii/u_rgmii_rx/u_idelayctrl_REPLICATED_0 replication was created for u_gmii_to_rgmii/u_rgmii_rx/u_idelayctrl IDELAYCTRL
+Phase 1.2 IO Placement/ Clock Placement/ Build Placer Device | Checksum: 87c1bcf2
+
+Time (s): cpu = 00:00:17 ; elapsed = 00:00:13 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 1.3 Build Placer Netlist Model
+Phase 1.3 Build Placer Netlist Model | Checksum: 1cf8e6dff
+
+Time (s): cpu = 00:00:46 ; elapsed = 00:00:33 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 1.4 Constrain Clocks/Macros
+Phase 1.4 Constrain Clocks/Macros | Checksum: 1cf8e6dff
+
+Time (s): cpu = 00:00:47 ; elapsed = 00:00:34 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 1 Placer Initialization | Checksum: 1cf8e6dff
+
+Time (s): cpu = 00:00:47 ; elapsed = 00:00:34 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 2 Global Placement
+
+Phase 2.1 Floorplanning
+Phase 2.1 Floorplanning | Checksum: 1e78238a4
+
+Time (s): cpu = 00:01:00 ; elapsed = 00:00:43 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 2.2 Update Timing before SLR Path Opt
+Phase 2.2 Update Timing before SLR Path Opt | Checksum: 181f475d8
+
+Time (s): cpu = 00:01:09 ; elapsed = 00:00:48 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 2.3 Post-Processing in Floorplanning
+Phase 2.3 Post-Processing in Floorplanning | Checksum: 181f475d8
+
+Time (s): cpu = 00:01:10 ; elapsed = 00:00:49 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 2.4 Global Placement Core
+INFO: [Place 30-3162] Check ILP status : ILP-based clock placer completed successfully.
+
+Phase 2.4.1 UpdateTiming Before Physical Synthesis
+Phase 2.4.1 UpdateTiming Before Physical Synthesis | Checksum: 16ce74073
+
+Time (s): cpu = 00:02:56 ; elapsed = 00:01:53 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 2.4.2 Physical Synthesis In Placer
+INFO: [Physopt 32-1035] Found 290 LUTNM shape to break, 2246 LUT instances to create LUTNM shape
+INFO: [Physopt 32-1044] Break lutnm for timing: one critical 148, two critical 142, total 290, new lutff created 20
+INFO: [Physopt 32-1138] End 1 Pass. Optimized 1298 nets or LUTs. Breaked 290 LUTs, combined 1008 existing LUTs and moved 0 existing LUT
+INFO: [Physopt 32-76] Pass 1. Identified 8 candidate nets for fanout optimization.
+INFO: [Physopt 32-81] Processed net u_mb_ctrl/axi_dma_0/U0/I_PRMRY_DATAMOVER/GEN_MM2S_FULL.I_MM2S_FULL_WRAPPER/ENABLE_AXIS_SKID.I_MM2S_SKID_BUF/sig_s_ready_dup. Replicated 9 times.
+INFO: [Physopt 32-81] Processed net u_mb_ctrl/axi_dma_0/U0/I_PRMRY_DATAMOVER/GEN_S2MM_FULL.I_S2MM_FULL_WRAPPER/GEN_ENABLE_INDET_BTT_SF.I_INDET_BTT/ENABLE_AXIS_SKID.I_INDET_BTT_SKID_BUF/sig_s_ready_dup. Replicated 7 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_cal_top/u_ddr_cal/u_ddr_cal_addr_decode/u_ddr_cal_cplx/cplx_cal. Replicated 6 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/div_clk_rst_r1. Replicated 81 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_ui/u_ddr_ui_wr_data/app_wdf_rdy_r. Replicated 7 times.
+INFO: [Physopt 32-81] Processed net u_mb_ctrl/axi_dma_0/U0/I_PRMRY_DATAMOVER/GEN_S2MM_FULL.I_S2MM_FULL_WRAPPER/ENABLE_AXIS_SKID.I_S2MM_STRM_SKID_BUF/sig_s_ready_dup. Replicated 6 times.
+INFO: [Physopt 32-81] Processed net u_mb_ctrl/axi_dma_0/U0/I_PRMRY_DATAMOVER/GEN_S2MM_FULL.I_S2MM_FULL_WRAPPER/I_S2MM_MMAP_SKID_BUF/sig_s_ready_dup. Replicated 8 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_ui/u_ddr_ui_wr_data/app_wdf_rdy_r_copy2. Replicated 6 times.
+INFO: [Physopt 32-232] Optimized 8 nets. Created 130 new instances.
+INFO: [Physopt 32-775] End 1 Pass. Optimized 8 nets or cells. Created 130 new cells, deleted 0 existing cell and moved 0 existing cell
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.252 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Physopt 32-456] No candidate cells for DSP register optimization found in the design.
+INFO: [Physopt 32-775] End 2 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-1123] No candidate cells found for Shift Register to Pipeline optimization
+INFO: [Physopt 32-775] End 2 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-677] No candidate cells for Shift Register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-526] No candidate cells for BRAM register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-846] No candidate cells for URAM register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-846] No candidate cells for URAM register optimization found in the design
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-949] No candidate nets found for dynamic/static region interface net replication
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.026 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Physopt 32-68] No nets found for critical-cell optimization.
+INFO: [Physopt 32-232] Optimized 0 net. Created 0 new instance.
+INFO: [Physopt 32-775] End 1 Pass. Optimized 0 net or cell. Created 0 new cell, deleted 0 existing cell and moved 0 existing cell
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.033 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Summary of Physical Synthesis Optimizations
+============================================
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+|  Optimization                                     |  Added Cells  |  Removed Cells  |  Optimized Cells/Nets  |  Dont Touch  |  Iterations  |  Elapsed   |
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+|  LUT Combining                                    |          290  |           1008  |                  1298  |           0  |           1  |  00:00:01  |
+|  Retime                                           |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Very High Fanout                                 |          130  |              0  |                     8  |           0  |           1  |  00:00:04  |
+|  DSP Register                                     |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Shift Register to Pipeline                       |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Shift Register                                   |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  BRAM Register                                    |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  URAM Register                                    |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Dynamic/Static Region Interface Net Replication  |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Critical Cell                                    |            0  |              0  |                     0  |           0  |           1  |  00:00:00  |
+|  Total                                            |          420  |           1008  |                  1306  |           0  |          10  |  00:00:05  |
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Phase 2.4.2 Physical Synthesis In Placer | Checksum: 1ce477ca9
+
+Time (s): cpu = 00:03:12 ; elapsed = 00:02:06 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 2.4 Global Placement Core | Checksum: 26d4de846
+
+Time (s): cpu = 00:03:24 ; elapsed = 00:02:15 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 2 Global Placement | Checksum: 26d4de846
+
+Time (s): cpu = 00:03:24 ; elapsed = 00:02:15 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3 Detail Placement
+
+Phase 3.1 Commit Multi Column Macros
+Phase 3.1 Commit Multi Column Macros | Checksum: 1e017ba48
+
+Time (s): cpu = 00:03:34 ; elapsed = 00:02:21 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.2 Commit Most Macros & LUTRAMs
+Phase 3.2 Commit Most Macros & LUTRAMs | Checksum: 190f715ce
+
+Time (s): cpu = 00:03:47 ; elapsed = 00:02:29 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.3 Small Shape DP
+
+Phase 3.3.1 Small Shape Clustering
+Phase 3.3.1 Small Shape Clustering | Checksum: 18fe723be
+
+Time (s): cpu = 00:04:24 ; elapsed = 00:02:57 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.3.2 DP Optimization
+Phase 3.3.2 DP Optimization | Checksum: 1e87e08c5
+
+Time (s): cpu = 00:05:19 ; elapsed = 00:03:30 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.3.3 Flow Legalize Slice Clusters
+Phase 3.3.3 Flow Legalize Slice Clusters | Checksum: 1f0b7485a
+
+Time (s): cpu = 00:05:20 ; elapsed = 00:03:30 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.3.4 Slice Area Swap
+
+Phase 3.3.4.1 Slice Area Swap Initial
+Phase 3.3.4.1 Slice Area Swap Initial | Checksum: 1a542b21c
+
+Time (s): cpu = 00:05:42 ; elapsed = 00:03:56 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 3.3.4 Slice Area Swap | Checksum: 1a542b21c
+
+Time (s): cpu = 00:05:42 ; elapsed = 00:03:56 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 3.3 Small Shape DP | Checksum: 1516fbe9d
+
+Time (s): cpu = 00:05:59 ; elapsed = 00:04:05 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.4 Re-assign LUT pins
+Phase 3.4 Re-assign LUT pins | Checksum: 166d86271
+
+Time (s): cpu = 00:06:02 ; elapsed = 00:04:08 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.5 Pipeline Register Optimization
+Phase 3.5 Pipeline Register Optimization | Checksum: 18f99e171
+
+Time (s): cpu = 00:06:02 ; elapsed = 00:04:09 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 3.6 Fast Optimization
+Phase 3.6 Fast Optimization | Checksum: e0ddb1ae
+
+Time (s): cpu = 00:06:48 ; elapsed = 00:04:39 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 3 Detail Placement | Checksum: e0ddb1ae
+
+Time (s): cpu = 00:06:49 ; elapsed = 00:04:39 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 4 Post Placement Optimization and Clean-Up
+
+Phase 4.1 Post Commit Optimization
+INFO: [Timing 38-35] Done setting XDC timing constraints.
+
+Phase 4.1.1 Post Placement Optimization
+Post Placement Optimization Initialization | Checksum: 11461e322
+
+Phase 4.1.1.1 BUFG Insertion
+
+Starting Physical Synthesis Task
+
+Phase 1 Physical Synthesis Initialization
+INFO: [Physopt 32-721] Multithreading enabled for phys_opt_design using a maximum of 2 CPUs
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-1.253 | TNS=-250.029 |
+Phase 1 Physical Synthesis Initialization | Checksum: 102fd94ea
+
+Time (s): cpu = 00:00:04 ; elapsed = 00:00:03 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Place 46-35] Processed net u_mem_i_1_n_0, inserted BUFG to drive 1327 loads.
+INFO: [Place 46-34] Processed net u_mb_ctrl/axi_dma_0/U0/I_PRMRY_DATAMOVER/GEN_S2MM_FULL.I_S2MM_FULL_WRAPPER/I_RESET/sig_stream_rst, BUFG insertion was skipped due to possible timing degradation.
+INFO: [Place 46-56] BUFG insertion identified 2 candidate nets. Inserted BUFG: 1, Replicated BUFG Driver: 0, Skipped due to Placement/Routing Conflicts: 0, Skipped due to Timing Degradation: 1, Skipped due to netlist editing failed: 0.
+Ending Physical Synthesis Task | Checksum: 606b8f13
+
+Time (s): cpu = 00:00:08 ; elapsed = 00:00:05 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 4.1.1.1 BUFG Insertion | Checksum: 10e696379
+
+Time (s): cpu = 00:07:38 ; elapsed = 00:05:11 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 4.1.1.2 Post Placement Timing Optimization
+INFO: [Place 30-746] Post Placement Timing Summary WNS=-0.525. For the most accurate timing information please run report_timing.
+Phase 4.1.1.2 Post Placement Timing Optimization | Checksum: 11563df2d
+
+Time (s): cpu = 00:10:26 ; elapsed = 00:08:02 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Time (s): cpu = 00:10:26 ; elapsed = 00:08:02 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 4.1 Post Commit Optimization | Checksum: 11563df2d
+
+Time (s): cpu = 00:10:26 ; elapsed = 00:08:02 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Post Placement Optimization Initialization | Checksum: 18b990439
+
+Starting Physical Synthesis Task
+
+Phase 1 Physical Synthesis Initialization
+INFO: [Physopt 32-721] Multithreading enabled for phys_opt_design using a maximum of 2 CPUs
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-0.525 | TNS=-141.724 |
+Phase 1 Physical Synthesis Initialization | Checksum: 102d7b336
+
+Time (s): cpu = 00:00:04 ; elapsed = 00:00:03 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Place 46-34] Processed net u_mb_ctrl/axi_dma_0/U0/I_PRMRY_DATAMOVER/GEN_S2MM_FULL.I_S2MM_FULL_WRAPPER/I_RESET/sig_stream_rst, BUFG insertion was skipped due to possible timing degradation.
+INFO: [Place 46-56] BUFG insertion identified 1 candidate nets. Inserted BUFG: 0, Replicated BUFG Driver: 0, Skipped due to Placement/Routing Conflicts: 0, Skipped due to Timing Degradation: 1, Skipped due to netlist editing failed: 0.
+Ending Physical Synthesis Task | Checksum: 16f623c95
+
+Time (s): cpu = 00:00:07 ; elapsed = 00:00:05 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Place 30-746] Post Placement Timing Summary WNS=-0.525. For the most accurate timing information please run report_timing.
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.065 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 4.2 Post Placement Cleanup
+Phase 4.2 Post Placement Cleanup | Checksum: 1e763b867
+
+Time (s): cpu = 00:12:27 ; elapsed = 00:09:49 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 4.3 Placer Reporting
+
+Phase 4.3.1 Print Estimated Congestion
+INFO: [Place 30-612] Post-Placement Estimated Congestion 
+ ____________________________________________________
+|           | Global Congestion | Short Congestion  |
+| Direction | Region Size       | Region Size       |
+|___________|___________________|___________________|
+|      North|                8x8|                8x8|
+|___________|___________________|___________________|
+|      South|                8x8|                8x8|
+|___________|___________________|___________________|
+|       East|                4x4|                8x8|
+|___________|___________________|___________________|
+|       West|                4x4|              16x16|
+|___________|___________________|___________________|
+
+Phase 4.3.1 Print Estimated Congestion | Checksum: 1e763b867
+
+Time (s): cpu = 00:12:27 ; elapsed = 00:09:49 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 4.3 Placer Reporting | Checksum: 1e763b867
+
+Time (s): cpu = 00:12:28 ; elapsed = 00:09:50 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 4.4 Final Placement Cleanup
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.025 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Time (s): cpu = 00:12:28 ; elapsed = 00:09:50 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Phase 4 Post Placement Optimization and Clean-Up | Checksum: 2053d300e
+
+Time (s): cpu = 00:12:28 ; elapsed = 00:09:50 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Ending Placer Task | Checksum: 111ec6241
+
+Time (s): cpu = 00:12:28 ; elapsed = 00:09:51 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Common 17-83] Releasing license: Implementation
+177 Infos, 126 Warnings, 0 Critical Warnings and 2 Errors encountered.
+place_design completed successfully
+place_design: Time (s): cpu = 00:12:35 ; elapsed = 00:09:56 . Memory (MB): peak = 6053.320 ; gain = 0.000
+Command: phys_opt_design -directive AggressiveExplore
+Attempting to get a license for feature 'Implementation' and/or device 'xcku060'
+INFO: [Common 17-349] Got license for feature 'Implementation' and/or device 'xcku060'
+INFO: [Vivado_Tcl 4-137] Directive used for phys_opt_design is: AggressiveExplore
+
+Starting Initial Update Timing Task
+
+Time (s): cpu = 00:00:35 ; elapsed = 00:00:20 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Vivado_Tcl 4-1435] PhysOpt_Tcl_Interface Runtime Before Starting Physical Synthesis Task | CPU: 37.00s |  WALL: 20.25s
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.026 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Starting Physical Synthesis Task
+
+Phase 1 Physical Synthesis Initialization
+INFO: [Physopt 32-721] Multithreading enabled for phys_opt_design using a maximum of 2 CPUs
+INFO: [Place 30-3162] Check ILP status : ILP-based clock placer completed successfully.
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-0.514 | TNS=-124.971 |
+Phase 1 Physical Synthesis Initialization | Checksum: 155c97d70
+
+Time (s): cpu = 00:00:14 ; elapsed = 00:00:09 . Memory (MB): peak = 6053.320 ; gain = 0.000
+
+Phase 2 SLR Crossing Optimization
+Phase 2 SLR Crossing Optimization | Checksum: 155c97d70
+
+Time (s): cpu = 00:00:14 ; elapsed = 00:00:09 . Memory (MB): peak = 6053.320 ; gain = 0.000
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-0.514 | TNS=-124.971 |
+
+Phase 3 Fanout Optimization
+INFO: [Physopt 32-76] Pass 1. Identified 50 candidate nets for fanout optimization.
+INFO: [Physopt 32-572] Net u_mem2/u_wr_bytes/ub_dout[0] was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[1]_rep_n_0. Replicated 10 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/ub_dout[5]. Replicated 4 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[2]_rep_n_0. Replicated 10 times.
+INFO: [Physopt 32-572] Net u_mem2/u_wr_desc/E[0] was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[0]_rep__1_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[1]_rep__0_n_0. Replicated 3 times.
+INFO: [Physopt 32-572] Net u_mem2/u_wr_bytes/ub_dout[4] was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-572] Net u_mem2/u_wr_bytes/ub_dout[1] was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[3]_rep_n_0. Replicated 10 times.
+INFO: [Physopt 32-572] Net u_mem2/u_wr_bytes/ub_dout[7] was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_bridge/r_bi[3]. Replicated 5 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[2]_rep__0_n_0. Replicated 3 times.
+INFO: [Physopt 32-572] Net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/tranSentC was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[1]_rep__1_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[1]_rep__3_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/ub_dout[6]. Replicated 4 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[1]_rep__2_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[0]_rep__2_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[2]_rep__2_n_0. Replicated 3 times.
+INFO: [Physopt 32-572] Net u_mem2/u_wr_bytes/ub_dout[2] was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[2]_rep__1_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[3].u_ddr_mc_group/cas_fifo_wptr[1]_i_2__1_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[3].u_ddr_mc_group/Q[0]. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem/u_bridge/rd_bin0. Replicated 1 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[3]_rep__1_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[2]_rep__3_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[0]_rep__0_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[3]_rep__3_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[0]_rep__3_n_0. Replicated 4 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/ub_dout[3]. Replicated 6 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[5]_rep_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[4]_rep__0_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[3]_rep__2_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_bridge/g_wr_hw.w_strb_r[63]_i_6_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[0]_rep_n_0. Replicated 10 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[3]_rep__0_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[5]. Replicated 4 times.
+INFO: [Physopt 32-572] Net u_mem/u_rd_bytes/wr_gray[11]_i_1__0_n_0 was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[5]_rep__1_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[4]_rep__1_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_bridge/r_bi[1]. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[4]_rep__2_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[4]_rep_n_0. Replicated 8 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_bridge/g_wr_hw.wr_slot_ptr_reg__0[2]. Replicated 4 times.
+INFO: [Physopt 32-572] Net u_mem2/u_bridge/r_slot was not replicated.
+Resolution: phys_opt_design can be forced to replicate a net driver using the option -force_replication_on_nets <list of net objects>.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/rd_bin_reg[4]_rep__3_n_0. Replicated 3 times.
+INFO: [Physopt 32-81] Processed net u_arb/rgrant[1]_i_2_n_0. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[3].u_ddr_mc_group/Q[1]. Replicated 2 times.
+INFO: [Physopt 32-81] Processed net u_mem2/u_wr_bytes/ub_empty. Replicated 6 times.
+INFO: [Physopt 32-232] Optimized 41 nets. Created 154 new instances.
+INFO: [Physopt 32-775] End 1 Pass. Optimized 41 nets or cells. Created 154 new cells, deleted 0 existing cell and moved 0 existing cell
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-0.514 | TNS=-94.412 |
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.148 . Memory (MB): peak = 7964.867 ; gain = 1.305
+Phase 3 Fanout Optimization | Checksum: 16d513581
+
+Time (s): cpu = 00:01:39 ; elapsed = 00:01:04 . Memory (MB): peak = 7964.867 ; gain = 1911.547
+
+Phase 4 Single Cell Placement Optimization
+INFO: [Physopt 32-660] Identified 215 candidate nets for placement-based optimization.
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[15]_i_1_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop[15]_i_1
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[7].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_1
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/p_0_in58_in.  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[10]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[2].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_6
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[15]_i_3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop[15]_i_3
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[1].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[1]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[13].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[13]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/S[4].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_14
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gen_wr_dma_obs.intr_ui_reg.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wd_pop[15]_i_6
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[1].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_7
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_6_n_0.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_6
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[0].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_8
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[0].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[0]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[12].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[12]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[14].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[14]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/p_0_in52_in.  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[8]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/rd_level_carry_i_16_n_0.  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_16
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/rd_level_carry_i_15_n_0.  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_15
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[3].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[3]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[8].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[8]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[4].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[4]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/S[5].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_13
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[2].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[2]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[7].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[7]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[9].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[9]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_7_n_0.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_7
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/p_1_in62_in.  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[12]
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/rd_level_carry_i_14_n_0.  Re-placed instance u_mem/u_wr_bytes/rd_level_carry_i_14
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wdst[2]_i_1_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wdst[2]_i_1
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/Q[2].  Re-placed instance u_mem/u_bridge/g_wr_dma.wdst_reg[2]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt[0]_i_3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt[0]_i_3
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wdst[2]_i_6_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wdst[2]_i_6
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/Q[1].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[1]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[3].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_5
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep__2_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep__2
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__2_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__2
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep__0_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep__0
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep__1_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[1]_rep__1
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[6].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[6]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[10].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[10]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[5].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[5]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_5_n_0.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_5
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/p_0_in55_in.  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[9]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[11].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[11]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[15].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[15]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/Q[0].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[0]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__0_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__0
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__1_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__1
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst_reg[0]_rep__3
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_drain_wait[3]_i_1_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_drain_wait[3]_i_1
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg_n_0_[3].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg[3]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg_n_0_[0].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg[0]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/wr_gray_s2_reg_n_0_[11].  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[11]
+INFO: [Physopt 32-663] Processed net u_mem2/u_wr_bytes/ub_dout[0].  Re-placed instance u_mem2/u_wr_bytes/g_wr_hw.w_data_r[504]_i_2
+INFO: [Physopt 32-663] Processed net u_mem2/u_wr_bytes/rd_bin_reg[3].  Re-placed instance u_mem2/u_wr_bytes/rd_bin_reg[3]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[88]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[88]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_bytes/g_wr_hw.w_data_r[504]_i_30_n_0.  Did not re-place instance u_mem2/u_wr_bytes/g_wr_hw.w_data_r[504]_i_30
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[88].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[88]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/S[6].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_12
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_8_n_0.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_8
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/rstate10_out.  Did not re-place instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_9
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_beat[7]_i_4_n_0.  Did not re-place instance u_mem2/u_bridge/r_beat[7]_i_4
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beats[1].  Re-placed instance u_mem2/u_bridge/r_beats_reg[1]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_bi[3]_i_1_n_0.  Re-placed instance u_mem2/u_bridge/r_bi[3]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_arlen[7]_INST_0_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/m_axi_arlen[7]_INST_0_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_beat[7]_i_15_n_0.  Did not re-place instance u_mem2/u_bridge/r_beat[7]_i_15
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beat[7]_i_9_n_0.  Re-placed instance u_mem2/u_bridge/r_beat[7]_i_9
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_30_n_0.  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_30
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_33_n_0.  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_33
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_bi[3].  Re-placed instance u_mem2/u_bridge/r_bi_reg[3]
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/p_0_in46_in.  Re-placed instance u_mem/u_wr_bytes/wr_gray_s2_reg[6]
+INFO: [Physopt 32-663] Processed net u_mem2/u_wr_desc/E[0].  Re-placed instance u_mem2/u_wr_desc/g_wr_hw.w_slot[7]_i_1
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[383]_i_1_n_0.  Re-placed instance u_mem2/u_bridge/g_wr_hw.w_data_r[383]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/ud_rd_en.  Did not re-place instance u_mem2/u_wr_desc/g_wr_hw.stat_len_err[15]_i_5
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/rd_gray[2]_i_3_n_0.  Did not re-place instance u_mem2/u_wr_desc/rd_gray[2]_i_3
+INFO: [Physopt 32-663] Processed net u_mem2/u_wr_desc/wr_gray_s2_reg_n_0_[2].  Re-placed instance u_mem2/u_wr_desc/wr_gray_s2_reg[2]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[380].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[380]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_9_n_0.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_9
+INFO: [Physopt 32-663] Processed net u_mem2/u_wr_desc/rd_gray_reg_n_0_[1].  Re-placed instance u_mem2/u_wr_desc/rd_gray_reg[1]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_bi[1]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/r_bi[1]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_bi[1]_repN_1.  Did not re-place instance u_mem2/u_bridge/r_bi_reg[1]_replica_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[344]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[344]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[344].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[344]
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/p_0_in34_in.  Re-placed instance u_mem/u_wr_bytes/wr_gray_s2_reg[2]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt[0]_i_1_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt[0]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_bi[1]_repN_2.  Did not re-place instance u_mem2/u_bridge/r_bi_reg[1]_replica_2
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[0].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[0]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[1].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[1]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[2].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[2]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[3].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[3]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[4].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[4]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[5].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[5]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[6].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[6]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[7].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[7]
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/p_0_in37_in.  Re-placed instance u_mem/u_wr_bytes/wr_gray_s2_reg[3]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_bi[1]_repN.  Did not re-place instance u_mem2/u_bridge/r_bi_reg[1]_replica
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[8].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[8]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[9].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[9]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[10].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[10]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[11].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[11]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[360]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[360]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[360].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[360]
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/tranSentC.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winPort[3]_i_1
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/last_reg.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[1]_i_1
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winWrite.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winWrite_reg
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/clrReq1.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/FSM_sequential_gr_cas_state[2]_i_4__2
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[3].u_ddr_mc_group/wrReq[0].  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[3].u_ddr_mc_group/write_req_ff[3]_i_2
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/prevSlot2_i_4_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/prevSlot2_i_4
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[1]_i_4__0_n_0.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[1]_i_4__0
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wrReqT[3].  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/winPort[1]_i_6
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/cmd_bank_cas_reg[1][0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_bank_cas[0]_i_1
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_bank_cas[0]_i_2_n_0.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_bank_cas[0]_i_2
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/win_bank_cas[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/win_bank_cas_reg[0]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[12].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[12]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[13].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[13]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[14].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[14]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[15].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[15]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/S[3].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_15
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/p_0_in4_in.  Did not re-place instance u_mem2/u_wr_desc/wr_gray_s2_reg[1]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/S[2].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_16
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/rdReqT[2].  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_9
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/clrReq17_out.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/FSM_sequential_gr_cas_state[2]_i_4__1
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[2].u_ddr_mc_group/rdReq[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[2].u_ddr_mc_group/read_req_ff[2]_i_2
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/u_ddr_mc_ctl/b2b_cas_not_allowed.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/prevSlot2_i_6
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/win_group_cas[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/win_group_cas_reg[0]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_bi[4].  Did not re-place instance u_mem2/u_bridge/r_bi_reg[4]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_bi[4]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/r_bi[4]_i_1
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[16].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[16]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[17].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[17]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[18].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[18]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[19].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_wait_cnt_reg[19]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[8]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[8]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[8].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[8]
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/p_0_in49_in.  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[7]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_28_n_0.  Did not re-place instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_28
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_115_n_0.  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_115
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[472]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[472]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[472].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[472]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[296]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[296]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[296].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[296]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beats[0].  Re-placed instance u_mem2/u_bridge/r_beats_reg[0]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_122_n_0.  Did not re-place instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_122
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_35_n_0.  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_35
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_10_n_0.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wdst[1]_i_10
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.byte_q[7]_i_1_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.byte_q[7]_i_1
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.byte_valid_q.  Re-placed instance u_mem/u_bridge/g_wr_dma.byte_valid_q_reg
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_ack_seen.  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_ack_seen_i_1
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.byte_q[7]_i_17_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.byte_q[7]_i_17
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.byte_q[7]_i_51_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.byte_q[7]_i_51
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_ack_seen_i_3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_ack_seen_i_3
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_ack_seen_reg_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_ack_seen_reg
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[1]_i_3_n_0.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[1]_i_3
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/rd_level_carry_i_13_n_0.  Re-placed instance u_mem/u_wr_bytes/rd_level_carry_i_13
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg_n_0_[2].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg[2]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst[1]_i_3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_3
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wdst[1]_rep_i_1__0_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wdst[1]_rep_i_1__0
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/rstate.  Did not re-place instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_1
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_29_n_0.  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_29
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/FSM_onehot_rstate[5]_i_8_n_0.  Did not re-place instance u_mem2/u_bridge/FSM_onehot_rstate[5]_i_8
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate_reg_n_0_[2].  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate_reg[2]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg_n_0_[1].  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_drain_wait_reg[1]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[264]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[264]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[264].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[264]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beats[2].  Re-placed instance u_mem2/u_bridge/r_beats_reg[2]
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_group_cas[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_group_cas[0]_i_1
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_group_cas[0]_i_2_n_0.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_group_cas[0]_i_2
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/brf_wr_en.  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate_reg[4]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/FSM_onehot_rstate_reg_n_0_[1].  Re-placed instance u_mem2/u_bridge/FSM_onehot_rstate_reg[1]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[216]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[216]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[216].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[216]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/g_wr_dma.wd_stall_cnt[23]_i_4_n_0.  Re-placed instance u_mem/u_bridge/g_wr_dma.wd_stall_cnt[23]_i_4
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst[2]_i_5_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[2]_i_5
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_bi[3]_repN_3.  Re-placed instance u_mem2/u_bridge/r_bi_reg[3]_replica_3
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winRead.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winRead_reg
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beat[7]_i_1_n_0.  Re-placed instance u_mem2/u_bridge/r_beat[7]_i_1
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beat_reg_n_0_[3].  Re-placed instance u_mem2/u_bridge/r_beat_reg[3]
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/S[1].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[1]_i_17
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[376]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[376]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[376].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[376]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_bi[3]_repN_2.  Re-placed instance u_mem2/u_bridge/r_bi_reg[3]_replica_2
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[480]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[480]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[480].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[480]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beat_reg_n_0_[2].  Re-placed instance u_mem2/u_bridge/r_beat_reg[2]
+INFO: [Physopt 32-663] Processed net u_mem2/u_wr_desc/rd_gray_reg_n_0_[2].  Re-placed instance u_mem2/u_wr_desc/rd_gray_reg[2]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[464]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[464]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[464].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[464]
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_beat_reg_n_0_[5].  Re-placed instance u_mem2/u_bridge/r_beat_reg[5]
+INFO: [Physopt 32-663] Processed net u_mem/u_bridge/rd_bin0_repN.  Re-placed instance u_mem/u_bridge/rd_gray[11]_i_1__0_replica
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/rd_bin_reg[3]_rep__3_n_0.  Re-placed instance u_mem/u_wr_bytes/rd_bin_reg[3]_rep__3
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/rd_bin_reg[4]_rep__2_n_0.  Re-placed instance u_mem/u_wr_bytes/rd_bin_reg[4]_rep__2
+INFO: [Physopt 32-663] Processed net u_mem2/u_bridge/r_bi[3]_repN_4.  Re-placed instance u_mem2/u_bridge/r_bi_reg[3]_replica_4
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winPort[3]_i_3_n_0.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winPort[3]_i_3
+INFO: [Physopt 32-662] Processed net u_mem/u_rd_bytes/wr_gray[11]_i_1__0_n_0.  Did not re-place instance u_mem/u_rd_bytes/wr_gray[11]_i_1__0
+INFO: [Physopt 32-663] Processed net u_mem/u_rd_bytes/wr_gray[9]_i_2__0_n_0.  Re-placed instance u_mem/u_rd_bytes/wr_gray[9]_i_2__0
+INFO: [Physopt 32-663] Processed net u_mem/u_rd_bytes/wr_bin_reg_n_0_[4].  Re-placed instance u_mem/u_rd_bytes/wr_bin_reg[4]
+INFO: [Physopt 32-663] Processed net u_mem/u_rd_bytes/ram_reg_3456_3519_0_6_i_1__0_n_0.  Re-placed instance u_mem/u_rd_bytes/ram_reg_3456_3519_0_6_i_1__0
+INFO: [Physopt 32-662] Processed net u_mem/u_rd_bytes/wr_gray[10]_i_2__0_n_0.  Did not re-place instance u_mem/u_rd_bytes/wr_gray[10]_i_2__0
+INFO: [Physopt 32-663] Processed net u_mem/u_rd_bytes/wr_gray[11]_i_10__0_n_0.  Re-placed instance u_mem/u_rd_bytes/wr_gray[11]_i_10__0
+INFO: [Physopt 32-662] Processed net u_mem/u_rd_bytes/wr_gray[11]_i_4__0_n_0.  Did not re-place instance u_mem/u_rd_bytes/wr_gray[11]_i_4__0
+INFO: [Physopt 32-663] Processed net u_mem/u_wr_bytes/rd_bin_reg[2]_rep__1_n_0.  Re-placed instance u_mem/u_wr_bytes/rd_bin_reg[2]_rep__1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[504]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[504]_i_1
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[504].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[504]
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/last32_reg_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[2]_i_1
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_8__0_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_8__0
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/u_ddr_mc_arb_c/reqs__3[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_5__0
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_beat_reg_n_0_[7].  Did not re-place instance u_mem2/u_bridge/r_beat_reg[7]
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[2].u_ddr_mc_group/p_10_in[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[2].u_ddr_mc_group/winPort[3]_i_22
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_15_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_15
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winWrite.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winWrite_i_1
+INFO: [Physopt 32-663] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winWrite_i_2_n_0.  Re-placed instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winWrite_i_2
+INFO: [Common 17-14] Message 'Physopt 32-663' appears 100 times and further instances of the messages will be disabled. Use the Tcl command set_msg_config to change the current settings.
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_beat_reg_n_0_[4].  Did not re-place instance u_mem2/u_bridge/r_beat_reg[4]
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/r_beat_reg_n_0_[6].  Did not re-place instance u_mem2/u_bridge/r_beat_reg[6]
+INFO: [Physopt 32-661] Optimized 101 nets.  Re-placed 101 instances.
+INFO: [Physopt 32-775] End 1 Pass. Optimized 101 nets or cells. Created 0 new cell, deleted 0 existing cell and moved 101 existing cells
+INFO: [Physopt 32-619] Estimated Timing Summary | WNS=-0.249 | TNS=-53.066 |
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.023 . Memory (MB): peak = 8119.199 ; gain = 0.285
+Phase 4 Single Cell Placement Optimization | Checksum: 181d21dd1
+
+Time (s): cpu = 00:02:13 ; elapsed = 00:01:25 . Memory (MB): peak = 8119.199 ; gain = 2065.879
+
+Phase 5 Multi Cell Placement Optimization
+INFO: [Physopt 32-660] Identified 100 candidate nets for placement-based optimization.
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[127]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[127]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/ud_rd_en.  Did not re-place instance u_mem2/u_wr_desc/g_wr_hw.stat_len_err[15]_i_5/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/rd_gray[2]_i_3_n_0.  Did not re-place instance u_mem2/u_wr_desc/rd_gray[2]_i_3/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/rd_gray_reg_n_0_[1].  Did not re-place instance u_mem2/u_wr_desc/rd_gray_reg[1]/Q
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[123].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[123]/Q
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[88]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[88]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_wr_desc/p_0_in4_in.  Did not re-place instance u_mem2/u_wr_desc/wr_gray_s2_reg[1]/Q
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_strb_r[63]_i_6_n_0_repN.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_strb_r[63]_i_6_replica/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[135]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[135]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[131].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[131]/Q
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[360]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[360]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[8]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[8]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[7].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[7]/Q
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.stat_len_err[15]_i_6_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.stat_len_err[15]_i_6/O
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wdst[2]_i_3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wdst[2]_i_3/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[480]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[480]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[344]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[344]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[264]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[264]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[296]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[296]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[367]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[367]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[124].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[124]/Q
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/m_axi_wdata[363].  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r_reg[363]/Q
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[1].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[1]/Q
+INFO: [Physopt 32-662] Processed net u_mem2/u_bridge/g_wr_hw.w_data_r[464]_i_1_n_0.  Did not re-place instance u_mem2/u_bridge/g_wr_hw.w_data_r[464]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[7].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_1/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/tranSentC.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winPort[3]_i_1/O
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gray2bin_return[2].  Did not re-place instance u_mem/u_wr_bytes/rd_level_carry_i_6/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_8__0_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_8__0/O
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[15]_i_3_n_0.  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop[15]_i_3/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winWrite.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/winWrite_reg/Q
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/p_0_in58_in.  Did not re-place instance u_mem/u_wr_bytes/wr_gray_s2_reg[10]/Q
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[10].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[10]/Q
+INFO: [Physopt 32-662] Processed net u_mem/u_bridge/g_wr_dma.wd_pop[5].  Did not re-place instance u_mem/u_bridge/g_wr_dma.wd_pop_reg[5]/Q
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/prevSlot2_i_4_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_arb_c/prevSlot2_i_4/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/u_ddr_mc_arb_c/reqs__3[1].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_4/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[2].u_ddr_mc_group/p_10_in[0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/bgr[2].u_ddr_mc_group/winPort[3]_i_22/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/cmd_bank_cas_reg[1][0].  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_bank_cas[0]_i_1/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_15_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/winPort[3]_i_15/O
+INFO: [Physopt 32-662] Processed net u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_bank_cas[0]_i_2_n_0.  Did not re-place instance u_ddr4/inst/u_ddr4_mem_intfc/u_ddr_mc/u_ddr_mc_rd_wr/wtrs[0].u_ddr_mc_wtr/win_bank_cas[0]_i_2/O
+INFO: [Physopt 32-662] Processed net u_mem/u_wr_bytes/gen_wr_dma_obs.intr_ui_reg.  Did not re-place instance u_mem/u_wr_bytes/g_wr_dma.wd_pop[15]_i_6/O

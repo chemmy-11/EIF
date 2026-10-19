@@ -250,6 +250,22 @@ volatile unsigned g_wa_s2cr, g_wa_s2sr, g_wa_s2len, g_wa_s2sr2, g_wa_s2len2;
 volatile unsigned g_wa_wreq, g_wa_wdbg, g_wa_cnt, g_wa_done;
 volatile unsigned g_step;   /* ★2026-10-19 AXI 楔死精确步号 */
 
+/* ★2026-10-19 50% 丢失定位: 服务事件环形记录 (128 events x 4 words, LMB; 'X' 打印)。
+ * 只记录"有意义"事件 (pending=1 / 编程 / abort / 读服务), 避免空转淹没。 */
+volatile unsigned g_evt[512];
+volatile unsigned g_evt_n;
+static void evt4(unsigned a, unsigned b, unsigned c, unsigned d)
+{
+    unsigned i = (g_evt_n & 127u) * 4u;
+    g_evt[i + 0u] = a;
+    g_evt[i + 1u] = b;
+    g_evt[i + 2u] = c;
+    g_evt[i + 3u] = d;
+    g_evt_n++;
+}
+
+static void s2mm_rearm(void);   /* fwd: 读服务后重武装 S2MM (定义见写服务段; MM2S 复位会连带复位 S2MM) */
+
 static int serve_dma_once(void)
 {
     unsigned v_req, slot, len, sa, sr, guard;
@@ -257,6 +273,7 @@ static int serve_dma_once(void)
     v_req = dread((volatile unsigned *)(REGS_BASE + 0x34u));
     if ((v_req & 0x02000000u) == 0u)
         return 0;                       /* 无待服务请求 */
+    evt4(v_req, 0u, 0u, 0xD1u);
 
     slot = (v_req >> 16) & 0xffu;
     len  = v_req & 0xffffu;
@@ -283,6 +300,7 @@ static int serve_dma_once(void)
     while ((dread((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u)
            && (++guard < 200000u))
         ;
+    s2mm_rearm();                       /* ★MM2S 复位会连带复位 S2MM，读服务后必须重武装 */
     return 1;
 }
 
@@ -314,6 +332,24 @@ static void s2mm_channel_init(void)
     g_wr_last_toggle = 0xFFFFFFFFu;             /* 首请求必 arm */
 }
 
+/* ★2026-10-19 修复 50% 丢帧（[L2] 事件环 + PG021 直证）：
+ * MM2S_DMACR.Reset=1 会复位【整个 AXI DMA 引擎】（PG021: "Setting either
+ * MM2S_DMACR.Reset = 1 or S2MM_DMACR.Reset = 1 resets the entire AXI DMA engine"），
+ * 读服务每次做 MM2S 复位都会把 S2MM 打成 Halted(RS=0)；而 Halted=1 时写
+ * S2MM_LENGTH "has no effect" ⇒ 下一帧写传输根本不会启动 ⇒ 桥 WAITDONE 超时
+ * 走 WD_HALT；固件再靠 fault 恢复把 S2MM 拉回来 ⇒ 表现 = 隔帧丢（50%）。
+ * 修法：读服务结束 / 每次编程写传输前都重新武装 S2MM（RS+IOC，清 IOC），
+ * 不动 MM2S 路径、不动 g_wr_last_toggle（避免误触发重 arm）。 */
+static void s2mm_rearm(void)
+{
+    unsigned sr, guard;
+    S2MM_DMACR = DMA_CR_IOCEN | DMA_CR_RS;      /* RS=1 + IOC_IrqEn */
+    guard = 0;
+    while ((((sr = dread(&S2MM_DMASR))) & DMA_SR_HALT) != 0u)
+        if (++guard > 4000000u) break;
+    S2MM_DMASR = DMA_SR_IOC;                    /* W1C: 清陈旧完成中断 */
+}
+
 /* 非阻塞: 有新写请求才编程 (返回 1 = 本调用 arm 了一帧) */
 static int serve_write_once(void)
 {
@@ -323,6 +359,7 @@ static int serve_write_once(void)
     v_dbg = dread(&R_WRDBG);
     g_step = 11u;
     if (v_dbg & 0x80000000u) {
+        evt4(v_dbg, 0u, 0u, 0x10u);
         /* ★fault 粘滞 (桥已停泊 WD_HALT 且已清 pending): 必须先恢复, 与 pending 无关;
          * 恢复序列 = S2MM DMACR reset -> RS+IOC -> 清 IOC -> 翻 ACK (桥回 IDLE) */
         uputs("[B2] WRFAULT recover\r\n");
@@ -334,11 +371,15 @@ static int serve_write_once(void)
 
     v_req = dread(&R_WRREQ);
     g_step = 12u;
-    if ((v_req & 0x80000000u) == 0u)
+    if ((v_req & 0x80000000u) == 0u) {
         return 0;                               /* 无待服务写请求 */
+    }
     tog = (v_req >> 24) & 1u;
-    if (tog == g_wr_last_toggle)
+    evt4(v_req, tog, g_wr_last_toggle, 0x11u);
+    if (tog == g_wr_last_toggle) {
+        evt4(v_req, tog, g_wr_last_toggle, 0x13u);
         return 0;                               /* 同一请求已 arm, 不重复编程 */
+    }
 
     slot = (v_req >> 16) & 0xffu;
     len  = v_req & 0xffffu;
@@ -350,38 +391,36 @@ static int serve_write_once(void)
         return 0;
     }
     S2MM_DMASR = DMA_SR_IOC;                    /* 清上一帧完成中断 (GO 前必须为 0) */
+    s2mm_rearm();                               /* ★确保 S2MM RS=1（MM2S 复位可能已把它打到 Halted） */
     S2MM_SA     = 0x00100000u + slot * 4096u;   /* 规则号 1: SA = SLOT_BASE + slot*4KB */
     /* ★A4 残余窗口兜底 (审计建议): 写 LENGTH(=启动传输)/翻 GO 前二次确认请求仍有效;
      * 若桥已因 WAITGO 超时丢弃该帧 (pending 落零或 toggle 已变) -> 不启动不翻 GO,
      * 避免把旧帧的 LENGTH/GO 错配给下一帧。 */
     {
         unsigned v2 = dread(&R_WRREQ);
+        evt4(v2, tog, (v2 >> 24) & 1u, 0x14u);
         if (((v2 & 0x80000000u) == 0u) || (((v2 >> 24) & 1u) != tog)) {
             uputs("[B2] WRABORT stale req\r\n");
             return 0;
         }
     }
     g_step = 13u;
+    evt4(len, slot, tog, 0x15u);
     S2MM_LENGTH = len;                          /* 写 LENGTH = 启动传输 */
     g_step = 14u;
     g_wr_last_toggle = tog;
     R_WRGO = 1u;                                /* 翻 GO: 桥看到变化才放流 */
     g_step = 15u;
-    /* ★2026-10-19 楔死定位: 上一版在 LENGTH 后立即读 DMA 寄存器会挂死 (G_STEP=14),
-     * 本版把快照移到 GO 之后 + 20ms 静默, 验证"写后瞬态窗口"假说。 */
-    busy_ms(20);
+    /* ★2026-10-19 perf1: 写服务不再做 20ms 静默 + 5 次寄存器快照（那是楔死定位期的
+     * 诊断动作, 会把单帧服务时间拉到 ~3ms, 1000fps 质量档必然丢帧）。改为最小 1ms
+     * 窗口, 让固件服务节奏回到 round2f 同口径; 状态取证改用 'W' 命令按需读取。 */
+    busy_ms(1);
     g_step = 16u;
-    g_wa_s2len = dread(&S2MM_LENGTH);
-    g_step = 17u;
-    g_wa_s2sr  = dread(&S2MM_DMASR);
-    g_step = 18u;
-    g_wa_s2cr  = dread(&S2MM_DMACR);
-    g_wa_wreq  = dread(&R_WRREQ);
-    g_wa_wdbg  = dread(&R_WRDBG);
+    g_wa_s2sr2  = 0u;                           /* 快照位留空, 由 'W' 按需读 */
+    g_wa_s2len2 = 0u;
     g_wa_cnt++;
     g_wa_done  = 0u;
     g_step = 19u;
-    busy_ms(1);                                 /* 写后间隔 (规避写后紧接读) */
     return 1;
 }
 
@@ -570,10 +609,10 @@ int main(void)
          * 退役桥硬件读引擎后, 所有出向帧(数据帧 + 栈自发 ARP/ICMP/命令应答)
          * 的读回都靠它 —— 无请求时本调用只是一次寄存器读(~1ms), 无副作用。 */
         while (!urx_poll()) {
-            /* ★2026-10-18 官方文档定位轮: 高频轮询 lite_regs 0x34 在 round2f 位流
-             * (lite fix1) 上会复现 AXI 楔死; 10ms 慢轮询: 服务延迟 << 桥 56ms
-             * 等待超时, 且 ping 后 UART 仍活着, 可用 'W' 读 S2MM_DMASR/LENGTH。 */
-            if (g_dma_mode) { serve_any(); busy_ms(10); }
+            /* ★2026-10-19 perf1: round3c（BD regen 后）位流上慢轮询不再必要；
+             * S8 10MB 质量档 = 1000fps 输入，服务循环必须全速（round2f 同口径）。
+             * 注: 若后续再观测到 AXI 楔死, 先回退为 busy_ms(1) 二分。 */
+            if (g_dma_mode) { serve_any(); }
         }
         c = urx_get();
         /* 串扰/延迟回声会在 RX FIFO 里进单字节幻影 (板上实证)。
@@ -693,6 +732,117 @@ int main(void)
             uputs(" dec=");          uputd((s2sr >> 6) & 0x1u);
             uputs(" err=");          uputd((s2sr >> 14) & 0x1u);
             uputs("\r\n");
+        } else if (c == 'P') {
+            /* ★2026-10-19 round3c 前哨实验: 定位"哪一笔写冻结了 CPU 读路"。
+             * 每步 = 一笔写 + 一次 lite_regs R_ID 读 (先读后打, 守坑 #44)。
+             * 判据: 某步后 R_ID != 50314231 / 串口在该行后中断 => 该笔写是冻结触发源。 */
+            unsigned r;
+            uputs("[P] start\r\n");
+            r = R_ID;
+            uputs("[P] id0=");     uputh(r); uputs("\r\n");
+            S2MM_SA = 0x00100000u;                 /* W1: DMA SA 写 (不启动) */
+            r = R_ID;
+            uputs("[P] id_wSA=");  uputh(r); uputs("\r\n");
+            S2MM_DMASR = DMA_SR_IOC;               /* W2: DMA DMASR W1C 写 */
+            r = R_ID;
+            uputs("[P] id_wIOC="); uputh(r); uputs("\r\n");
+            S2MM_LENGTH = 86u;                     /* W3: 写 LENGTH = 启动 S2MM (无流数据) */
+            r = R_ID;
+            uputs("[P] id_wLEN="); uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[P] id2=");     uputh(r); uputs("\r\n");
+            r = S2MM_DMASR;
+            uputs("[P] s2sr=");    uputh(r); uputs("\r\n");
+            r = S2MM_LENGTH;
+            uputs("[P] s2len=");   uputh(r); uputs("\r\n");
+            r = R_WRREQ;
+            uputs("[P] wreq=");    uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[P] id3=");     uputh(r); uputs("\r\n");
+            uputs("[P] done\r\n");
+        } else if (c == 'G') {
+            /* GO-only 写实验: 只翻桥 GO (lite_regs +0x48), 不碰 DMA */
+            unsigned r;
+            uputs("[G] start\r\n");
+            R_WRGO = 1u;
+            r = R_ID;
+            uputs("[G] id_after_GO="); uputh(r); uputs("\r\n");
+            r = R_WRREQ;
+            uputs("[G] wreq=");    uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[G] id2=");     uputh(r); uputs("\r\n");
+            uputs("[G] done\r\n");
+        } else if (c == 'C') {
+            /* WRACK-only 写实验 (lite_regs +0x4C 写, 与 GO 同型不同址: 对照) */
+            unsigned r;
+            uputs("[C] start\r\n");
+            R_WRACK = 1u;
+            r = R_ID;
+            uputs("[C] id_after_ACK="); uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[C] id2=");     uputh(r); uputs("\r\n");
+            uputs("[C] done\r\n");
+        } else if (c == 'J') {
+            /* ★2026-10-19 服务序列模仿: M02(LENGTH) 后紧接 M01(GO) 写, 再读。
+             * 判据: 若某读返回陈旧值/串口中断 => "跨从机连续写(LENGTH->GO)" 冻结读路得到复现。 */
+            unsigned r;
+            uputs("[J] start\r\n");
+            r = R_ID;
+            uputs("[J] id0=");       uputh(r); uputs("\r\n");
+            S2MM_DMASR = DMA_SR_IOC;               /* M02 写 */
+            S2MM_SA    = 0x00100000u;              /* M02 写 */
+            r = R_WRREQ;
+            uputs("[J] wreq=");      uputh(r); uputs("\r\n");
+            S2MM_LENGTH = 86u;                     /* M02 写 = 启动 S2MM */
+            R_WRGO = 1u;                           /* M01 写 (跨从机紧接) */
+            busy_ms(20);
+            r = R_ID;
+            uputs("[J] id_after=");  uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[J] id2=");       uputh(r); uputs("\r\n");
+            r = R_WRREQ;
+            uputs("[J] wreq2=");     uputh(r); uputs("\r\n");
+            r = S2MM_DMASR;
+            uputs("[J] s2sr=");      uputh(r); uputs("\r\n");
+            r = S2MM_LENGTH;
+            uputs("[J] s2len=");     uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[J] id3=");       uputh(r); uputs("\r\n");
+            uputs("[J] done\r\n");
+        } else if (c == 'K') {
+            /* 顺序对照: 先 M01(GO) 再 M02(LENGTH), 再读 -> 与 J 单变量对比 */
+            unsigned r;
+            uputs("[K] start\r\n");
+            R_WRGO = 1u;                           /* M01 写 */
+            S2MM_DMASR = DMA_SR_IOC;               /* M02 写 */
+            S2MM_SA    = 0x00100000u;
+            S2MM_LENGTH = 86u;                     /* M02 写 */
+            busy_ms(20);
+            r = R_ID;
+            uputs("[K] id_after=");  uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[K] id2=");       uputh(r); uputs("\r\n");
+            r = R_WRREQ;
+            uputs("[K] wreq=");      uputh(r); uputs("\r\n");
+            r = S2MM_DMASR;
+            uputs("[K] s2sr=");      uputh(r); uputs("\r\n");
+            r = R_ID;
+            uputs("[K] id3=");       uputh(r); uputs("\r\n");
+            uputs("[K] done\r\n");
+        } else if (c == 'X') {
+            /* ★事件环形打印 (纯 LMB 读, 不碰 AXI, 守坑 #44); 只打印非零条目 */
+            unsigned n = g_evt_n, i, k, printed = 0u;
+            uputs("[B2] X evt_n="); uputd(n); uputs("\r\n");
+            for (i = 0u; i < 128u; i++) {
+                unsigned base = i * 4u;
+                if (g_evt[base + 3u] == 0u && g_evt[base + 0u] == 0u) continue;
+                uputs("[X] "); uputd(i); uputs(":");
+                for (k = 0u; k < 4u; k++) { uputc(' '); uputh(g_evt[base + k]); }
+                uputs("\r\n");
+                printed++;
+                if (printed >= 40u) { uputs("[X] ...more\r\n"); break; }
+            }
+            uputs("[X] printed="); uputd(printed); uputs("\r\n");
         } else if (c == 'S') {
             R_MODE = MODE_SEQ;
             uputs("[B2] SEQRESTORED (cmd S)\r\n");

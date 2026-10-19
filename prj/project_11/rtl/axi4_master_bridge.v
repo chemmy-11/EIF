@@ -556,6 +556,10 @@ module axi4_master_bridge #(
         end
     end
     end else begin : g_wr_dma
+    // ---- round3c (2026-10-19): WAITGO 是否看到软核 GO 翻转 (纯观测; ui 域) ----
+    //   去向 u_ila_5 probe5；不反馈进 FSM（坑 #28 纪律：镜像/探针不得合并回数据锥）。
+    //   (net 声明必须放在 generate 分支最前: Verilog-2000 块内声明先于语句)
+    (* mark_debug = "true" *) wire dbg_wd_go_ok;
     //=========================================================================
     // B3-2 写引擎 (HAS_DMA=1): 逐帧 512b AXI4-Stream -> axi_dma S2MM
     //-------------------------------------------------------------------------
@@ -881,6 +885,8 @@ module axi4_master_bridge #(
             endcase
         end
     end
+    // ---- round3c (2026-10-19): WAITGO 是否看到软核 GO 翻转 (纯观测; ui 域) ----
+    assign dbg_wd_go_ok = wd_go_ok;
     end endgenerate
 
     //=========================================================================

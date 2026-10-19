@@ -1,0 +1,49 @@
+{
+  "mode": "recon",
+  "verdict": "PASS",
+  "reason": "mem/mem2 各自 wm==wr_frm==rd_frm、ost=0; mem stall/len_err=0 (mem.bresp 恒 0 仅 INFO: S2MM 下 BRESP 不可见); mem2 错误计数无 ILA 探针(仅 INFO, 不可观测); R2 dbg_wr_fault=0/timeout 无 ILA 探针且无 Lite 读回路径(仅 INFO)",
+  "detail": {
+    "ui_csv_label": "post",
+    "mem": {
+      "label": "u_mem (write=S2MM/DMA, read=MM2S/DMA)",
+      "wm": 9,
+      "wr_frm": 9,
+      "rd_frm": 9,
+      "ost": 0,
+      "stall": 0,
+      "len_err": 0,
+      "bresp": null,
+      "trio_ok": true,
+      "ost_ok": true,
+      "err_ok": true,
+      "verdict": "PASS"
+    },
+    "mem2": {
+      "label": "u_mem2 (write/read=硬件路径, R2 禁改)",
+      "wm": 9,
+      "wr_frm": 9,
+      "rd_frm": 9,
+      "ost": 0,
+      "stall": null,
+      "len_err": null,
+      "bresp": null,
+      "trio_ok": true,
+      "ost_ok": true,
+      "err_ok": true,
+      "verdict": "PASS"
+    },
+    "globals": {
+      "wr_fault": {
+        "last": 0,
+        "ok": true
+      }
+    },
+    "r2_probes_present": [
+      "s2mm_state",
+      "s2mm_tvalid",
+      "s2mm_tready",
+      "s2mm_reqpend",
+      "wr_fault_user"
+    ]
+  }
+}

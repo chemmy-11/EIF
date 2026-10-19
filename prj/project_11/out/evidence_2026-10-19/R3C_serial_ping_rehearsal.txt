@@ -1,0 +1,22 @@
+[BOOT] t=-1.000..-1.000 bytes=0
+[BOOT] b''
+[TX U] b'U'
+[U] t=2.999..2.999 bytes=618
+[U] b'[B2] U id: 50314231 50314231 50314231 50314231 50314231 50314231\r\n[B2] U req: 50314231 00000000 00000000 00000000 00000000 00000000\r\n[B2] U reqX: 0000000 0000000 0000000\r\n[B2] U wmrd: 00000000 00000000 00000000 00000000 00000000 00000000\r\n[B2] U stat: 00000000 00000000 00000000\r\n[B2] U arl: 0000000 0000000 0000000\r\n[B2] U emit: 0000000 0000000 0000000\r\n[B2] U wreq: 01000048 01000048 01000048\r\n[B2] U wdbg:00000000 00000000 00000000\r\n[B2] U s2sr: 00000001 00000001\r\n[B2] U wmwr: 00000000 00000001 00000001 00000001 00000001 00000001\r\n[B2] U ust: 00000008 00000008 00000008 00000008 00000008 00000008\r\n[B2] U mode=0\r\n'
+[TX d] b'd'
+[d] t=5.189..5.189 bytes=22
+[d] b'[B2] DMAMODE now=DMA\r\n'
+[TX W-pre] b'W'
+[W-pre] t=7.157..7.157 bytes=186
+[W-pre] b'[B2] W s2cr=00011003 s2sr=00000000 s2len=00000000 m2sr=00000001 m2len=00000000\r\n[B2] W wreq=01000048 wdbg=00000000 dreq=01000000\r\n[B2] W dec halt=0 idle=0 ioc=0 int=0 slv=0 dec=0 err=0\r\n'
+[PING] ping -n 1 -w 900 192.168.1.10
+[PING] rc=1 out='Pinging 192.168.1.10 with 32 bytes of data:\nRequest timed out.\n\nPing statistics for 192.168.1.10:\n    Packets: Sent = 1, Received = 0, Lost = 1 (100% loss),'
+[post-ping] t=-1.000..-1.000 bytes=0
+[post-ping] b''
+[TX W-post] b'W'
+[W-post] t=-1.000..-1.000 bytes=0
+[W-post] b''
+[TX U-post] b'U'
+[U-post] t=-1.000..-1.000 bytes=0
+[U-post] b''
+[DONE]

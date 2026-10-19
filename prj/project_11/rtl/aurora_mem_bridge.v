@@ -704,6 +704,9 @@ end
 assign cfg_mode_eff    = ctl_owner ? lite_cfg_mode    : cmd_cfg_mode;
 assign cfg_rd_slot_eff = ctl_owner ? lite_cfg_rd_slot : cmd_cfg_rd_slot;
 
+// round3c (2026-10-19): lite_regs AXI wedge observation bus (BD dbg_l_bus -> u_ila_4 @clk_100m)
+wire [35:0] dbg_l_bus_w;
+
 mb_ctrl u_mb_ctrl (
     .clk_100m        (init_clk            ),
     .ext_reset_in    (reset_pb | pma_init ),   // 高有效 + 上电 POR
@@ -777,7 +780,8 @@ mb_ctrl u_mb_ctrl (
     .dma_wr_req           (mem_dma_wr_req),
     .dma_wr_dbg           (mem_dma_wr_dbg),
     .cfg_wr_go            (dma_wr_go_w   ),
-    .cfg_wr_ack           (dma_wr_ack_w  )
+    .cfg_wr_ack           (dma_wr_ack_w  ),
+    .dbg_l_bus            (dbg_l_bus_w   )
 );
 
 // prj11 B1: ILA0(@user_clk) 观测 —— J_B1 ③ 寄存器回读一致性
@@ -1462,6 +1466,12 @@ end
 (* mark_debug = "true" *) wire [63:0]  dbg_s2mm_tdata64 = s2mm_tdata[63:0];
 (* mark_debug = "true" *) wire [7:0]   dbg_s2mm_tkeep8  = s2mm_tkeep[7:0];
 (* mark_debug = "true" *) wire         dbg_s2mm_tlast_w = s2mm_tlast;
+// round3c (2026-10-19): lite_regs AXI wedge observation bus @clk_100m (u_ila_4 probe0=36b)
+//   bit map (LSB first): 0..9 AXI handshake | 10..17 addr decode | 18..21 lwst/lrst
+//   22..27 mailbox(aclk side) | 28 aresetn | 29 rst_user_n(2FF) | 30 rst_user_evt
+//   31..34 stuck[3:0] | 35 |stuck  (ILA4 trigger bit)
+(* mark_debug = "true" *) wire [35:0] dbg_l_bus      = dbg_l_bus_w;
+(* mark_debug = "true" *) wire        dbg_l_stuck_or = dbg_l_bus_w[35];
 
 // 未观测信号聚合（防剪枝告警; 数值不使用）
 wire unused = ^{mem_rd_slot_o, mem_rd_len_o, mem_rd_frame_done, mem_wr_hold,

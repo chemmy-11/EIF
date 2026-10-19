@@ -65,6 +65,14 @@
 #   EXPECTED WIDTHS for R2_EXPECT_PROBES (presence check is WARN-only):
 #       dbg_s2mm_state 3 (ILA3), dbg_s2mm_tvalid 1 (ILA3), dbg_s2mm_tready 1 (ILA3),
 #       dbg_s2mm_reqpend 1 (ILA0), dbg_wr_fault 1 (ILA0)
+#   round3d (2026-10-19): ILA5 probe5 adds 4 single-bit probes, appended to
+#   R2_EXPECT_PROBES default (list length 5 -> 9; presence check stays WARN-only):
+#       dbg_wd_go_ui 1 (ILA5), dbg_wd_ack_ui 1 (ILA5),
+#       dbg_wd_intr_ui 1 (ILA5), dbg_wd_go_ok 1 (ILA5)
+#   NOTE: this script has NO probe-width expectation constants (it only dumps
+#   the measured widths as R2CAP_PROBE(...) lines); ILA3 63b (round3c-diag)
+#   vs 152b (round3d) needs no edit here. Width/caliber checks live in
+#   tools/r3c_cap.tcl (R2C_EXPECT_WIDTH_ILA0/3/5/4, WARN-only).
 #   Observables usable for interpretation (still not hard criteria):
 #     ILA3 dbg_s2mm_state encode 0=IDLE 1=WAITGO 2=STREAM 3=PUSH 4=WAITDONE
 #                                5=DRAIN 6=HALT
@@ -114,7 +122,7 @@ set snapshot_only [envval R2_SNAPSHOT_ONLY 0]
 set match_ui [envval R2_ILA_MATCH_UI "dbg_mem2_rd_frm"]
 set match_user [envval R2_ILA_MATCH_USER "dbg_mem2_u_wr"]
 set match_extra [envval R2_ILA_MATCH_EXTRA ""]
-set expect_probes [split [envval R2_EXPECT_PROBES "dbg_s2mm_reqpend,dbg_wr_fault,dbg_s2mm_state,dbg_s2mm_tvalid,dbg_s2mm_tready"] ","]
+set expect_probes [split [envval R2_EXPECT_PROBES "dbg_s2mm_reqpend,dbg_wr_fault,dbg_s2mm_state,dbg_s2mm_tvalid,dbg_s2mm_tready,dbg_wd_go_ui,dbg_wd_ack_ui,dbg_wd_intr_ui,dbg_wd_go_ok"] ","]
 # ---- round2d (2026-10-18): optional TRIGGERED capture for AXI-wedge / handshake diagnosis ----
 #   R2_TRIGGER_PROBE     : probe name substring to trigger on (e.g. dbg_lite_arvalid, dbg_s2mm_reqpend,
 #                          dbg_s2mm_state, dbg_wr_fault, dbg_lite_hang_st). Empty = old trigger_now behavior.

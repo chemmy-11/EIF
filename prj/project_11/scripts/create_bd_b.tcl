@@ -188,6 +188,14 @@ foreach pin {clk_user rst_user_n u_wr_frame u_rd_frame u_buf_drop ctl_owner \
 }
 puts "BD_STEP: user-domain pins externalized"
 
+# ---- round3c (2026-10-19): lite_regs AXI 楔死观测总线 -> 顶层 u_ila_4 @clk_100m ----
+#   rtl/axi_lite_regs.v 新增 output [35:0] dbg_o（纯观测，无功能逻辑）；
+#   用普通 create_bd_port + connect_bd_net 引出（不用 make_bd_pins_external 的 _0 命名）。
+#   依据：UG835 update_module_reference / create_bd_port；位定义见 RTL 末尾 DBG 段。
+set dbgport [create_bd_port -dir O -from 35 -to 0 dbg_l_bus]
+connect_bd_net [get_bd_pins axi_lite_regs_0/dbg_o] $dbgport
+puts "BD_STEP: round3c dbg_l_bus\[35:0\] connected"
+
 # ---- address map (project_1 语法) ----
 assign_bd_address -offset 0x40600000 -range 0x00010000 -target_address_space [get_bd_addr_spaces microblaze_0/Data] [get_bd_addr_segs axi_uartlite_0/S_AXI/Reg] -force
 assign_bd_address -offset 0x00000000 -range 0x00010000 -target_address_space [get_bd_addr_spaces microblaze_0/Data] [get_bd_addr_segs microblaze_0_local_memory/dlmb_bram_if_cntlr/SLMB/Mem] -force

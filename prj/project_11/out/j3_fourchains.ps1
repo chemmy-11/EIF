@@ -189,9 +189,15 @@ function Get-ReqEngineBit {
 function Invoke-Precheck {
     # J3 前置: 'S' 恢复 SEQ + 确认槽表干净(只读, 不发 'd')。
     param([int]$MaxPolls = 8)
-    Write-Section "J3 前置: 发 'S' + 轮询 'U'（wmwr==wmrd 且 req.bit25=0 连续两拍; 不发 'd'）"
+    Write-Section "J3 前置(R2 口径): 发 'S' → 若 mode=0 发一次 'd' → 轮询 'U'（bit25=0 且 wmwr/wmrd 两拍不变）"
     $sres = Invoke-UartProbe -Cmd "S" -Wait 1.2 -Drain 0.15 -Title "前置 'S' 恢复 SEQ"
     Start-Sleep -Milliseconds 300
+    # ★R2: 桥①读出仅 DMA（硬件读引擎退役）=> J3 必须在 DMA 模式。只在 mode=0 时发一次 'd'（toggle）。
+    $u0 = Get-UState -Title "前置模式自检"
+    if ($null -ne $u0 -and $u0.ParseOk -and ($u0.Mode -ne 1)) {
+        [void](Invoke-UartProbe -Cmd "d" -Wait 1.2 -Drain 0.15 -Title "前置 'd' 切 DMA（R2 必需）")
+        Start-Sleep -Milliseconds 300
+    }
     $trace = New-Object System.Collections.ArrayList
     $prev = $null
     $lastU = $null
@@ -207,7 +213,9 @@ function Invoke-Precheck {
         $rd = [int]($u.WmRd -band 0xFFFF)
         $sticky = (($u.Req -band 0x02000000) -ne 0)
         [void]$trace.Add(("U#{0}: mode={1} bit24={2} wmwr={3} wmrd={4} sticky={5}" -f $i, $u.Mode, [int](Get-ReqEngineBit $u), $wr, $rd, [int]$sticky))
-        if ((-not $sticky) -and ($wr -eq $rd)) {
+        # ★R2 (2026-10-19): u_wr/u_rd 不再 1:1（mode-0/超时丢弃也计入 wr）=> 不要求相等;
+        # 槽表干净 = bit25 落零 且 两拍计数不变（无待服务请求 + 无新写提交）。
+        if (-not $sticky) {
             if ($null -ne $prev -and $prev.Wr -eq $wr -and $prev.Rd -eq $rd) {
                 Write-Log ($trace -join "`n")
                 return [pscustomobject]@{ Ok = $true; State = $u; Trace = ($trace -join "`n") }
@@ -282,10 +290,10 @@ if ($null -ne $preState -and $preState.ParseOk) {
     }
 }
 if (-not $pre.Ok) {
-    Write-Log "前置失败: 槽表不干净(wmwr!=wmrd 或 req.bit25 未落) ⇒ 判据未取得; **板卡需重烧**后再跑（本脚本不自动重试）" "Red"
+    Write-Log "前置失败: 槽表不干净(bit25 未落 或 计数仍在变) ⇒ 判据未取得; **板卡需重烧**后再跑（本脚本不自动重试）" "Red"
     foreach ($r in @("M", "A", "B")) { $script:Results[$r] = [pscustomobject]@{ Ok = $null; Verdict = "NOT_OBTAINED"; Detail = "前置槽表不干净, 未跑; 板卡需重烧"; Log = ""; Exit = $null } }
 } else {
-    Write-Log "前置清槽检查通过 ✓（wmwr==wmrd & bit25=0 连续两拍）" "Green"
+    Write-Log "前置清槽检查通过 ✓（R2 口径: bit25=0 & wmwr/wmrd 两拍不变）" "Green"
     $stopped = $false
     foreach ($r in @("M", "A", "B")) {
         if ($stopped) {
