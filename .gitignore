@@ -117,3 +117,5 @@ __pycache__/
 # 临时仿真/检查目录
 tmp_r2_check*/
 tmp_*/
+# json_storm 重组产物（可由 SHA 证据+run 日志复现；10MB/份，不入库）
+*.recomposed.jsonl

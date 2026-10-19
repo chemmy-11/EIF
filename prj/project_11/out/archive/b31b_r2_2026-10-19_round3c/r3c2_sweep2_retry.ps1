@@ -1,4 +1,4 @@
-# r3c2_sweep2_retry.ps1 -- round3c-lite implementation sweep2 retry wrapper
+﻿# r3c2_sweep2_retry.ps1 -- round3c-lite implementation sweep2 retry wrapper
 $ErrorActionPreference = "Continue"
 Set-Location "D:\FPGA"
 $proj = "D:\FPGA\prj\project_11"

@@ -1,4 +1,4 @@
-# r3c_sweep2_retry.ps1 -- round3c implementation sweep2 retry wrapper (Vivado transient, pit #61)
+﻿# r3c_sweep2_retry.ps1 -- round3c implementation sweep2 retry wrapper (Vivado transient, pit #61)
 # ★2026-10-19: MUST run from ASCII CWD (D:\FPGA). implement_debug_core spawns a child vivado whose
 #   temp dir/scripts live under <CWD>\.Xil; a Chinese CWD (C:\Users\...\毕设) makes the child fail
 #   to read its Tcl (pit #21 family) -> "Synthesis of Debug Cores has failed / dbg_hub_synth_1".

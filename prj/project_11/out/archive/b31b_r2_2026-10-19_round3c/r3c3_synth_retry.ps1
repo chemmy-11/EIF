@@ -1,4 +1,4 @@
-# r3c3_synth_retry.ps1 -- round3c-diag (lite ILA: ILA4 skipped, ILA3/ILA5 trimmed) synth
+﻿# r3c3_synth_retry.ps1 -- round3c-diag (lite ILA: ILA4 skipped, ILA3/ILA5 trimmed) synth
 $ErrorActionPreference = "Continue"
 Set-Location "D:\FPGA"
 $env:R3C_SKIP_ILA4 = "1"

@@ -1,4 +1,4 @@
-# r3c3_sweep_one_retry.ps1 -- round3c-diag single-directive (ExtraTimingOpt) sweep
+﻿# r3c3_sweep_one_retry.ps1 -- round3c-diag single-directive (ExtraTimingOpt) sweep
 $ErrorActionPreference = "Continue"
 Set-Location "D:\FPGA"
 $proj = "D:\FPGA\prj\project_11"

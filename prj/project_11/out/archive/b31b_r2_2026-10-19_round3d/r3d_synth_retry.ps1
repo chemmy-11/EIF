@@ -1,4 +1,4 @@
-# r3d_synth_retry.ps1 -- round3d full-acceptance-probe synth
+﻿# r3d_synth_retry.ps1 -- round3d full-acceptance-probe synth
 #   ILA3 = 152b full (mem/mem2 counters + stall/len_err + s2mm state: S6/S10 判据所需)
 #   ILA5 = 47b trimmed (tdata32/tkeep8/tvalid/tready/tlast + probe5 4b)
 #   ILA4 skipped (not needed for S0-S11; saves timing margin)
