@@ -248,6 +248,7 @@ static unsigned g_dma_mode = 0u;        /* 默认 0 = 不驻留服务 (串口可
  * "S2MM 是否真的启动/写了多少字节/有无错误 halt" 的后验现场。 */
 volatile unsigned g_wa_s2cr, g_wa_s2sr, g_wa_s2len, g_wa_s2sr2, g_wa_s2len2;
 volatile unsigned g_wa_wreq, g_wa_wdbg, g_wa_cnt, g_wa_done;
+volatile unsigned g_step;   /* ★2026-10-19 AXI 楔死精确步号 */
 
 static int serve_dma_once(void)
 {
@@ -318,7 +319,9 @@ static int serve_write_once(void)
 {
     unsigned v_req, v_dbg, slot, len, tog;
 
+    g_step = 10u;
     v_dbg = dread(&R_WRDBG);
+    g_step = 11u;
     if (v_dbg & 0x80000000u) {
         /* ★fault 粘滞 (桥已停泊 WD_HALT 且已清 pending): 必须先恢复, 与 pending 无关;
          * 恢复序列 = S2MM DMACR reset -> RS+IOC -> 清 IOC -> 翻 ACK (桥回 IDLE) */
@@ -330,6 +333,7 @@ static int serve_write_once(void)
     }
 
     v_req = dread(&R_WRREQ);
+    g_step = 12u;
     if ((v_req & 0x80000000u) == 0u)
         return 0;                               /* 无待服务写请求 */
     tog = (v_req >> 24) & 1u;
@@ -357,18 +361,27 @@ static int serve_write_once(void)
             return 0;
         }
     }
+    g_step = 13u;
     S2MM_LENGTH = len;                          /* 写 LENGTH = 启动传输 */
-    /* ★PG021 定位快照(1): 启动后立即读 DMACR/DMASR/LENGTH (LMB 全局, JTAG 可取) */
-    g_wa_s2cr  = rd_reg(&S2MM_DMACR);
-    g_wa_s2sr  = rd_reg(&S2MM_DMASR);
-    g_wa_s2len = rd_reg(&S2MM_LENGTH);
-    g_wa_wreq  = rd_reg(&R_WRREQ);
-    g_wa_wdbg  = rd_reg(&R_WRDBG);
-    g_wa_cnt++;
-    g_wa_done  = 0u;
+    g_step = 14u;
     g_wr_last_toggle = tog;
     R_WRGO = 1u;                                /* 翻 GO: 桥看到变化才放流 */
-    busy_ms(1);                                 /* 2026-10-18 板验: 写后间隔, 规避写后紧接读的 AXI 楔死 (待 RTL 根因收口后评估移除) */
+    g_step = 15u;
+    /* ★2026-10-19 楔死定位: 上一版在 LENGTH 后立即读 DMA 寄存器会挂死 (G_STEP=14),
+     * 本版把快照移到 GO 之后 + 20ms 静默, 验证"写后瞬态窗口"假说。 */
+    busy_ms(20);
+    g_step = 16u;
+    g_wa_s2len = dread(&S2MM_LENGTH);
+    g_step = 17u;
+    g_wa_s2sr  = dread(&S2MM_DMASR);
+    g_step = 18u;
+    g_wa_s2cr  = dread(&S2MM_DMACR);
+    g_wa_wreq  = dread(&R_WRREQ);
+    g_wa_wdbg  = dread(&R_WRDBG);
+    g_wa_cnt++;
+    g_wa_done  = 0u;
+    g_step = 19u;
+    busy_ms(1);                                 /* 写后间隔 (规避写后紧接读) */
     return 1;
 }
 
@@ -377,10 +390,17 @@ static void serve_any(void)
 {
     if (g_dma_mode == 0u)
         return;
-    if (dread((volatile unsigned *)(REGS_BASE + 0x34u)) & 0x02000000u) {
-        serve_dma_once();
-        return;
+    g_step = 1u;                    /* serve_any 入口 */
+    {
+        unsigned v34 = dread((volatile unsigned *)(REGS_BASE + 0x34u));
+        g_step = 2u;                /* 0x34 读返回 */
+        if (v34 & 0x02000000u) {
+            g_step = 9u;
+            serve_dma_once();
+            return;
+        }
     }
+    g_step = 3u;                    /* 无读请求 -> 进写服务 */
     /* ★PG021 定位快照(2): pending 已落零时取"完成态" DMASR/LENGTH 到 LMB */
     {
         unsigned v = dread(&R_WRREQ);
