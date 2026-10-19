@@ -279,3 +279,18 @@
 | **round3d 最终验收：S0–S11 全 13 步 PASS**（`R2_RESULT: PASS`，run3，重烧后；S0 方案 B adapter 生效、S6 ILA3 152b 双桥差分闭合、S9 J3 M/A/B 全 PASS、S10 recon PASS、S11 收尾 sticky=0） | [L2]（板端判据） | `R3D_S0-S11_run3.log`（`EC927EC6`）、`R2_20261019_164245.log`、ILA CSV 164245、`R2_4tier_20261019_164245.log`、`R2_mb10_20261019_164518.log`、`j3_fourchains_20261019_164540.log` |
 | **S10 双桥对账：PASS**（mem/mem2 各 wm==wr_frm==rd_frm、ost=0、stall/len_err=0、wr_fault=0） | [L2]（板端判据；run2/run3） | `R2_COUNTER_RECON: PASS` + `R2_RECON_RESULT: PASS`（run2 L846-847、run3）；工具补丁记录 `tools/selfcheck.txt §10.9` |
 | S9 对板卡起始态敏感：run2 残留态 NOT_OBTAINED、重烧后 run3 PASS（J3 纪律：残留态不重试） | [L2] | `j3_fourchains_20261019_164008.log`（FAIL M）vs `…164540.log`（PASS） |
+
+## 13. R3 速率量化 + R4 收尾证据（2026-10-19 收尾轮）
+
+| 文件 | 内容 | 来源 |
+|---|---|---|
+| `R3_RATE_RESULTS.md` | R3 汇总：档位矩阵/膝点/三版固件 A/B/与路线 A 对照/D2 判定 | `tools/r3_analyze.py` 生成 |
+| `R3_thru_tiers.json/.log`、`R3_thru_knee.json/.log`、`R3_thru_perf2.json/.log`、`R3_thru_perf3.json/.log` | perf1 矩阵+膝点、perf2/perf3 A/B 原始测量 | `tools/r3_thru.py`（board COM5 + json_storm） |
+| `R3_thru_console.log`、`R3_thru_knee_console.log`、`R3_thru_perf2_console.log`、`R3_thru_perf3_console.log` | 各轮控制台逐档摘要（recv/lost/dwr/drd/evt/帧） | 同上 |
+| `R3_tier_pace*_us.log` | 单档 storm 原始输出（同名档后跑覆盖，主结论以 console/json 为准） | json_storm |
+| `R3_final_fourtier.log`、`R2_mb10_20261019_172807.log`、`R3_final_burn_official.log` | R3 实验后恢复官方对（round3d+perf1）并复验：四档 PASS、10MB+SHA PASS | udp_verify_ddr / r2_mb10_sha / xsct |
+| `tools/r3_thru.py`、`tools/r3_analyze.py`、`tools/r3_patch_perf2.py`、`tools/r3_patch_perf3.py` | 测量/分析/固件实验脚本（perf2 `ED908502` / perf3 `47B9EB18`，均未采纳） | 本轮新增 |
+| `out/W6_prj11_可观测性清单.md` | R4-2：探针/计数清单（ILA0 110b/ILA3 152b/ILA5 47b=309b；118 声明；86 未挂） | `scripts/w6_inventory_prj11.py` |
+| `out/archive/ARCHIVE_INDEX_prj11.md` | R4-3：跨轮归档索引 **33 轮/627 文件/0 缺失**（13 旧轮补 SHA256） | `scripts/archive_index_prj11.py` |
+| `复现/复现_prj11_指南_2026-10-19.md` | R4-1：复现指南 B 章（12 节） | vault `复现/` + docs 镜像 |
+| `out/archive/b31b_r3_rate_2026-10-19/` | 本轮证据归档（43 项 + SHA256.txt + README） | 本轮 |

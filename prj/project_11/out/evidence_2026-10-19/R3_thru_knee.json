@@ -1,0 +1,339 @@
+{
+  "tiers": [
+    {
+      "pace_us": 400.0,
+      "limit_bytes": 10293111,
+      "storm_exit": 1,
+      "storm": {
+        "summary": {
+          "file_bytes": 10293111,
+          "chunks": 7022,
+          "chunk_size": 1466,
+          "gap_ms": 0.0,
+          "pace_us": 400.0,
+          "pace_per_proc_us": 400.0,
+          "sndbuf_requested": 4194304,
+          "sndbuf_actual": 4194304,
+          "prep_s": 0.0193,
+          "prep_us_per_frame": 2.742,
+          "recv": 7016,
+          "lost": 6,
+          "corrupt": 0,
+          "inversions": 0,
+          "rtt_avg_ms": 4.215875954655338,
+          "goodput_mbps": 14.085025016998106,
+          "goodput_send_mbps": 29.251603621433723,
+          "channel_mbps": 28.170050033996212,
+          "sha_match": false,
+          "pace_late": 1,
+          "pace_waited": 7021,
+          "pace_iv_avg_us": 400.604
+        },
+        "recv": 7016,
+        "chunks": 7022,
+        "lost": 6,
+        "corrupt": 0,
+        "rtt_avg_ms": 4.215875954655338,
+        "send_s": 2.81
+      },
+      "board_i0": {
+        "wr": 28059,
+        "rd": 28058,
+        "drop": 28329
+      },
+      "board_i1": {
+        "wr": 35075,
+        "rd": 35074,
+        "drop": 28335
+      },
+      "board_u0": {
+        "req": "019a05f6",
+        "wmrd": "00006d9a",
+        "wmwr": "00006d9b",
+        "wreq": "019a05f6",
+        "wdbg": "009a05f6",
+        "s2sr": "00000000"
+      },
+      "board_u1": {
+        "req": "01020181",
+        "wmrd": "00008902",
+        "wmwr": "00008903",
+        "wreq": "01020181",
+        "wdbg": "00020181",
+        "s2sr": "00000000"
+      },
+      "evt0": 112232,
+      "evt1": 140296,
+      "t_storm_s": 6.103,
+      "t_total_s": 15.49,
+      "quiet_after": {
+        "ok": true,
+        "state": {
+          "wr": 35075,
+          "rd": 35074,
+          "drop": 28335
+        }
+      },
+      "board_dwr": 7016,
+      "board_drd": 7016,
+      "board_wr_rate": 452.9,
+      "board_rd_rate": 452.9,
+      "board_drop": 6,
+      "evt_delta": 28064,
+      "evt_per_readout": 4.0
+    },
+    {
+      "pace_us": 350.0,
+      "limit_bytes": 10293111,
+      "storm_exit": 1,
+      "storm": {
+        "summary": {
+          "file_bytes": 10293111,
+          "chunks": 7022,
+          "chunk_size": 1466,
+          "gap_ms": 0.0,
+          "pace_us": 350.0,
+          "pace_per_proc_us": 350.0,
+          "sndbuf_requested": 4194304,
+          "sndbuf_actual": 4194304,
+          "prep_s": 0.0206,
+          "prep_us_per_frame": 2.928,
+          "recv": 6309,
+          "lost": 713,
+          "corrupt": 0,
+          "inversions": 0,
+          "rtt_avg_ms": 1.7756473134443924,
+          "goodput_mbps": 13.468858840392928,
+          "goodput_send_mbps": 29.99945907311294,
+          "channel_mbps": 26.937717680785855,
+          "sha_match": false,
+          "pace_late": 1,
+          "pace_waited": 7021,
+          "pace_iv_avg_us": 351.25
+        },
+        "recv": 6309,
+        "chunks": 7022,
+        "lost": 713,
+        "corrupt": 0,
+        "rtt_avg_ms": 1.7756473134443924,
+        "send_s": 2.47
+      },
+      "board_i0": {
+        "wr": 35075,
+        "rd": 35074,
+        "drop": 28335
+      },
+      "board_i1": {
+        "wr": 41384,
+        "rd": 41383,
+        "drop": 29048
+      },
+      "board_u0": {
+        "req": "01020181",
+        "wmrd": "00008902",
+        "wmwr": "00008903",
+        "wreq": "01020181",
+        "wdbg": "00020181",
+        "s2sr": "00000000"
+      },
+      "board_u1": {
+        "req": "01a70181",
+        "wmrd": "0000a1a7",
+        "wmwr": "0000a1a8",
+        "wreq": "00a70181",
+        "wdbg": "00a70181",
+        "s2sr": "00000000"
+      },
+      "evt0": 140296,
+      "evt1": 165532,
+      "t_storm_s": 5.752,
+      "t_total_s": 15.098,
+      "quiet_after": {
+        "ok": true,
+        "state": {
+          "wr": 41384,
+          "rd": 41383,
+          "drop": 29048
+        }
+      },
+      "board_dwr": 6309,
+      "board_drd": 6309,
+      "board_wr_rate": 417.9,
+      "board_rd_rate": 417.9,
+      "board_drop": 713,
+      "evt_delta": 25236,
+      "evt_per_readout": 4.0
+    },
+    {
+      "pace_us": 300.0,
+      "limit_bytes": 10293111,
+      "storm_exit": 1,
+      "storm": {
+        "summary": {
+          "file_bytes": 10293111,
+          "chunks": 7022,
+          "chunk_size": 1466,
+          "gap_ms": 0.0,
+          "pace_us": 300.0,
+          "pace_per_proc_us": 300.0,
+          "sndbuf_requested": 4194304,
+          "sndbuf_actual": 4194304,
+          "prep_s": 0.019,
+          "prep_us_per_frame": 2.704,
+          "recv": 5400,
+          "lost": 1622,
+          "corrupt": 0,
+          "inversions": 0,
+          "rtt_avg_ms": 1.5491756292801626,
+          "goodput_mbps": 12.295992765714855,
+          "goodput_send_mbps": 30.000308900903804,
+          "channel_mbps": 24.59198553142971,
+          "sha_match": false,
+          "pace_late": 2,
+          "pace_waited": 7020,
+          "pace_iv_avg_us": 300.626
+        },
+        "recv": 5400,
+        "chunks": 7022,
+        "lost": 1622,
+        "corrupt": 0,
+        "rtt_avg_ms": 1.5491756292801626,
+        "send_s": 2.11
+      },
+      "board_i0": {
+        "wr": 41384,
+        "rd": 41383,
+        "drop": 29048
+      },
+      "board_i1": {
+        "wr": 46784,
+        "rd": 46783,
+        "drop": 30670
+      },
+      "board_u0": {
+        "req": "01a70181",
+        "wmrd": "0000a1a7",
+        "wmwr": "0000a1a8",
+        "wreq": "00a70181",
+        "wdbg": "00a70181",
+        "s2sr": "00000000"
+      },
+      "board_u1": {
+        "req": "01bf0181",
+        "wmrd": "0000b6bf",
+        "wmwr": "0000b6c0",
+        "wreq": "00bf0181",
+        "wdbg": "00bf0181",
+        "s2sr": "00000000"
+      },
+      "evt0": 165532,
+      "evt1": 187132,
+      "t_storm_s": 5.4,
+      "t_total_s": 14.739,
+      "quiet_after": {
+        "ok": true,
+        "state": {
+          "wr": 46784,
+          "rd": 46783,
+          "drop": 30670
+        }
+      },
+      "board_dwr": 5400,
+      "board_drd": 5400,
+      "board_wr_rate": 366.4,
+      "board_rd_rate": 366.4,
+      "board_drop": 1622,
+      "evt_delta": 21600,
+      "evt_per_readout": 4.0
+    },
+    {
+      "pace_us": 250.0,
+      "limit_bytes": 10293111,
+      "storm_exit": 1,
+      "storm": {
+        "summary": {
+          "file_bytes": 10293111,
+          "chunks": 7022,
+          "chunk_size": 1466,
+          "gap_ms": 0.0,
+          "pace_us": 250.0,
+          "pace_per_proc_us": 250.0,
+          "sndbuf_requested": 4194304,
+          "sndbuf_actual": 4194304,
+          "prep_s": 0.0208,
+          "prep_us_per_frame": 2.957,
+          "recv": 4503,
+          "lost": 2519,
+          "corrupt": 0,
+          "inversions": 0,
+          "rtt_avg_ms": 1.5277487231052829,
+          "goodput_mbps": 11.028886306587681,
+          "goodput_send_mbps": 30.00170173474431,
+          "channel_mbps": 22.057772613175363,
+          "sha_match": false,
+          "pace_late": 2,
+          "pace_waited": 7020,
+          "pace_iv_avg_us": 250.671
+        },
+        "recv": 4503,
+        "chunks": 7022,
+        "lost": 2519,
+        "corrupt": 0,
+        "rtt_avg_ms": 1.5277487231052829,
+        "send_s": 1.76
+      },
+      "board_i0": {
+        "wr": 46784,
+        "rd": 46783,
+        "drop": 30670
+      },
+      "board_i1": {
+        "wr": 51287,
+        "rd": 51286,
+        "drop": 33189
+      },
+      "board_u0": {
+        "req": "01bf0181",
+        "wmrd": "0000b6bf",
+        "wmwr": "0000b6c0",
+        "wreq": "00bf0181",
+        "wdbg": "00bf0181",
+        "s2sr": "00000000"
+      },
+      "board_u1": {
+        "req": "01560181",
+        "wmrd": "0000c856",
+        "wmwr": "0000c857",
+        "wreq": "01560181",
+        "wdbg": "00560181",
+        "s2sr": "00000000"
+      },
+      "evt0": 187132,
+      "evt1": 205144,
+      "t_storm_s": 5.032,
+      "t_total_s": 14.431,
+      "quiet_after": {
+        "ok": true,
+        "state": {
+          "wr": 51287,
+          "rd": 51286,
+          "drop": 33189
+        }
+      },
+      "board_dwr": 4503,
+      "board_drd": 4503,
+      "board_wr_rate": 312.0,
+      "board_rd_rate": 312.0,
+      "board_drop": 2519,
+      "evt_delta": 18012,
+      "evt_per_readout": 4.0
+    }
+  ],
+  "meta": {
+    "chunk": 1466,
+    "storm": "D:\\FPGA\\prj\\project_9\\scripts\\json_storm.py",
+    "data": "D:\\FPGA\\prj\\project_9\\testdata\\session_full.jsonl",
+    "port": "COM5",
+    "when": "2026-10-19 17:19:41"
+  }
+}

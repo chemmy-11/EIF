@@ -1,0 +1,26 @@
+# CMD: C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe D:\FPGA\prj\project_9\scripts\json_storm.py D:\FPGA\prj\project_9\testdata\session_full.jsonl --chunk 1466 --pace-us 0.0 --limit-bytes 10293111 --gap-ms 0
+# EXIT: 1
+
+生效口径: chunk=1466B | UDP载荷=1472B | 以太帧=1518B | 线上=1538B(含前导+IFG) | gap=0.0ms(sleep 节拍, Windows 精度 ~0.5ms) | parallel=1 | sndbuf=4.00MB
+节奏裁决: 未启用 pace(--pace-us=0), 用 --gap-ms=0.0ms | 该 chunk 净载荷线速上限 953.2Mbps
+负载: 10293111 B -> 7022 片 x 1466 B, 预构造 19.6 ms(2.796 µs/帧, 不含在发送计时内)
+源 SHA256: 4F38AF2C85D9D03336B92548A2CB5F6B048F822A8632D0EE2499972F94BA3BF5
+发送 socket: SO_SNDBUF 请求 4194304 B -> 实际 4194304 B (getsockopt 回读)  ✓
+
+==== 传输质量报告 ====
+发送片数        : 7022
+收到片数        : 223  (3.18%)
+丢失片数        : 6799  首丢:[3, 4, 5, 6, 7]
+损坏片数(MD5不符): 0 
+到达流逆序对    : 0
+RTT ms  min/avg/p95/max : 0.86 / 16.97 / 30.29 / 31.59
+发送用时        : 0.06s   全程(含收尾): 3.10s
+A2 预构造用时   : 19.6 ms (2.796 µs/帧, 已移出发送计时窗口)
+单向有效吞吐    : 0.11 MB/s (0.8 Mbps)
+发送阶段速率    : 5.81 MB/s (46.5 Mbps)  [扣除收尾等待, 纯 sendto 循环+节拍]
+含预构造速率    : 34.5 Mbps  [诚实口径: 预构造+发送]
+等效信道速率    : 0.21 MB/s (1.7 Mbps)  [数据渡链路两次]
+重组 SHA256     : (有丢失/损坏, 未重组)
+SHA256 比对     : 不一致 ✗
+JSON_STORM_SUMMARY: {"file_bytes": 10293111, "chunks": 7022, "chunk_size": 1466, "gap_ms": 0.0, "pace_us": 0.0, "pace_per_proc_us": 0.0, "sndbuf_requested": 4194304, "sndbuf_actual": 4194304, "prep_s": 0.0196, "prep_us_per_frame": 2.796, "recv": 223, "lost": 6799, "corrupt": 0, "inversions": 0, "rtt_avg_ms": 16.9696103123167, "goodput_mbps": 0.8444021018247151, "goodput_send_mbps": 46.49475645127669, "channel_mbps": 1.6888042036494302, "sha_match": false, "pace_late": 0, "pace_waited": 0, "pace_iv_avg_us": -1}
+

@@ -1,0 +1,93 @@
+{
+  "tiers": [
+    {
+      "pace_us": 1000.0,
+      "limit_bytes": 300000,
+      "storm_exit": 0,
+      "storm": {
+        "summary": {
+          "file_bytes": 300000,
+          "chunks": 205,
+          "chunk_size": 1466,
+          "gap_ms": 0.0,
+          "pace_us": 1000.0,
+          "pace_per_proc_us": 1000.0,
+          "sndbuf_requested": 4194304,
+          "sndbuf_actual": 4194304,
+          "prep_s": 0.0006,
+          "prep_us_per_frame": 2.981,
+          "recv": 205,
+          "lost": 0,
+          "corrupt": 0,
+          "inversions": 0,
+          "rtt_avg_ms": 1.866965364698866,
+          "goodput_mbps": 9.354227038220854,
+          "goodput_send_mbps": 11.758187004276246,
+          "channel_mbps": 18.708454076441708,
+          "sha_match": true,
+          "pace_late": 1,
+          "pace_waited": 204,
+          "pace_iv_avg_us": 1000.219
+        },
+        "recv": 205,
+        "chunks": 205,
+        "lost": 0,
+        "corrupt": 0,
+        "rtt_avg_ms": 1.866965364698866,
+        "send_s": 0.2
+      },
+      "board_i0": {
+        "wr": 5,
+        "rd": 4,
+        "drop": 0
+      },
+      "board_i1": {
+        "wr": 210,
+        "rd": 209,
+        "drop": 0
+      },
+      "board_u0": {
+        "req": "01040056",
+        "wmrd": "00000004",
+        "wmwr": "00000005",
+        "wreq": "01040056",
+        "wdbg": "00040056",
+        "s2sr": "00000000"
+      },
+      "board_u1": {
+        "req": "01d103e4",
+        "wmrd": "000000d1",
+        "wmwr": "000000d2",
+        "wreq": "00d103e4",
+        "wdbg": "00d103e4",
+        "s2sr": "00000000"
+      },
+      "evt0": 16,
+      "evt1": 836,
+      "t_storm_s": 0.503,
+      "t_total_s": 9.856,
+      "quiet_after": {
+        "ok": true,
+        "state": {
+          "wr": 210,
+          "rd": 209,
+          "drop": 0
+        }
+      },
+      "board_dwr": 205,
+      "board_drd": 205,
+      "board_wr_rate": 20.8,
+      "board_rd_rate": 20.8,
+      "board_drop": 0,
+      "evt_delta": 820,
+      "evt_per_readout": 4.0
+    }
+  ],
+  "meta": {
+    "chunk": 1466,
+    "storm": "D:\\FPGA\\prj\\project_9\\scripts\\json_storm.py",
+    "data": "D:\\FPGA\\prj\\project_9\\testdata\\session_full.jsonl",
+    "port": "COM5",
+    "when": "2026-10-19 17:13:03"
+  }
+}

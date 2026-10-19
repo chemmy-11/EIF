@@ -1,0 +1,30 @@
+# CMD: C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe D:\FPGA\prj\project_9\scripts\json_storm.py D:\FPGA\prj\project_9\testdata\session_full.jsonl --chunk 1466 --pace-us 1000.0 --limit-bytes 10293111 --gap-ms 0
+# EXIT: 0
+
+生效口径: chunk=1466B | UDP载荷=1472B | 以太帧=1518B | 线上=1538B(含前导+IFG) | pace=1000.000µs/帧→目标 11.7Mbps @1.00kfps | parallel=1 | sndbuf=4.00MB
+节奏裁决: pace 接管节奏, --gap-ms=0.0ms 被忽略(R5: sleep 无 µs 精度) | 该 chunk 净载荷线速上限 953.2Mbps
+负载: 10293111 B -> 7022 片 x 1466 B, 预构造 21.9 ms(3.119 µs/帧, 不含在发送计时内)
+源 SHA256: 4F38AF2C85D9D03336B92548A2CB5F6B048F822A8632D0EE2499972F94BA3BF5
+发送 socket: SO_SNDBUF 请求 4194304 B -> 实际 4194304 B (getsockopt 回读)  ✓
+
+==== 传输质量报告 ====
+发送片数        : 7022
+收到片数        : 7022  (100.00%)
+丢失片数        : 0  
+损坏片数(MD5不符): 0 
+到达流逆序对    : 0
+RTT ms  min/avg/p95/max : 1.00 / 5.27 / 17.01 / 29.03
+发送用时        : 7.02s   全程(含收尾): 7.08s
+A2 预构造用时   : 21.9 ms (3.119 µs/帧, 已移出发送计时窗口)
+单向有效吞吐    : 1.45 MB/s (11.6 Mbps)
+发送阶段速率    : 1.47 MB/s (11.7 Mbps)  [扣除收尾等待, 纯 sendto 循环+节拍]
+含预构造速率    : 11.7 Mbps  [诚实口径: 预构造+发送]
+节拍实测        : 目标 1000.000µs/帧, 实测 min/avg/p50/p95/max = 1000.000/1000.531/1000.100/1000.400/1209.700 µs
+突发检查        : 最短帧间隔 1000.000 µs vs 目标 1000.000 µs -> 无背靠背突发 ✓(帧间隔恒 >= 目标)
+节拍等待/抢占   : 忙等命中 7021 帧, 入口已过期(OS 抢占) 1 帧, 累计滞后 2.6 µs
+判定            : 节拍有效 —— 帧周期由脚本设定(1000.000µs), 实测速率是设计值, 不是 PC 上限
+等效信道速率    : 2.91 MB/s (23.3 Mbps)  [数据渡链路两次]
+重组 SHA256     : 4F38AF2C85D9D03336B92548A2CB5F6B048F822A8632D0EE2499972F94BA3BF5
+SHA256 比对     : 一致 ✓ 全量数据完好穿越光链路往返
+JSON_STORM_SUMMARY: {"file_bytes": 10293111, "chunks": 7022, "chunk_size": 1466, "gap_ms": 0.0, "pace_us": 1000.0, "pace_per_proc_us": 1000.0, "sndbuf_requested": 4194304, "sndbuf_actual": 4194304, "prep_s": 0.0219, "prep_us_per_frame": 3.119, "recv": 7022, "lost": 0, "corrupt": 0, "inversions": 0, "rtt_avg_ms": 5.272032697115089, "goodput_mbps": 11.635071988052555, "goodput_send_mbps": 11.722096383193955, "channel_mbps": 23.27014397610511, "sha_match": true, "pace_late": 1, "pace_waited": 7021, "pace_iv_avg_us": 1000.531}
+
