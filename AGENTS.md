@@ -67,7 +67,7 @@
 | 光口控制脚 | A: tx_dis=AF12 rs0=AF13 rs1=AE13；B: AH12/AH11/AG11；C: J25/M26/M25；D: H26/G27/H27 | 官方 55 号 XDC |
 | 光模块 | 须 10G SFP+（线速率 10G，RS0=RS1=1 高速档，tx_disable=0） | Aurora xci C_LINE_RATE=10 |
 | LED | T22=观测（粘滞 rx）· T23=channel_up/link_ok（链路硬门控指示） | 各工程 XDC |
-| JTAG | 调试烧录用 Digilent USB-JTAG（210512180081）；串口 FT2232H-B COM7 | hw_server 实测 |
+| JTAG | 调试烧录用 Digilent USB-JTAG（210512180081）；串口 FT2232H-B **COM5**（2026-10 实测；COM7 为旧误记） | hw_server 实测 |
 | PC 侧 | NIC 192.168.1.102/24 静态 ↔ 板 192.168.1.10（MAC 00:11:22:33:44:55） | prj6 起 |
 | Python | `C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe`，**须 `PYTHONUTF8=1`**（GBK 控制台打 ✓ 会崩） | udp_verify 实证 |
 
@@ -138,8 +138,9 @@ D:\FPGA\prj\project_N\
 
 | 资产 | 位置 | 作用域 | 现状 |
 |---|---|---|---|
-| 项目级 AI 技能（7 个：6 官方 + `amd-doc-search` 桥） | `<vault>\.dsh\skills\`（vault = `C:\Users\15266\Desktop\毕设\`） | **仅本工作区**（DSH `projectRoot/.dsh/skills`，rank 100） | 已生效（热加载）；全局技能根 `~/.agents/skills` **不放**任何 Vivado 技能（2026-10-18 用户定案，避免污染其他 Agent 上下文） |
-| 官方文档检索（原生 MCP） | `~/.dsh/profiles/web/cordis.patch.yml` 的 `mcp-amd-doc-search` 条目 | DSH **web profile 全局**（所有工作区；重启 `dsh web` 后生效） | 已配置；工具名 `mcp__amd_doc_search__vivado_doc_search` |
+| 项目级 AI 技能（7 个：6 官方 AMD 技能 + `amd-doc-search` CLI 桥） | `<vault>\.dsh\skills\` | **仅本工作区**（DSH `projectRoot/.dsh/skills`，rank 100） | 已生效（热加载）。**注意**：`hw-ila-debug`/`hw-vio-debug` 依赖的 `vivado-mcp` MCP 未挂进当前会话；两技能文首有「本机适配注记」→ 走 CLI 桥 `D:\vivado-mcp\mcp_ctl.py` 或 Vivado batch Tcl |
+| 官方文档检索（原生 MCP） | `~/.dsh/profiles/web/cordis.patch.yml` 的 `mcp-amd-doc-search` 条目 | DSH **web profile 全局**（所有工作区；重启 `dsh web` 后生效） | **已配置但当前进程未加载**（会话工具清单无 `mcp__amd_doc_search`）；重启后生效，工具名 `mcp__amd_doc_search__vivado_doc_search` |
+| 官方文档检索（项目级 CLI 桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | **当前实际生效**：`py doc_search.py "<query>"`（stdlib 直连，无需重启） |
 | 官方文档检索（项目桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | 已生效：`py doc_search.py "<query>"`（stdlib 直连 MCP，无需重启） |
 | 服务端点 | `https://ross.amd.com/mcp/doc-search` | AMD 托管、免 key、英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+；**query 会发往 AMD**（官方称不存 query 文本）；NDA/EA/项目私有资料不在索引内 | — |
 
@@ -178,6 +179,8 @@ D:\FPGA\prj\project_N\
   · 混合型**以主导内容归类**（证据为主 → 调试记录，步骤为主 → 操作文档）。记录类 frontmatter `type` 词表见 `docs/调试记录/README.md`。
   · **移动/重命名必须同步修正全库引用**（vault wiki 链接 + `docs/` 镜像 + 工程 README），并在提交信息里注明处数；记录类**只增不改历史结论**，订正用"补记"小节并保留原数字与出处。
 - 工程状态变化 → 更新本文件「当前工程状态」+ README「当前推进」，并向用户报告一句。
+- **文档分工（2026-10-20 定）**：`README.md`=对外门面（工程血缘/快速开始）；`AGENTS.md`=AI 规范权威（§一–§十二）；`docs/README.md`=文档全量索引；vault `agent.md`=会话入口（只放指针，不复制规范正文）。
+- **可维护性纪律（2026-10-20 增补）**：单行 ≤800 字符（超长行破坏 diff/检索/阅读；长历史写记录，不堆状态节）；§十 只保留一个「当前状态」块，历史一律用指针。
 
 ## 九、Correction（坑账本：踩过的坑 = 规范的来源）
 
@@ -256,65 +259,39 @@ D:\FPGA\prj\project_N\
 
 
 
-## 十、当前工程状态（一屏速览；内部详表见本节附录）
+## 十、当前工程状态（一屏速览；历史详情见附 A 与调试记录）
 
-- 🔄 **路线 B / `prj/project_11/` 进行中（2026-10-10 起，最新 10-16）**：**B0** 断点核查与 fork 脚手架（10-10）→ **B1 软核控制面集成**（`axi_lite_regs`（W5 语义 Lite 从机）+ mb_ctrl BD + owner 最近写者仲裁；七套回归全绿；J_B1 板上三步全过 **`[B1-SELFTEST] PASS (0 errors)`** + ILA 九项交叉一致；位流 `d14425f2…`）→ **B2 J3 软核验证**（UART 两段协议 + `scripts/j3_soft_verify.py`（`--mock` 全绿）；**J_B2 板上三轮全 PASS**：逆序对 24905/0 缺 0 多 0 字节差；板上实证三段缺陷链：read_line 遗留缓冲 / RX 幽灵字节 / 打印穿插 AXI 读）→ **B3-0 延迟可观测**（桥内 `lat_w`/`lat_r` 饱和计数 + 双回读路 UDP `GET_LATENCY(0x05)` / 软核 Lite `+0x20/+0x24`；板上 128 帧采样 **Lw 中位 97 拍 0.32µs、Lr 中位 23 拍 0.08µs**，`LAT_BOARD: PASS` ⇒ **B3 硬阻断（真 MIG Lw/Lr 实测）闭合**）→ **B3-1a DMA 集成**（BD 加 `axi_dma`（512b MM2S、控制 100M/数据 300M 双时钟域）+ `dma_sink` + `dma_rd_shim` + 三主仲裁器；`DMA_SMOKE PASS` + 四档基线前后双跑零回归；根因定案 = axi_dma 512b 数据通道**确定性装配偏移**（非故障，判据预补偿）；坑 #47 宽归约锥静默误优化）→ **B3-1b 双读引擎 + v3 结构重构**（10-14～16：DMA 服务机制全通、**AR 无偏移定案**、槽存完整 ETH 帧（−8 窗口）；0 回显链收敛到「shim 输出域被综合器改写」⇒ **v3 职责剥离**：shim 只发字节流 + `frame_done`，描述符改由桥 R_DRET 自发射；离线回归全绿（shim/shim_drop/bridge_dma/arb3/lite/cmd/sink/W2/W4）；**v3 位流 `a432addd…a023`（WNS +0.004 / WHS +0.004）/ xsa `03c90cdd…`**，归档 `out/archive/b31b_board_2026-10-15/`，提交 `fa9ed97`）→ **10-16 v3 板场次**：烧 `a432addd` + ELF `0f4f0bd3` ⇒ **四档零回归 PASS**（20/20 · 12/12 · 12/12 · 300/300）+ **DMA_SMOKE PASS**，但 **'E' 轮 4 次全 FAIL（0/16 ×3、单帧 0/1）⇒ v3 未消除 0 回显**；同帧 A/B 对照（桥模式 16/16 逐字节回显 vs E 模式 0/16）**计数签名逐项一致**（`up_frames/up_bytes/echo_b_rx/echo_b_tx` 各 +20，ovf/stall/err 全 0）⇒ 缺陷在**内容**不在通路/长度；E-EMIT `len = 载荷+54`、byte0 = PC MAC 首字节稳定正确；PC 网卡零到达且错误计数 0 ⇒ **根因重定向到「DMA MM2S 在 base=SA 的字节映射 / DROP_BYTES 口径」**；证据归档 `out/archive/b31b_board_2026-10-16/`）→ **同日第二轮取证（只重建 ELF `03d456ef`，位流不动）**：新增软核命令 `'F'`（`SA−64/SA/SA+64` 三点各做一笔 MM2S 64B，回读 `dma_sink.q1` = 流首拍 4 字节）⇒ `SA+64` 点命中末帧帧内偏移 56 ⇒ **流起点 = 帧首前 8 字节 ⇒ `DROP_BYTES=8` / `DMA_LENGTH=len+8` 口径实测正确，DMA 映射嫌疑证伪**；最小帧对照（2B 载荷 → 帧 44B 补齐 60B、`len_tab=72`、传输 80B = 2 拍）**桥模式回显 `aa55` ✓ / E 模式 0 回显 ✗** ⇒ **损坏在帧首字节之后**（拍内 lane 4..63 或拍间字节流 —— `dma_sink` 只能看 lane 0..3 的盲区）→ **同日第三轮：发射字节流探针定案（v5 位流 `442ca75a`）**：给 `u_ila_0` 新建 probe1（`dbg_mem_rden`+`mem_rd_data[7:0]`，复用既有检查点只跑 impl，**WNS/WHS 仍 +0.004**）⇒ 同一帧两模式各捕获一次（总长均 **1526B = len_tab**）：**桥流 =【8B 以太网前导+SFD (`55×7,D5`)】+【帧】+【FCS】**（回显 YES）vs **E 流 =【帧】+【FCS】+【8B 垃圾】**（回显 NO）⇒ **0 回显根因 = `DROP_BYTES=8` 把槽内存开头的以太网前导+SFD 丢掉、`DMA_LENGTH=len+8` 又多读 8B** ⇒ 上线无前导 ⇒ 接收侧 MAC 无法定界 ⇒ 静默丢弃（与"三类计数全对、错误计数 0、`E-EMIT` byte0=0x08 正确"完全自洽）。**修复已实施**：`rtl/axi4_master_bridge.v` 用 `DROP_BYTES(0)` + `sw/src_j3/main.c` 用 `DMA_LENGTH = len` ⇒ DMA 发射流与桥引擎逐字节同构；探针已固化进 `scripts/build_debug.tcl`（probe1 + place 指令 `ExtraPostPlacementOpt`）；v3 位流与 pre-fix RTL 快照归档 `out/archive/v3_bit_a432addd_2026-10-16/` 可回滚 → **同日修复板级验证（v5-SW，无需重建位流）**：`DMA_SA = 槽基址-8` + `DMA_LENGTH = len+8`（配 `DROP_BYTES=8` 位流；前移 8B 让"被丢的 8B"落在前导之前）⇒ **'E' 轮 `ECHO: 16/16` 逐字节回显 + `B31B_E_ROUND: 0 errors`（该判据首次跑绿）** + **四档零回归 PASS**，发射流恢复【8B 前导+SFD】+【帧】+【FCS】与桥流同构（`E-EMIT` byte0 `0x08`→`0x55`）。等价形态 v5-RTL（`DROP_BYTES=0` + `LEN=len`）位流被时序门限拒（−0.017/−0.185），`build_v5_sweep.tcl` 指令扫描进行中；**软核口径必须与位流 DROP 配对**（配对表见记录 §三之十二）→ **最终口径收敛 = v5-RTL（同日 16:2x）**：指令扫描第一轮 `place -directive ExtraTimingOpt` 过门限（**WNS/WHS +0.004**）⇒ 位流 **`708f15a4`**（`DROP_BYTES=0`）/ ltx `352a5f28` / xsa `6a0af1ef` + 软核**单一口径**「基址对齐 + `LEN=len`」（ELF `c13a54f5`）⇒ **四档零回归全 PASS + 'E' 轮 16/16 逐字节回显 + 桥/E 发射流都以 8B 前导开头、1526B 同长逐字节同构**；v5-SW 保留为"不便重建位流时的等价应急口径"；最终配置归档 `out/archive/b31b_v5rtl_2026-10-16/` → **B3-1c 功能闭包（同日）**：`sw/src_j3/main.c` 加 `'d'`（读出引擎切换命令）+ `serve_dma_once()`（等 sticky 请求 → 编程 MM2S（v5-RTL 配对 SA=槽基址/LEN=len）→ 等 Idle → 等退休），并在 `run_round()` 逐槽等待里逐笔服务 ⇒ **RND 也走 DMA 描述符**；`scripts/j3_soft_verify.py --dma`（幂等切引擎）复跑四条链：**M `wr+256 rd+256 inv=16260 miss=0 extra=0 bytediff=0` PASS · A `rd+255 miss=1`（恰缺帧#5100）PASS · B 重读槽无产出 PASS**（ELF `4b463f93`，位流沿用 `708f15a4`）⇒ B3-1c **行为面收口**；剩「退役桥②读引擎」（删 `R_AR/R_R/R_UNPACK/R_FIN` + 输出 mux → 重建位流 → 四档 + 四条链复跑，届时 DMA 为唯一读路径）→ **退役尝试（同日傍晚）**：RTL 已删硬件读路径 + 引擎 mux（shim 唯一消费者）、`bridge_dma_tb` 按新架构改造后 **PASS（0 errors）**、位流 **`7064368d`**（首掷 −0.068 被拒 → 重掷 `ExtraTimingOpt` **+0.004**，体积小 ~0.9MB）；但**板验暴露基线回归：板卡不再应答 ARP ⇒ ping 不通** ✗。**根因（代码级）**：**栈自发帧也走内存环路**——`stack_txd/stack_tx_en`（eth 栈产生的 ARP/ICMP/命令应答）经泵A 写入 DDR（`aurora_mem_bridge.v` L108/L756），其读回同样依赖读出路径；退役后必须由软核编程 MM2S，而软核**只在轮次内服务** ⇒ 应答出不去；另 `dma_tready = dma_engine_ui ? shim : sink`（L290）在退役后必须**恒接 shim**。**已恢复绿配置**（烧回 v5-RTL `708f15a4` + ELF `c13a54f5` ⇒ ping ✓ + M 轮 `inv=30897` PASS ✓）。**退役前置两件**：① `dma_tready` 恒接 shim；② 软核驻留服务（主循环空闲即服务 sticky 请求）或保留一条硬件读路径专服务栈自发帧；W2/W4 两个 TB 因此失效（驱动已退役路径）→ 改造成 DMA 版为待办 → **10-17 日场 L1 假说检验（2×2，记录 §三之十八）**：位流 ± × ELF ± 四格全跑 ⇒ **退役位流 `3aa600aa` 配归档 ELF `c13a54f5` 应答正常（`LAT w=68 r=0`），绿位流 `708f15a4` 配驻留 ELF `f8175c32` 静默** —— **退役位流洗清、责任归位固件**，§三之十七 的 `[L1]` 假说「退役位流读 `UART_ST` 恒 0」**证伪**；本轮另排除 LMB 容量（15.6KB/64KB）、DMA 覆写软核段（槽基址 `0x00100000` vs LMB ≤`0x10000`）、构建-源不一致（`j3_soft/src/main.c` ≡ `src_j3/main.c` = `6ea72c5c`）、链接脚本差异（两 ELF 节布局/VMA 一致）；→ **同日（10-17）根因定案并修复（记录 §三之十九）**：新增固件 `'U'` 探针（软核自视连读 `R_ID/R_DMAREQ/R_WM_WR/UART_ST` 各 6 次）实测 M01 读形态 = **一笔滞后、同址连读第二笔即正确**；驻留空闲环里 `serve_dma_once()` 的 `rd_reg(+0x34)` 含**哑写 0x2C**，而 `urx_poll()` 原为**单次读** `UART_ST` ⇒ 每笔都落在「紧跟写之后的第一笔读」位置 ⇒ `RX_VALID` 恒 0 ⇒ **软核收不到任何字节 = 串口静默（与位流无关）**。修复 = `urx_poll()` 同址双读（`UART_RX` 必须保持单读，双读会吞两字节——本轮实踩一次，ELF `597ef983` 全哑）；**ELF `24eb49c7` 复验：绿位流与退役位流在 `'d'` 切 DMA 后串口均即时应答 ⇒ 退役位流首次具备可用控制面 `[L4]`**。遗留三项：①退役位流 **ping 0/3 且 PC 网卡计数 delta=0**（绿位流对照 3/3）⇒ 栈自发帧没上线 `[L3]`；②因 ARP 不通、PC 发不出 UDP 数据帧 ⇒ **四判据在退役位流上尚未取值**（广播直发探测既无回显也无 `wm_wr` 增长 = 判据未取得，§6a 硬规则 3）；③（**已撤销**）所谓「J3 `--dma` 基线冲突」是我的参数误用——板端 `NSLOTS` 编译期固定 256，`--nslots 64` 只改 PC 侧期望；按默认 256 复跑，桥引擎与 DMA 引擎**两种模式三链全 PASS**（`[M] inv=26057/25472`、`[A] miss=1` 恰帧#100、`[B] inv=25665/25092`），另有 `manual_round.py` 手动轮 `wr+256 rd+256 stall=0` + 256/256 回显旁证；④**缺陷已锁进退役 RTL**：`'d'` 现在同时写 `R_ENGINE`（ELF `4aac46be`），**绿位流 engine=1（驻留服务）ping 4/4 ✓，退役位流同固件同开关 ping 0/3、PC 网卡 delta=0 ✗** ⇒ 同一驻留服务在绿位流可用、退役位流不可用 ⇒ 差异在退役 RTL；`full_bit` 退休清零与 `out_dec` 均正常，候选收敛到「shim 结算 ↔ `frame_mem_if` 读出端口」，需 ILA 取证
-- ✅ **路线 B 收口完成（2026-10-19）**：B0–B5 / R1（读侧）/ **R2（写侧 S2MM，round3d `F6012BA0` + S0–S11 13/13 PASS）** / **R3 速率量化**（1466B：可持续 **2000fps 零丢失**≈23.5Mbps，临界 **≈2500fps**，上限 **≈2560fps≈390µs/帧**；三版固件 A/B 证明瓶颈=每帧软核服务往返而非单点延时；D2 三读撤除收益<2% ⇒ 放弃） / **R4 文档收口**（复现指南 B 章 `复现/复现_prj11_指南_2026-10-19.md`、`out/W6_prj11_可观测性清单.md`、`out/archive/ARCHIVE_INDEX_prj11.md` **32 轮/584 文件/0 缺失**、AGENTS+记录 §二十二+docs 镜像）全部完成。D1/K2 已结项，K1 保留风险条。证据：`out/evidence_2026-10-19/R3_RATE_RESULTS.md`、`R3D_S0-S11_run3.log`、四档/10MB 复验日志。后续属新范围：双板双链路（2026-09-30 Q4 暂缓）/ SG 描述符环提速 / 调度与 FL 负载验证。
-- 🔄 **路线 B / R2 桥①写侧换层 S2MM（2026-10-17 晚～10-18，位流已出、板验待上电）**：设计 v1.2 / 实现落地（`HAS_DMA` 参数化、桥② 写读零改动）/ 请求-GO-ACK-introut 协议 / fail-stop 同前；**独立审计 A1–A19 全闭环**。**round2c 位流过时序门限**：`ExtraTimingOpt` 后布 WNS +0.042 → 尾判 **+0.004 / WHS +0.004**、DRC **0 Errors / 22 Warnings**、`V5_SWEEP2_OK`；修复链 = ①字节捕获 1 级流水（审计抓 A16“跨拍预取覆盖”后修复，坑 #59）②`WD_ARM` 拆拍把 FIFO level 比较从 512 CE 移走（坑 #60）③ILA 裁剪（ILA1/2 整核移除、ILA0 374→92、ILA3 184→152；缺失探针列=INFO/判据未取得）。产物：bit **`28921C6B…324627`**（10,266,180 B）/ ltx `4AC25546…`（审计 ltx 实物逐项核对 92/9/152 通过）/ xsa `16A4F01F…` / ELF `1bc8088d`；归档 `out/archive/b31b_r2_2026-10-18/`（**27 项清单 + SHA256.txt（28 文件）**，清单自身 SHA256 `73FB1AAE…`，清单头 A19 已修）；**S0 已钉且 dry-run PASS**（WNS/WHS/DRC/hash 全过）。**板验待用户上电**：烧归档绝对路径 bit+ELF → S0–S11（S4 单帧 86B 尾拍逐字节 + S2MM DMASR；`dbg_s2mm_state` **7=ARM 正常/6=HALT fail-stop**；`fault` 全程 0）。RTL 冻结 blob **`f43267db`**。详见 `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十。**round2c 后继续（10-18 下午/晚间）**：lite_regs AXI 协议修复（`d133b508`→fix2 `d5d16d46`）、写引擎 fix2 `c92c20c7`、round2f 位流 `8A8FE378` **过门限 +0.004** 并上板：**S0/S1/S3 PASS**，AXI 楔死定位到 lite_regs 写后紧接读、用 GO 后 1ms 间隔规避；写/读数据面计数推进（wm/rd_frm=5/5）；但 **PC 仍收不到帧**（`r2_tx_probe`=NO_FRAME），**R1 绿位流对照 ping 4/4** ⇒ 问题在 R2 数据面（写流首拍/前导/TKEEP 待证）。round3 加 `u_ila_5@ui` 写流探针（64/8/1/1/1）+ ILA0 写入口 9b（92→101）+ lite fix2 `d5d16d46` 后构建 **WNS=-0.002 / WHS=+0.004（差 0.002ns）⇒ NO_BITSTREAM 未收口**（归档 `out/archive/b31b_r2_2026-10-18_round3/`）。按用户要求断电收尾，**本轮板验未完成**。**新会话入口 = `操作文档/阶段三_prj11_R2板验续作交接单_2026-10-18.md`**；下一步 = 构建（ILA5 1024→512 / ILA3 2048→1024 后重掷）→ 板验最小序列 → ILA5 首拍抓写流（期望 beat0 `0xD555555555555555`/tkeep=FF）→ 修数据面 → S0–S11 + 四档/10MB/双桥对账。**10-19 00:36 round3b 位流 PASS**：lite fix2 `d5d16d46` + `u_ila_5@ui` 写流探针（64/8/1/1/1，深 1024）+ ILA0 101b（92b 旧位序不变），ILA3 深降 1024；`ExtraTimingOpt` 首掷 **WNS=+0.004 / WHS=+0.004**（`V5_SWEEP2_OK`）；bit **`02F7153A`**（9,996,016 B）/ ltx **`0B2CC2F5`**（84,582 B，3 核）/ xsa `95E1D156` / 诊断 ELF `16D06BD3`；归档 `out/archive/b31b_r2_2026-10-19_round3b/`（含 BUILD_STATUS）。**板已断电收尾** ⇒ 待上电按 BUILD_STATUS §4：'d'→'W'（期望 s2sr=0/s2len=0）→ ping→'W'（期望 s2len=86/s2sr=0x1002）→ ILA5 首拍（`0xD555…`/tkeep）判写侧。官方工具定位（PG021/PG022 + 官方 axi_dma IP 仿真 `TEST_PASS`）见 `out/evidence_2026-10-18/R2_official_tool_diagnosis_20261018.md`。详见记录 §十二–§十七。**✅ 10-19 R2 收口（round3c/round3d）**：① 楔死根因 = **module-ref IP cache 陈旧**（lite fix1/fix2 从未进旧位流；BD regen 后新 cache 才真综合当前 RTL）——坑 #68，`[L2 强推断]`；② **隔帧 50% 丢帧根因 = 固件读服务 `MM2S_DMACR.Reset` 连带复位整个 AXI DMA**（PG021 原文直证），S2MM 变 Halted ⇒ 下一帧 `S2MM_LENGTH` 写 no effect ⇒ 无 introut ⇒ 桥 WAITDONE 超时 → WD_HALT → 故障恢复 → 隔帧循环；**修复 = 固件 `s2mm_rearm()`（零 RTL 改动）**，50%→100%；③ round3c-diag 位流 `9852016C`（WNS +0.004）上首次全通四档/10MB+SHA/J3；④ **round3d 验收位流 `F6012BA0`（9,288,496 B，WNS **+0.002**/WHS +0.004/DRC 0E，ltx `2F8AF498`：ILA0 110/ILA3 **152**/ILA5 47、xsa `216839F4`、验收固件 ELF `BA3C0220`）→ `r2_board.ps1 -Run` 完整 **S0–S11 13/13 PASS（`R2_RESULT: PASS`，run3 16:42–16:46）**：S6 双桥差分各 +4/ost=0；S7 四档 20/20·12/12·12/12·300/300；S8 10MB 7022/7022 + SHA256 一致（独立复算）；S9 J3 M/A/B 全 PASS；**S10 双桥对账 mem/mem2 各自 wm=wr_frm=rd_frm=9、ost=0、stall/len_err=0、wr_fault=0**；S11 sticky=0**。工具维护（判据逻辑零改动）：`r2_counter_recon.py` recon 补打 `R2_RECON_RESULT` marker、`j3_fourchains.ps1` R2 口径、`r2_ilacap.tcl` 探针 5→9、S0 用 `r3d_s0_buildlog_adapter.py` 适配 `V5_SWEEP1_OK`。证据：`out/evidence_2026-10-19/R3D_S0-S11_run{1,2,3}.log` + `EVIDENCE_INDEX_r3c.md` + `tools/r3c_pin.md`；记录 §十八–§二十。**R2 关卡 = 完成**（遗留：ILA5 GO/ACK 触发未抓，不影响判据）。
-- ✅ **速率线速化 L1 帧泵乒乓双 bank（2026-10-09，014cde2）**：根因 = prj9 帧泵握手门控（帧在途到达的帧整帧丢弃，背靠背丢 50%）；派生副本 `prj_loop/rtl_patch/frame_fifo_pump.v`（prj9 原件零改动）帧尾立即翻 bank 接收下一帧。实测 1466B 帧 41.7k→**82.67k fps 零丢帧（≈969 Mbps 线速）**、PRJ9 同款吞吐档 51.45%→99.99%；功能回归全过（DDR 四档 / 导师原话正常+报错 / 死锁专项 / 稳定性 3/3）；WNS +0.019。**当前在库位流 = DBE35734…017F**（`prj_loop/out/aurora_mem_bridge.bit`，与 probes.ltx 配对）。坑账本 #31–#34
-- ✅ **W6 可观测性收口 ⇒ 路线 A（W0–W6）收口（2026-10-09，9680b2c）**：①判决计数器总表自动生成（49 信号 / 795 bit）；②4 个 ILA 按域分挂核对（user_clk 404b / eth_rxc 111b / user_clk_b 101b / ui_clk 179b，无跨域采样）；③归档索引 41 条带 SHA256、0 缺失；三脚本 `w6_inventory.py` / `w6_healthcheck.py` / `w6_archive.py`，自检经正负对照验证（5 健康 PASS / 1 死锁 FAIL）。诚实缺口：4 个桥内部计数器挂 ILA3 会打崩 300MHz 域（WNS −0.041→−1.142）故未挂、仅 xsim 可见（清单与验收记录已标注并给替代路径）。**J1–J6+J3′ 全过 ⇒ 路线 B 启动条件满足**
+- ✅ **路线 A（prj10，W0–W6）已收口（2026-10-09）**：DDR 四档逐字节 / 10MB 100%+SHA / 导师四环节 / 死锁专项 / 稳定性 3/3 全过；`prj/project_10/` **目录冻结（只读）**，终版位流 `DBE35734…017F`。详见 `调试记录/` 各记录。
+- ✅ **路线 B（prj11，B0–B5 / R1–R4）已收口（2026-10-19）**：round3d 位流 `F6012BA0`（WNS **+0.002** / WHS +0.004）+ 固件 `BA3C0220`；`r2_board.ps1 -Run` **S0–S11 13/13 PASS**（四档 20/20·12/12·12/12·300/300；10MB 7022/7022 + SHA；J3 四链；双桥对账 mem/mem2 各自 wm=wr_frm=rd_frm=9、ost=0、fault=0）。**R3 速率**：1466B 帧可持续 **2000 fps 零丢**、临界 ≈2500 fps、服务上限 ≈2560 fps（≈390 µs/帧；perf2/perf3 A/B 证明瓶颈=每帧软核服务往返，非单点延时；Q5 不要求提速）。**R4**：复现指南 B 章 / 探针清单 / 跨轮归档索引 **33 轮·627 文件·0 缺失**。
+- ⏭️ **下一步（非强制）**：双板双链路按 2026-09-30 Q4 定案**暂缓**；SG 描述符环提速 / 调度与 FL 负载验证属新范围。
+- 🧭 **权威指针**：当前状态=本文件 §十 + `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十九–§二十二；复现=`复现/复现_prj11_指南_2026-10-19.md`；证据索引=`prj/project_11/out/archive/ARCHIVE_INDEX_prj11.md`。
 
-
-- ✅ **D1 DDR4 校准 + W3 内存插入联调全过（2026-10-06，c27eea3/2465cf4）**：双位流校准全绿；集成位流 ping 20/20 + UDP 12/12 + 10MB 桥零丢零错 + 七级对账闭合；一条命令验证 prj_loop/scripts/udp_verify_ddr.py（四档全 PASS）
-- ✅ **过载硬冻结修复落地（2026-10-06 晚，9f29d7c）**：prj_loop/rtl_patch/udp_tx.v 派生副本（忙时锁存 pending，prj9 原件零改动）；R4 TB + 板上重放 pace 13µs 场景双验证，"过载只降速不冻结"达成
-- ✅ **W5 随机读（命令通道 + J3/J3′）—— 上板验证通过（2026-10-08 晚，J5）**：导师原话四环节全部取到板卡证据（J3 逆序对 52 / 逐帧对应 16/16 / J3′ 收 16/16 缺 0 多 0 字节差 0 / 负向 A 报缺 1 帧 / 负向 B 观测到「空」），终端一键复现 `prj_loop/scripts/mentor_verify.py`（展示层独立复核，不采信引擎 PASS）。过程中发现并修复**两处真实缺陷**：①**应答帧是以太网 runt**（58B<64B，网卡硬件静默丢弃、板内 ILA 全正常）→ 按 RFC 894 加 6B 填充 + 单元 TB 补最小帧长护栏（旧 RTL 负向对照 FAIL 45 例）；②**RND 模式写槽游标死锁**（接受计数 334 vs 提交计数 278 发散 56；写槽号取自提交计数，拒收时不推进 ⇒ 游标停在满槽上永久卡死、上位机推不出正确槽号）→ 新增独立槽游标 `wr_slot_ptr`（每帧无论提交或被拒都 +1），专项回归 `deadlock_regress.py` PASS。另排除三个假故障：PC 侧 ARP 老化、工具应答配对错位、LUTRAM 宏常量传播。**终版位流 SHA256 `6ACFF515…A62B`（WNS +0.010）**，报告见 `docs/汇报/汇报_导师原话验证报告_prj10内存进环路_2026-10-08.md`。**原时序攻坚（第三轮）**：时序攻坚 8 轮 **−1.121 → +0.001**（WNS_GATE 过 / 全域 0 失败端点；SHA256 `18387F8C…FDF9E`，19:31:22 版，与 probes.ltx 配对）。根因经**对照实验链定案**：主因 = 读命令解码锥（结构性移除实验 −0.494→−0.074，占缺口 4/5），次因 = cmd_channel 负载（≈0.08ns）；**两次「cfg 常量对照」均无效**（LUTRAM 宏对常量传播不透明，坑 #28）。最终修法（全在 axi4_master_bridge.v，两桥共享）：预取拍做范围数学并寄存 `pre_eff` + `len_beats_tab` 预算表 + **keep 保护的 `full_bit_q` 控制镜像**（无 keep 被合并回原树、收益归零）。四仿真全绿、计数逐字一致。上板验证单已恢复「就绪」。详见 `docs/调试记录/阶段三_prj10_W5时序收敛_第三轮根因验证与收敛_2026-10-08.md`。：命令通道 `rtl_patch/cmd_channel.v`（单元 TB PASS / 负向 FAIL 68，集成期拦下两缺陷：应答注入点必须走 RGMII 末级而非泵A、`cmd_hold` 多驱动 DRC 才拦）+ PC 侧 `scripts/j3_random_read.py`（`--mock` 全流程 PASS）已交付。**时序阻断**：`cfg_mode` 接活后**整条读命令解码锥**超预算（`u_rd_cmd` FWFT 组合读出 → 范围比较 → 槽选择 → `full_bit/len_tab` 三张 256:1 查表 → 各 CE/D，4.226ns vs 3.333ns；W2–W4 通过纯属常量折叠，残段只剩 +0.008ns）。**cut-1 已实施**（命令预取寄存 + `R_PRE` 判决拍 + `len_beats_tab` 预算表）→ **WNS -1.121 → -0.494**（失败端点 5011→3464），四仿真全绿；**cut-2 触发 Vivado 2023.1 工程级综合崩溃 ×3（单模块 OOC 却通过）→ 回退留证**（坑账本 #27）。停点 **-0.494ns，不可上板**；构建脚本已带 **WNS/WHS 门限**（不达标不写位流）。候选手段 B→A→D 见 `docs/调试记录/阶段三_prj10_W5时序收敛_第二轮根因重定与修复_2026-10-08.md`。⚠️ 盘上 `.bit`（20:43，WNS<0）与 `probes.ltx`（00:03，cut-1 网表）**互不配对，都勿烧**。
-- ✅ **W4 两级内存全环路（J4 全过，2026-10-07 收官）**：缺陷修复 + 位流重建后，AI 远程烧录 + 判读完成 J4 五项——PROGRAM_OK（4 ILA+1 MIG/四域时钟）· T22/T23 双灯（ILA 印证 calib=1/ch_up=1）· ping 20/20 · 四档 PASS · **10MB 质量档 7022/7022 + SHA256 一致** · **双桥对账 mem/mem2 各自 wm=wr_frm=rd_frm=11012、错误计数全 0**；另 pace13 吞吐档：零损坏/不冻结、丢失全在泵A之前（已知单帧在途结构）。**下一步 W5（命令通道 + 随机读 J3/J3′）**。原状态（留痕）：：第七轮构建实际已成功（WNS=+0.035）；上板前审查拦截仲裁器 B/R 响应按 bid/rid[0] 路由 + 两桥常量 ID 恒同 → 必死锁（单元 TB 喂不同 ID 掩盖）。修复 = 按 wgrant/rgrant 授权锁存路由；新增两桥联合仿真 w4_joint_tb（负向对照复现死锁 + 正向 0 错误）+ 双回归逐字一致 + ila_snap.tcl 板上对账。J4 验证单就绪（vault 操作文档 10-07），待用户烧板
-> **README 分工变更（2026-10-01）**：仓库 `README.md` 改为**面向组员/新手的外部门面**（工程血缘图 + 通俗一览 + 快速开始）。原 README 承载的**内部信息**（工程索引详表、docs 文档中心指向、标准开发流程、挂起区触发条件）全部迁入本节附录，内部协作只看 AGENTS.md。
-
-- ✅ prj6 网口栈（09-04）· ✅ prj8 数据级桥 M2 判据全过（09-18，git 66ff43d）
-- ✅ **prj9 双笼真光链路判据全过（09-21，f7c8be8）**：渡光两次，ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死，WNS=+1.006ns
-- ✅ **会话 JSON 全量传输质量评测（09-21）**：质量档 100%+SHA 一致 · 单流 19.3 Mbps（PC 侧天花板）· 并行回程 22.9 Mbps（**测量下界，非结构极限**——原「串行上限」归因已由设计报告 v0.5 §3.3.2 修正）；损坏/乱序全程 0
-- ✅ **prj9 尾巴 = 全量传输 0.4% 丢失已定案修复（09-21 晚）**：判决位流 build9v（三域 ILA）差分链算术闭合——pack 输出队列 2 深溢出吞 tlast 字→相邻帧合并（7×2+9×2=32，git d9327bd）；队列 2→16（0ee2611）后全量 10MB **100%+SHA 一致**（历史首次）；真实业务传输层 json_reliable.py 交付 100%/0 重传
-- ⏭️ 下一步（09-26 导师定案：DDR 先行，路线图 #14）：**D 线 DDR4 队列缓存**——D1 MIG 校准复验（prj4 位流在库）→ D2 队列后端 DDR 化 → D3 判别复测 → D4 缓存/直通双模式 → D5 AXI DMA；BRAM v2 = 回退。并行：双板双链路组网（10G 模块 4 只 + LC 跳线 4 条已齐备，零采购）。后续：过载冻结根因（看门狗就位）→ IBERT 眼图（空闲通道 C/D）
-- 🔄 project_4 MIG 已解冻移入主线（#14，D1 校准复验起步）；⏸️ 挂起区：串口桥三级验证 · project_7 内环 · 8b/10b 练手（恢复触发条件见本节附 A）
-- ✅🔬 **prj10 W2 内存桥 RTL + xsim 仿真（09-29）**：`prj/project_10/`（三层 RTL + AXI4 RAM 替身 + 六用例 TB），`=== prj10 W2 SIM: PASS (0 errors) ===`；一键复现 `sim\run_sim.bat`（只用 xvlog/xelab/xsim，**未建 Vivado 工程/未上板**，prj4·prj9 零改动）。实测单桥服务 3.11/3.07 µs 每帧（开工草案 §九 漏算 8b↔512b 逐字节转换，已修正；节拍结论不变）。bring-up 修掉 AXI R 通道握手违规 / 尾拍不满 64B 卡死 / 描述符长度清零竞争三条真 BUG（见 vault 执行记录）
-
-### 附 A · 工程索引详表（内部视角，原 README 2026-10-01 迁入）
-
-**✅ 已完成**
-
-| 目录 | 工程 | 达成 | 说明 |
-|---|---|---|---|
-| `prj/project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） | BD design_1：MicroBlaze + UART Lite + AXI Interconnect |
-| `prj/ibert_ultrascale_gth_0/` | IBERT 眼图实验 | ✅ 08-27 | 10G PRBS 跨口过纤 0E0；眼图截图已归档 |
-| `prj/aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31 内环验证 | 10G duplex X1Y11；`uart_bridge.v`（串口桥位流在库，验证挂起见下） |
-| `prj/project_6/` | 以太网 UDP 网口栈 | ✅ 09-04 上板验证 | 官方 39_eth_udp_loop 整包移植；ping/UDP 回环/Wireshark 四包链 |
-| `prj/project_8/` | Aurora-UDP 数据级桥 | ✅ M2（09-18）判据全过 | 以太网栈 + Aurora 64b/66b（X1Y11 内环）；axis_word_pack/unpack 8↔64 + 双向帧泵；`rtl/*_dly.v` = IDELAY 1250ps 修复版；排障脚本与 ILA 数据在 `scripts/` |
-| `prj/project_9/` | 真光链路版（双笼 A↔B） | ✅ 真光链路判据全过（09-21，f7c8be8） | prj8 全部验证资产复用；loopback=3'b000 正常模式；判决位流 build9v/w（三域 ILA）；0.4% 丢失已定案修复（pack 队列 2→16，0ee2611），全量 10MB 100%+SHA |
-
-**🔄 正在推进**
+### 附 A · 工程索引详表（内部视角；状态截至 2026-10-19）
 
 | 目录 | 工程 | 状态 |
 |---|---|---|
-| `prj/project_4/` | MIG/DDR4（D 线第一步） | **D1 校准已过（2026-10-06，双位流 MIG JTAG 报告全绿）**；例程自带比对测试有自身缺陷链，内存正确性以集成位流全链判据为准；D2 队列 DDR 化待启动 |
-| `prj/project_10/` | 内存进环路（DDR4 帧队列） | **路线 A（W0–W6）已收口（2026-10-09），全目录冻结为路线 A 资产**（只读；终版位流 DBE35734…017F）：W3 插桥 → W4 两级全环路 J4 → W5 随机读 J5（导师原话四环节）→ 速率线速化 969 Mbps → W6 可观测性；J1–J6+J3′ 全过。**路线 B 在新工程 `prj/project_11/` 做**（fork prj10；MicroBlaze + AXI DMA，Q1/Q3 后继——2026-10-10 用户定案） |
-| `prj/project_11/` | 路线 B（软核控制面 + AXI DMA 数据面） | 🔄 **进行中（2026-10-10 起）**：B0 脚手架 → B1 软核控制面集成（`[B1-SELFTEST] PASS`）→ B2 J3 软核验证（`[B2-SOFT-VERIFY] PASS`）→ B3-0 延迟可观测（Lw 中位 97 拍 / Lr 中位 23 拍）→ B3-1a DMA 集成（`DMA_SMOKE PASS`）→ B3-1b 双读引擎 + v3 结构重构。**2026-10-19：路线 B 全量收口（B0–B5/R1–R4）**——round3d `F6012BA0` + S0–S11 13/13 PASS；R3 速率：可持续 2000fps/临界≈2500fps/上限≈2560fps（瓶颈=每帧软核服务）；R4：复现指南 B 章 + 探针清单 + 归档索引 0 缺失；D1/K2 结项、D2 放弃** |
+| `prj/project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） |
+| `prj/ibert_ultrascale_gth_0/` | IBERT 眼图 | ✅ 08-27（10G PRBS 跨口过纤 0E0） |
+| `prj/aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31（内环验证） |
+| `prj/project_6/` | 以太网 UDP 网口栈 | ✅ 09-04（ping/UDP/Wireshark 四包链） |
+| `prj/project_8/` | Aurora-UDP 数据级桥 | ✅ M2（09-18） |
+| `prj/project_9/` | 真光链路版（双笼 A↔B） | ✅ 09-21（WNS +1.006；10MB 100%+SHA 基线） |
+| `prj/project_4/` | MIG/DDR4 | ✅ D1 校准（10-06，双位流全绿）；后续 D 线闭环在 prj10 |
+| `prj/project_10/` | 内存进环路（路线 A） | ✅ W0–W6 收口（10-09），**目录冻结只读**，终版 `DBE35734…017F` |
+| `prj/project_11/` | 路线 B（软核 + AXI DMA） | ✅ B0–B5/R1–R4 收口（10-19），验收对 `F6012BA0` + `BA3C0220` |
+| `prj/0DMA_uart2ddr/`、`prj/project_2~3/`、`prj/project_7/` | 参考实现 / 练手 / 挂起 | 🗄️ 归档或挂起（见附 B 与 vault `操作文档/挂起/`） |
 
-**⏸️ 挂起（恢复触发条件见 vault `操作文档/挂起/README`）**：串口桥 M-D 三级验证（解 dbg 探针时钟域 undefined + AE33 输入方向）· `prj/project_7/` SFP 前端内环（09-22 定案后不再复活，PCS/PMA 配置留档）· 8b/10b 练手（IBERT 已覆盖）· prj9 传输效率深挖 B 组（B1 板卡自发流/B2 C 发包器/B3 帧泵 B 硬件提速；E1–E5 已随实操单 v2 移回主线）。
+### 附 B · docs/ 文档中心指向
 
-**🗄️ 归档/工具**：`prj/project_2/` 8b/10b 练手遗骸 · `prj/project_3/` Aurora IP 定版 xci · `prj/0DMA_uart2ddr/`（MicroBlaze+MIG+DMA+UART 参考 BD，Vivado **2019.2**，**未验证勿当资产**，D2/D5 骨架）· `scripts/` 顶层 Tcl 骨架 + `ci_check.py` · `KU_IO.xdc` + `docs/KU引脚表.xlsx`（GBK）· `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` · **`vivado-mcp/`**（上游 [vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26 **零改动副本**，Apache-2.0；权利边界与 NOTICE 见根 `THIRD_PARTY.md`；运行时实装在 `D:\vivado-mcp`，见坑账本 #21，仓库内副本仅溯源）· **CI**：`.github/workflows/ci.yml`（push 触发 `scripts/ci_check.py` 仓库体检：文档规范/链接/Tcl 语法；本地收尾先跑 `"C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe" scripts/ci_check.py`，**Git Bash 的 `python` 是别名坏壳**，坑账本 #45）· 根 `LICENSE`（MIT，**仅覆盖作者原创部分**）。
+- `docs/` = vault 文档的**脱敏快照**（用户名→`***`，人名→`前辈`；`[[双链]]` 保留）；命名 `[阶段]_prj标识_概要_YYYY-MM-DD`；索引 `docs/README.md`（CI 第 6 项强制一致）。
+- 关键文档：`导览_cross_已完成工作说明_2026-10-01.md` · `规划_cross_长期路线图_2026-09-04.md` · `追踪_cross_短期待办_2026-10-10.md` · `调试记录/`（结论与证据）· `操作文档/`（照着做）。
 
-### 附 B · docs/ 文档中心指向（原 README 迁入）
+### 附 C · 标准开发流程
 
-- `docs/` = vault 文档的**脱敏快照**（用户名→***，人名→前辈；`[[双链]]` 按仓库惯例保留）；命名规范 `[阶段]_prj标识_概要_YYYY-MM-DD`，索引见 `docs/README.md`。
-- 关键文档：`导览_cross_已完成工作说明_2026-10-01.md`（8 件已完成工作展开）· `规划_cross_长期路线图_2026-09-04.md`（v4.5，#15 prj10 定案）· `追踪_cross_短期待办_2026-10-10.md` · `规划_cross_AI-Infra系统设计报告_2026-10-06.md`（v0.6，服务器底座定案：Windows + WSL2 / 4090D 24GB）· `操作文档/`（含挂起区）· `调试记录/`（prj10 W2/W3 执行记录、prj9 R4 仿真复现等）· `结论_cross_prj9-prj10_进度体检报告_2026-09-29.md`。
-
-### 附 C · 标准开发流程（原 README 迁入）
-
-1. Vivado：设计 → 综合/实现 → Generate Bitstream → Export Hardware（含 bitstream）→ .xsa
-2. Hardware Manager：Program Device（成功标志 `End of startup status: HIGH`）
-3. Vitis：更新 .xsa → Run Configuration **取消 Program FPGA**（保留 Reset entire system）→ Run → 串口 9600
-4. 批处理构建：`vivado -mode batch -source <script>.tcl`（幂等脚本见各工程 `scripts\`；⚠️ 纯 ASCII 工作目录）
+1. Vivado：设计 → 综合/实现 → Generate Bitstream → Export Hardware（含 bitstream）→ `.xsa`；
+2. Hardware Manager：Program Device（成功标志 `End of startup status: HIGH`）；
+3. Vitis：更新 `.xsa` → Run Configuration **取消 Program FPGA**（保留 Reset entire system）→ Run → 串口 9600；
+4. 批处理：`vivado -mode batch -source <script>.tcl`（幂等脚本在各自 `scripts\`；⚠️ 工作目录必须纯 ASCII）。
 
 ## 十一、跨目录约定
 
