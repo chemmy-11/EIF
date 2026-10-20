@@ -268,6 +268,8 @@ py scripts\ci_check.py      # 退出码 0 = 全过（Git Bash 里勿用 python �
 
 **许可**：本仓库**作者原创部分**（自研 RTL、脚本、文档、评测与工具链封装）采用 **[MIT License](LICENSE)**，**仅供学习研究使用**。
 **例外**（详见 [`THIRD_PARTY.md`](THIRD_PARTY.md)，第三方与版权素材声明）：
+
+- **坑账本全文**：`PITFALLS.md`（#1–#68；索引见 `AGENTS.md §九`）
 - **AMD / Xilinx 版权素材**——`prj/aurora_64b66b_loop_ex/`、`prj/ibert_ultrascale_gth_0/`、各工程的官方例程移植件与 IP 生成物、`KU_IO.xdc` 等：**不适用** MIT，权利归 AMD/Xilinx，仅供学习研究；
 - [`vivado-mcp/`](vivado-mcp/)——第三方项目，遵循其上游 Apache-2.0（全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE)）；
 - **Vivado 许可文件**——`*.lic` 已被 `.gitignore` 排除，不入库不分发；本仓库不复制、不传播任何 AMD/Xilinx 工具授权；
