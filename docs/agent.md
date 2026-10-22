@@ -105,8 +105,8 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 
 - Vivado 2023.1：`D:\Xilinx\Vivado\2023.1\bin\vivado.bat`；批处理 `-mode batch -source <tcl>`，日志落文件再检索。
 - Python：`C:\Users\***\AppData\Local\Python\pythoncore-3.14-64\python.exe`。
-- JTAG：Digilent USB-JTAG（210512180081）；**板卡串口 = COM5（USB-SERIAL CH340，9600 8N1；115200 无响应属正常，非故障）**。
-- **板卡状态（2026-10-19 收尾时的最后在役配置）**：round3d 位流 `F6012BA0` + 固件 `BA3C0220`（`'d'` 后 DMA 模式）；是否上电以现场为准，重烧与体检见 `复现/复现_prj11_指南_2026-10-19.md` §2–§3。
+- JTAG：Digilent USB-JTAG（210512180081）；**板卡串口 = COM7（本机当前；以 `[System.IO.Ports.SerialPort]::GetPortNames()` 枚举为准，换 USB 口可能漂移，历史曾 COM5/COM6。USB-SERIAL CH340，9600 8N1；115200 无响应属正常，非故障）**。
+- **板卡状态（2026-10-22 复检/演示固件）**：round3d 位流 `F6012BA0` + 演示固件 `B6D3F7B1`（多 `Q` 一行汇总 / `?` 速查；位流不变）；正式证据仍用 `BA3C0220`。`'d'` 后 DMA 模式；重烧与体检见 `复现/复现_prj11_指南_2026-10-19.md` §2–§3。
 - **prj11 主线工具入口**：判据 `D:\FPGA\prj\project_11\out\r2_board.ps1`（S0–S11；工具 README `R2_tools_README.md`）；PC 侧 TX 判别 `out\r2_tx_probe.ps1`；ILA 抓取 `out\r2_ilacap.tcl` 与 `out\evidence_2026-10-18\tools\r2_ila5_capture.tcl`。
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
 - **配套工具 `vivado-mcp`（已随仓库入库）**：MCP 服务，**32 个工具**——会话/Tcl/工程/流程/报告/诊断/CDC/位流探针/IP/波形十类；其中 `parse_xpr`·`parse_bit_header`·`parse_ltx`·`xdc_lint` 为**离线工具**（不启 Vivado）。**上游 = [mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26（Apache-2.0，LICENSE 已随源码入库）**——本仓库副本**零代码改动**、仅目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 平铺入包内；逐字节比对 52 同 / 0 改）。上游基准 **Vivado 2019**，本项目 **2023.1**：离线工具与 Vivado 会话实测可用；**`compare_xci` 不可用**（上游按 XML 版 xci 设计，本项目 2023.1 的 xci 全为 JSON 版）。 仓库内为**可移植副本**（`D:\FPGA\vivado-mcp\`，零本机配置），安装与清单见 `vivado-mcp/README.md`。⚠️ **与下条「工具纪律」里的本机 CLI 壳是两回事**：那层壳是开发者本地设施、不入库。两条硬约束：安装路径必须**纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；Vivado 会话与综合/实现/仿真**全局串行**。
@@ -121,9 +121,10 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 - **执行层不变**：技能只是知识与流程；官方 skill 里的 `vivadoExecute`/`vivado_start`/`vivado_doc_search` 按技能顶部「本机适配注记」映射到本工程 `run_tcl`/`start_session`/`mcp_ctl.py` CLI 桥。只读日志分析**不启动 Vivado、不占全局串行锁**；原始日志先复制到 C: 侧副本再解析。
 - **细节**：[[参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18]]；坑账本 #62–#64；2023.1 适配待实测项见该文档 §6。
 
-## 当前状态（2026-10-20 更新；主线 = 路线 B 已收口）
+## 当前状态（2026-10-22 更新；主线 = 路线 B 已收口）
 
 - ✅ **路线 B（prj11）已全量收口（2026-10-19）**：round3d 位流 `F6012BA0`（WNS +0.002）+ 固件 `BA3C0220`；S0–S11 **13/13 PASS**；四档 / 10MB 100%+SHA / J3 四链 / 双桥对账全过；R3 速率：1466B 可持续 2000fps 零丢、上限≈2560fps；R4 文档收口完成（复现指南 / 探针清单 / 归档索引 0 缺失）。
+- 🧪 **演示固件（2026-10-22，非验收件）**：`B6D3F7B1` 在 `BA3C0220` 同源上仅增串口 `Q`（一行汇总：mode/wr/rd/drop/s2sr 解码/fault/末帧槽长）与 `?`（速查），位流 `F6012BA0` 不变；归档 `prj/project_11/out/archive/fw_q_2026-10-22/`（J3 M/A/B 逐轮 + 四档 UDP 日志）。正式证据仍以 `BA3C0220` 为准。
 - 📦 **发布页**：<https://github.com/chemmy-11/EIF/releases/tag/prj11-routeB-closed-2026-10-19>（tag `prj11-routeB-closed-2026-10-19`）；**已完工作说明**：vault `汇报/导览_cross_已完成工作说明_2026-10-22.md`（GitHub 镜像 `docs/导览_cross_已完成工作说明_2026-10-22.md`）。
 - ✅ **路线 A（prj10）目录冻结只读**（终版 `DBE35734…017F`）。
 - **入口**：`调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十九–§二十二（收口/速率/重审）；`复现/复现_prj11_指南_2026-10-19.md`（一键复现）；`操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md` §七/§八（重审与收尾）。

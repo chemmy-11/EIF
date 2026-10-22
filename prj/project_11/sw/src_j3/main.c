@@ -26,6 +26,11 @@
  *       -> "[B2] E-DONE served=N rd+=N stall=0"
  *   'd' B3-1c: 切换读出引擎 (DMA 描述符 / 桥硬件读) —— 切换后 'M'/'A'/'B' 四条
  *       链都在所选引擎上跑 -> "[B2] DMAMODE now=DMA|bridge"
+ *   'Q' 2026-10-22: 一行汇总 (板卡自报, 只读不改状态) ->
+ *       "[Q] mode=DMA wr=.. rd=.. drop=.. s2sr=........ H=.. I=.. E=.. fault=.. P=.. last=s/l"
+ *       演示用: 敲一个字母看计数/DMA 状态/写引擎 fault/末帧槽长; 流量中勿用
+ *       (9600 阻塞打印 ~85ms, 会拖慢服务) —— 档间/空闲时用。
+ *   '?' 打印命令速查一行 (演示时不用翻文档)。
  *   'F' B3-1b v4: DMA 流起点取证 —— 槽基址 SA-64/SA/SA+64 三点各做一笔 MM2S(64B),
  *       回读 dma_sink q1(流首拍 4 字节 LE) -> "[B2] F slot=n q1[-64]=.. q1[0]=.. q1[+64]=.."
  *
@@ -658,6 +663,10 @@ int main(void)
             uputs("[B2] DMAMODE now=");
             uputs(g_dma_mode ? "DMA\r\n" : "bridge\r\n");
         }
+        else if (c == '?') {
+            /* 2026-10-22: 串口速查 (演示时不用翻文档) */
+            uputs("[?] U W I Q L X S d M A B E D F P G C J K\r\n");
+        }
         else if (c == 'U') {
             /* ★N3 探针: 从软核自身视角取 M01/UART 读的滞后形态 (坑 #39 机制取证)。
              * 每行都是"连续背靠背读同一地址", 用软核自己的总线时序, 不经 JTAG。 */
@@ -1040,6 +1049,34 @@ int main(void)
             uputs(" wr=");     uputd(v_wr);
             uputs(" rd=");     uputd(v_rd);
             uputs(" drop=");   uputd(v_dr);
+            uputs("\r\n");
+        } else if (c == 'Q') {
+            /* ★2026-10-22 板卡自报汇总行 (演示/复现用; 只读, 不改任何状态):
+             * 一行给出 模式 + 桥①计数 + S2MM 状态解码 + 写引擎 fault/pending
+             * + 末帧槽长。纪律: 先把寄存器全读完再一次性纯打印 (坑 #44:
+             * 打印中穿插 AXI 读会毁 TX 行)。9600 下一行 ~85ms, 只在空闲/档间
+             * 用 —— 流量中打印会阻塞服务循环, 表现为丢帧, 不是计数器坏了。 */
+            unsigned wr, rd, dr, s2sr, wdbg, wreq, err;
+            wr   = rd_reg(&R_WM_WR)  & 0xffffu;
+            rd   = rd_reg(&R_WM_RD)  & 0xffffu;
+            dr   = rd_reg(&R_WM_DRP) & 0xffffu;
+            s2sr = rd_reg(&S2MM_DMASR);
+            wdbg = rd_reg(&R_WRDBG);
+            wreq = rd_reg(&R_WRREQ);
+            /* S2MM_DMASR: bit4 IntErr / bit5 SlvErr / bit6 DecErr / bit14 ErrIrq */
+            err  = ((s2sr >> 4) & 0x7u) | ((s2sr >> 14) & 0x1u);
+            uputs("[Q] mode="); uputs(g_dma_mode ? "DMA" : "bridge");
+            uputs(" wr=");    uputd(wr);
+            uputs(" rd=");    uputd(rd);
+            uputs(" drop=");  uputd(dr);
+            uputs(" s2sr=");  uputh(s2sr);
+            uputs(" H=");     uputd(s2sr & 0x1u);
+            uputs(" I=");     uputd((s2sr >> 1) & 0x1u);
+            uputs(" E=");     uputd(err);
+            uputs(" fault="); uputd((wdbg >> 31) & 1u);
+            uputs(" P=");     uputd((wreq >> 31) & 1u);
+            uputs(" last=");  uputd((wdbg >> 16) & 0xffu);
+            uputc('/');       uputd(wdbg & 0xffffu);
             uputs("\r\n");
         }
         /* 其余字符 (\r\n 等) 忽略 */

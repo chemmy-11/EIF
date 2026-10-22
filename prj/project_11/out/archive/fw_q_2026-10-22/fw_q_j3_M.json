@@ -1,0 +1,23 @@
+{
+ "ok": true,
+ "rounds": {
+  "M": {
+   "type": "M",
+   "ok": true,
+   "errors": [],
+   "warnings": [],
+   "wr0": 345,
+   "n_expected": 256,
+   "missing": [],
+   "extra": 0,
+   "byte_diff": 0,
+   "order_ok": true,
+   "inv": 17777,
+   "wr_delta": 256,
+   "rd_delta": 256,
+   "dup_nodata": false,
+   "seq_base": 5000,
+   "rd0": 344
+  }
+ }
+}

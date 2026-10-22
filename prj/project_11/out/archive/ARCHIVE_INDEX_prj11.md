@@ -1,15 +1,15 @@
 # prj11 归档跨轮总索引（自动生成，勿手改）
 
-> 生成器 `scripts/archive_index_prj11.py` · 目录 `prj/project_11/out/archive/` · 生成时间：2026-10-19 17:30:01
+> 生成器 `scripts/archive_index_prj11.py` · 目录 `prj/project_11/out/archive/` · 生成时间：2026-10-22 16:16:10
 
 ## 一、总览与「0 缺失」核对
 
 | 指标 | 值 |
 |---|---|
-| 归档轮次数 | **33** |
-| 文件总数 | 627 |
-| 总大小 | 404.6 MiB |
-| 有 SHA256.txt 的轮次 | 33 / 33 |
+| 归档轮次数 | **34** |
+| 文件总数 | 639 |
+| 总大小 | 404.7 MiB |
+| 有 SHA256.txt 的轮次 | 34 / 34 |
 | SHA256.txt 列名缺失数 | **0** |
 | 缺 SHA256.txt 的轮次 | 0（全部有） |
 
@@ -51,6 +51,7 @@
 | `b31b_v5fix_2026-10-16` | 12 | 0.7 | ✓ | 0/0 | — | — |
 | `b31b_v5probe_2026-10-16` | 17 | 13.1 | ✓ | 0/0 | `442CA75A` | aurora_mem_bridge_rdprobe.bit(9.8MB)、mb_ctrl_rdprobe.xsa(2.5MB)、probes_rdprobe.ltx(0.2MB) |
 | `b31b_v5rtl_2026-10-16` | 17 | 13.6 | ✓ | 0/0 | `708F15A4` | aurora_mem_bridge.bit(10.1MB)、mb_ctrl.xsa(2.6MB)、probes.ltx(0.2MB) |
+| `fw_q_2026-10-22` | 12 | 0.1 | ✓ | 11/0 | — | — |
 | `v3_bit_a432addd_2026-10-16` | 43 | 9.7 | ✓ | 0/0 | `A432ADDD` | aurora_mem_bridge.bit(9.0MB)、probes.ltx(0.2MB) |
 
 ## 三、缺口明细
