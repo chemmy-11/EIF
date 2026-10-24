@@ -13,9 +13,15 @@
 
 本地专用检查（vault 不存在时 [跳过]，不影响远程 GitHub CI；用户裁决 D2）：
   7. 技能清单一致性    vault `.dsh/skills/MANIFEST.json` 与磁盘 7 个 SKILL.md 的
-                       source_hash / 技能集合 / name==dir / version / baseline 四键一致
+                       技能集合 / name==dir / version / baseline 四键一致；并且**逐字节**
+                       校验：直接跑 `gen_skills_manifest.py --check`（重新生成后与盘上文件
+                       比对，生成逻辑唯一实现不复制），任何字段被手改都在这里 FAIL（H1）。
   8. 技能 references   SKILL.md 里的 Markdown 链接与 references|scripts|examples 反引号
-                       相对路径必须真实存在（占位符跳过）
+                       相对路径必须真实存在（占位符跳过）。
+                       注：MANIFEST.skills[].references 的存在性**不另立一套检查** —— 手改它由
+                       检查 7 的逐字节比对直接暴露；SKILL.md 侧的悬空引用由本检查负责。
+                       （真做存在性校验会把基线判红：references 是「正文里出现的相对路径」的
+                       启发式抽取，含 REPORT.md/report_data.json/build.tcl 这类**产物名**）
   9. 技能绝对路径      SKILL.md 里出现的 Windows 盘符路径必须真实存在
                        （允许侧文件 `.dsh/skills/.path-allowlist.json` 登记例外并写理由）
  10. 技能工具名        ① `mcp__vivado__<x>` 必须在 MANIFEST.tool_catalog.mcp_vivado 内；
@@ -37,7 +43,6 @@
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -226,6 +231,8 @@ def check_docs_index() -> None:
 SKILLS_ROOT = VAULT / ".dsh" / "skills"
 SKILL_MANIFEST = SKILLS_ROOT / "MANIFEST.json"
 SKILL_PATH_ALLOWLIST = SKILLS_ROOT / ".path-allowlist.json"
+# MANIFEST 的生成器（唯一实现）。检查 7 只调它的 --check，绝不复制生成/序列化逻辑（H1）。
+GEN_SKILL_MANIFEST = ROOT / "scripts" / "gen_skills_manifest.py"
 
 # 占位符 / 演示路径：不当作真实引用（与 gen_skills_manifest.py 同口径）
 PLACEHOLDER = re.compile(r"path/to|\.\.\.|xxx|[<>*{}]")
@@ -287,14 +294,38 @@ def _txt(val: object) -> str:
     return val.strip() if isinstance(val, str) else ""
 
 
-def skills_source_hash(dirs: list[Path]) -> str:
-    """MANIFEST.source_hash 的复算（与 gen_skills_manifest.py 唯一实现同算法）：
-    按技能目录名排序 → 每个 SKILL.md 的 UTF-8 字节 sha256 十六进制串 → 依次拼接 → 再 sha256。
+def _generator_manifest_check() -> tuple[bool, str]:
+    """跑生成器的 `--check`（MANIFEST 唯一生成实现），返回 (是否一致, 诊断文本)。
+
+    这是「禁手写 MANIFEST」的**真正判据**：MANIFEST 必须与「由 SKILL.md 重新生成的字节」
+    完全相同。旧实现只复算 source_hash —— 那只证明 SKILL.md 没变，手改 description /
+    evidence / tested_on / references / tool_catalog 在任何检查里都不会红（H1 的洞）。
+    生成/序列化逻辑只存在于 gen_skills_manifest.py 一处（同检查 12 用渲染器 --check 的做法）。
     """
-    digest = hashlib.sha256()
-    for d in sorted(dirs, key=lambda p: p.name):
-        digest.update(hashlib.sha256((d / "SKILL.md").read_bytes()).hexdigest().encode("ascii"))
-    return digest.hexdigest()
+    cmd = [sys.executable, str(GEN_SKILL_MANIFEST), "--check", "--skills-root", str(SKILLS_ROOT)]
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=600,  # 生成器内部探测 MCP 的 timeout 是 180s，留足余量
+        )
+    except Exception as exc:
+        return False, f"执行 `{' '.join(cmd)}` 失败：{exc}"
+    if proc.returncode == 0:
+        return True, ""
+    detail = "\n".join(
+        x for x in ((proc.stdout or "").rstrip(), (proc.stderr or "").rstrip()) if x.strip()
+    )
+    return False, f"`{GEN_SKILL_MANIFEST.name} --check` rc={proc.returncode}\n" + (
+        detail or "（生成器无输出）"
+    )
 
 
 def load_skill_manifest() -> dict:
@@ -339,13 +370,15 @@ def check_skills_manifest() -> None:
     if man.get("schema_version") != 1:
         problems.append(f"schema_version={man.get('schema_version')!r}，应为 1")
 
-    expect_hash = skills_source_hash(dirs)
-    got_hash = man.get("source_hash")
-    if got_hash != expect_hash:
-        problems.append(
-            f"source_hash 与 {len(dirs)} 个 SKILL.md 现算值不符"
-            f"（MANIFEST={str(got_hash)[:16]}… 现算={expect_hash[:16]}…）"
-            "⇒ MANIFEST 已过期，请重跑 `py scripts/gen_skills_manifest.py`（禁手写）"
+    # H1：整份 MANIFEST 必须逐字节等于「由 SKILL.md 重新生成」的结果。
+    # 这里只取生成器 --check 的退出码，不在本文件复算/复写生成逻辑（单一实现）。
+    gen_ok, gen_detail = _generator_manifest_check()
+    if not gen_ok:
+        FAILS.append(
+            f"MANIFEST 与「由 SKILL.md 重新生成」的结果不一致（{rel_man}）——MANIFEST 禁手写："
+            "description / evidence / tested_on / references / tool_catalog 任一字段被手改都会在这里暴露。"
+            "处置：跑 `py scripts/gen_skills_manifest.py` 重新生成。诊断:\n    "
+            + gen_detail.replace("\n", "\n    ")
         )
 
     skills = man.get("skills")
@@ -401,6 +434,47 @@ def check_skills_manifest() -> None:
 
 
 # ---------- 8. 技能 references 真实存在 ----------
+SKILL_REF_FILENAME = re.compile(r"^[\w][\w.\-]*\.(md|py|tcl|ps1|json|v|sv|rpt)$")
+
+
+def _skill_body_start(text: str) -> int:
+    """frontmatter 之后的正文起点（与生成器 split_body 同口径，避免误扫前言里的反引号）。"""
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end >= 0:
+            return end + 4
+    return 0
+
+
+def _skill_artifacts(md: Path) -> set[str]:
+    """SKILL.md 前言 ``artifacts:`` = 运行时产物名（技能自己写出来的，不随包发布）。
+
+    H3：显式声明后这些名字从「引用必须存在」里豁免；**未声明**的裸文件名不再放行。
+    之前 check 8 只查 markdown 链接与 references/|scripts/|examples/ 前缀，裸文件名
+    （REPORT.md / build.tcl …）从不校验 ⇒ MANIFEST.references 里可以有悬空名字。
+    """
+    text = _read_text(md)
+    start = _skill_body_start(text)
+    if start == 0:
+        return set()
+    out: set[str] = set()
+    in_key = False
+    for line in text[3:start].splitlines():
+        s = line.strip()
+        if not in_key:
+            if s.startswith("artifacts:"):
+                rest = s.split(":", 1)[1].strip()
+                if rest.startswith("[") and rest.endswith("]"):
+                    out |= {x.strip().strip("\"'") for x in rest[1:-1].split(",") if x.strip()}
+                in_key = True
+            continue
+        if s.startswith("- "):
+            out.add(s[2:].strip().strip("\"'"))
+        elif line and not line.startswith((" ", "\t")):
+            in_key = False  # 回到顶层 key，artifacts 区块结束
+    return {x.replace("\\", "/") for x in out if x}
+
+
 def check_skills_references() -> None:
     if not _skills_ready():
         return
@@ -408,6 +482,8 @@ def check_skills_references() -> None:
     for d in _SKILL_DIRS or []:
         md = d / "SKILL.md"
         text = _read_text(md)
+        body_start = _skill_body_start(text)
+        arts = _skill_artifacts(md)
         picked: list[tuple[int, str, str]] = []
         for m in LINK.finditer(text):
             picked.append((m.start(), "链接", m.group(1)))
@@ -415,6 +491,9 @@ def check_skills_references() -> None:
             cand = m.group(1).strip()
             if cand.startswith(SKILL_REF_PREFIXES):
                 picked.append((m.start(), "代码内路径", cand))
+            elif m.start() >= body_start and SKILL_REF_FILENAME.match(cand):
+                # 裸文件名：正文提到就要求随包存在，除非在 artifacts: 里声明为运行时产物
+                picked.append((m.start(), "产物名/文件名", cand))
         for pos, kind, raw in picked:
             t = raw.strip()
             if not t or t.startswith(("http://", "https://", "mailto:", "#")):
@@ -425,6 +504,9 @@ def check_skills_references() -> None:
             t = t.split("#", 1)[0].strip()
             if not t or PLACEHOLDER.search(t):
                 continue
+            norm = t.replace("\\", "/")
+            if norm in arts or Path(norm).name in arts:
+                continue  # 已声明为运行时产物
             if re.match(r"^[A-Za-z]:[\\/]", t):
                 target = Path(t)
             else:
@@ -438,7 +520,8 @@ def check_skills_references() -> None:
     if bad:
         FAILS.append(
             "技能 SKILL.md 里的引用指向不存在的文件（解析基准 = 该 SKILL.md 所在目录；"
-            "占位符 path/to|...|xxx|<>*{} 已跳过）:\n    " + "\n    ".join(bad)
+            "占位符 path/to|...|xxx|<>*{} 已跳过；**运行时产物必须在前言 `artifacts:` 里声明**）:\n    "
+            + "\n    ".join(bad)
         )
 
 

@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-10-24",
-  "note": "镜像门禁白名单（SPEC §4 检查 11 / 用户裁决 D1）。只有「归一（去 UTF-8 BOM + vault 侧 15266→*** + CRLF→LF）后仍不相等」或「docs 有而 vault 无此相对路径」的条目才允许登记；path 相对 docs/，正斜杠分隔；kind ∈ {drift, docs-only}；since = 登记日期（差异起始日可考时写进 reason）。reason 为空 → ci_check 自身 FAIL。归一后已经相等的文件不许登记（会被 [提示] 报告为多余条目）。",
+  "note": "镜像门禁白名单（SPEC §4 检查 11 / 用户裁决 D1）。只有「归一（去 UTF-8 BOM + vault 侧 15266→*** + CRLF→LF）后仍不相等」或「docs 有而 vault 无此相对路径」的条目才允许登记；path 相对 docs/，正斜杠分隔；kind ∈ {drift, docs-only}；since = 登记日期（差异起始日可考时写进 reason）。reason 为空 → ci_check 自身 FAIL。归一后已经相等的文件不许登记（会被 [提示] 报告为多余条目）。｜2026-10-24 收口：原 15 条（drift 9 + docs-only 6）中 7 条「纯目录改名」漂移已按最小编辑 resync 进 docs/ 并删除登记（docs 侧只把 `AI-Infra系统设计/` 换成 `GSnFPipe系统设计与指导文档/`，未整体覆盖）。现存 8 条 = drift 2（docs/README.md 的定位差异；追踪_cross_短期待办_2026-10-10.md 的有意去链接）+ docs-only 6（同内容换路径 / 仓库原创）。",
   "entries": [
     {
       "path": "README.md",
@@ -9,51 +9,9 @@
       "since": "2026-10-24"
     },
     {
-      "path": "规划_cross_长期路线图_2026-09-04.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 侧 `AI-Infra系统设计/` 已改名为 `GSnFPipe系统设计与指导文档/`（该目录现存 `FPGA-AI-Infra-系统设计报告.md` + 2026-10-22 下发的 GSnFPipe v1.0 三件指导文档），vault 副本第 96/103 行的 wiki 链接随之写成 `[[GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告]]`；docs 快照仍是改名前的 `[[AI-Infra系统设计/…]]`。逐行比对：191 行仅第 96/103 行不同，其余逐字节相同。",
-      "since": "2026-10-24"
-    },
-    {
-      "path": "操作文档/挂起/架构_cross_内存进环路拓扑_2026-09-24.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 第 8/240 行 wiki 链接为 `[[GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告]]`，docs 快照仍为改名前的 `[[AI-Infra系统设计/…]]`。逐行比对：308 行仅第 8/240 行不同，其余逐字节相同。",
-      "since": "2026-10-24"
-    },
-    {
-      "path": "操作文档/挂起/汇报_阶段三_prj10_内存进环路路线建议_2026-09-28.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 第 7 行 frontmatter `related` 里的 wiki 链接为 `[[GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告]]`，docs 快照仍为 `[[AI-Infra系统设计/…]]`。逐行比对：182 行仅第 7 行不同。",
-      "since": "2026-10-24"
-    },
-    {
-      "path": "操作文档/阶段三_cross_S0服务器运行底座搭建实操单_2026-10-06.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 第 13 行「依据」行的 wiki 链接为 `[[GSnFPipe系统设计与指导文档/服务器操作系统与本地 LLM 推理层架构修订报告]]`，docs 快照仍为 `[[AI-Infra系统设计/…]]`。逐行比对：402 行仅第 13 行不同。",
-      "since": "2026-10-24"
-    },
-    {
-      "path": "操作文档/阶段三_prj10_内存进环路开工草案_2026-09-29.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 第 8 行 frontmatter `related` 里的 wiki 链接为 `[[GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告]]`，docs 快照仍为 `[[AI-Infra系统设计/…]]`。逐行比对：431 行仅第 8 行不同。",
-      "since": "2026-10-24"
-    },
-    {
-      "path": "操作文档/阶段二之十_prj9_传输效率与瓶颈判定实操单_2026-09-29.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 第 7 行 frontmatter `related` 里的 wiki 链接为 `[[GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告]]`，docs 快照仍为 `[[AI-Infra系统设计/…]]`。逐行比对：302 行仅第 7 行不同。",
-      "since": "2026-10-24"
-    },
-    {
-      "path": "结论_cross_prj9-prj10_进度体检报告_2026-09-29.md",
-      "kind": "drift",
-      "reason": "vault 目录改名：vault 第 7 行 frontmatter `related` 里的 wiki 链接为 `[[GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告]]`，docs 快照仍为 `[[AI-Infra系统设计/…]]`。逐行比对：294 行仅第 7 行不同。",
-      "since": "2026-10-24"
-    },
-    {
       "path": "追踪_cross_短期待办_2026-10-10.md",
       "kind": "drift",
-      "reason": "vault 目录改名 + docs 缺目标文件：vault 第 104 行是 Markdown 链接 `[AI-Infra 系统设计报告](GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告.md)`；docs 侧该文件未镜像（见本表 `规划_cross_AI-Infra系统设计报告_2026-10-06.md` 一条），且目录名已改，故 docs 版改成纯文本「AI-Infra 系统设计报告（毕设 vault，未镜像）」，同一行还去掉了指向 `毕设方向与论文大纲/开题报告_2026-09-22.md` 的链接（同属未镜像文件）。逐行比对：132 行仅第 104 行不同。",
+      "reason": "vault 目录改名 + docs 侧**有意去链接**（目标未镜像），与 README 同类的定位差异，不是未同步的改名残留：vault 第 104 行是两条 Markdown 链接 `[开题报告](毕设方向与论文大纲/开题报告_2026-09-22.md)` 与 `[AI-Infra 系统设计报告](GSnFPipe系统设计与指导文档/FPGA-AI-Infra-系统设计报告.md)`；docs/ 侧这两个相对路径都不存在（前者从未镜像，后者按仓库命名规范落成根目录 `规划_cross_AI-Infra系统设计报告_2026-10-06.md`，见本表该条），照 vault 原文 resync 会引入 2 个断链、直接触发 ci_check 检查 2（相对链接可解析，`ci_check.py:114-134`），故 docs 版把两条链接降级为纯文本「（毕设 vault，未镜像）」——**为什么不等** = docs 侧可解析性要求优先于逐字镜像。逐行比对：132 行仅第 104 行不同；vault 25760 B vs docs 25687 B，差 73 B ≠ 纯改名应有的 N×15 B，证实含改名以外的改写。",
       "since": "2026-10-24"
     },
     {

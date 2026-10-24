@@ -63,7 +63,7 @@
 - **「字节不一致」多数是脱敏设计的结果，不是缺陷**：当日抽查的差异样本中，vault `C:\Users\***\…` 对应 docs `C:\Users\***\…`，差异全部来自脱敏替换。
 - ⇒ **纪律：绝不「为了对齐」把 vault 原文覆盖进 `docs/`**（会把敏感信息写进 git 历史）。确需同步时先判定差异类型（脱敏 / 内容更新），内容更新以「更晚、有实测证据」的版本为准，**同步后必须重新脱敏**。
 - **vault 增删文档后，镜像入 `docs/` 时必须同步 `docs/README.md` 全量索引**（口径 = docs/ 下除任意 `README.md` 外的全部 .md），否则远程 CI 第 6 项会红。
-- **CI 门禁（2026-10-24 起，`ci_check.py` 第 7 项）**：存在 vault 时逐文件比对 `docs/**/*.md` ↔ vault 对应文件，**先归一（两侧 `***`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节**；归一后仍不等、或 docs 独有而 vault 没有 → 必须在 `D:\FPGA\scripts\mirror_allowlist.json` 登记（每项带可复核理由），否则 **CI FAIL**。现状：83 篇 = 归一相等 68 + 白名单 15（drift 9 / docs-only 6），未登记不一致 **0**（2026-10-24 已把 `W5随机读上板验证单` 按 vault 新版重新脱敏同步并删掉那条白名单）。
+- **CI 门禁（2026-10-24 起，`ci_check.py` 第 11 项 `check_mirror_gate`；第 7 项是 `check_skills_manifest`，勿混）**：存在 vault 时逐文件比对 `docs/**/*.md` ↔ vault 对应文件，**先归一（两侧 `***`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节**；归一后仍不等、或 docs 独有而 vault 没有 → 必须在 `D:\FPGA\scripts\mirror_allowlist.json` 登记（每项带可复核理由），否则 **CI FAIL**。现状：83 篇 = 归一相等 **75** + 白名单 **8**（drift 2 / docs-only 6），未登记不一致 **0**（2026-10-24 二次收口：7 条纯目录改名漂移按最小编辑 resync 进 docs 并删除登记，白名单 15→8；剩余 drift 2 = `README.md` 定位差异 + `追踪_cross_短期待办_2026-10-10.md` 有意去链接）。
 - 白名单不是垃圾桶：新增条目要写清**为什么**不等（脱敏未覆盖 / vault 目录改名 / 内容新旧 / docs 独有），写「历史遗留」视为无效理由（门禁自身会校验 reason 非空）。
 
 ## 文档地图（本目录）
@@ -154,7 +154,7 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 | `vivado-rtl-lint` | 1.0.0 | 2026.1 | — | ⚠️ 未在本机实测 | `parse_lint_report.py` |
 | `vivado-simulate-rtl` | 1.0.0 | 2025.2, 2026.1 | — | ⚠️ 未在本机实测 | `scripts/sim_env_doctor.py`、`scripts/validate_skill.py` |
 
-<sub>source_hash `f3c39b9ac2804b0f…` · mcp 工具目录 32 项 · 重算命令 `py D:\FPGA\scripts\gen_skills_manifest.py`</sub>
+<sub>source_hash `0ebaa1026c239693…` · mcp 工具目录 32 项 · 重算命令 `py D:\FPGA\scripts\gen_skills_manifest.py`</sub>
 
 <!-- END:skills -->
 - **官方文档检索**：AMD hosted `amd-doc-search`（`https://ross.amd.com/mcp/doc-search`，免 key，英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+）。原生 MCP 已配置在 DSH web profile（**重启 `dsh web` 后**工具名 `mcp__amd_doc_search__vivado_doc_search`）；未重启时用项目桥：`py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>" --limit 5`。

@@ -186,7 +186,7 @@ D:\FPGA\prj\project_N\
 
 ## 九、Correction（坑账本索引；全文见仓库根 `PITFALLS.md`）
 
-> 踩过的坑 = 规范的来源。**#1–#70 的完整「坑 / 根因与修法」已移至 `PITFALLS.md`（2026-10-20 拆分，2026-10-24 续至 #70）**；本节只保留编号+主题索引（长标题截断，全文以 `PITFALLS.md` 为准）。
+> 踩过的坑 = 规范的来源。**#1–#75 的完整「坑 / 根因与修法」已移至 `PITFALLS.md`（2026-10-20 拆分，2026-10-24 续至 #75）**；本节只保留编号+主题索引（长标题截断，全文以 `PITFALLS.md` 为准）。
 > 维护：新增坑只在 `PITFALLS.md` 表尾追加（编号连续、不重排、不删旧条），并在此索引加一行。
 
 | # | 主题 | # | 主题 |
@@ -226,6 +226,9 @@ D:\FPGA\prj\project_N\
 | 33 | RAM 推断对 always 块划分极敏感：把 `ram[addr] <= data` 与… | 67 | Vivado 2023.1 ILA `C_DATA_DEPTH` 合法值最小 1024（5… |
 | 34 | 拆分 always 块时必须同时复核驱动归属（拆块与多驱动是一体两面） | 68 | module-ref IP cache 不随 RTL 源文件失效（BD 模块引用会用旧网表） |
 | 69 | `is_error=false` 但文本是 `[ERROR]` ⇒ CLI 桥假成功（判据只看传输层） | 70 | CLI 桥一进程一调用 ⇒ 会话类工具在桥下不可用（写单进程脚本/长连接） |
+| 71 | DSH 会话里 `pwsh` 中途消失（win-bash 插件 `replacePwsh`）⇒ 改用 `win_bash` | 72 | 2023.1 硬差异：Tcl **8.5.14**、`open_project -noprogress` 不存在 |
+| 73 | Win11 `NoDefaultCurrentDirectoryInExePath` 静默挂掉 `launch_simulation` | 74 | `run_tcl` 原始 stdout 不裁剪 ⇒ 单次调用烧 ~8k tokens |
+| 75 | `safe_tcl` 占位符必须独占一个 Tcl 词（`X={0}` 会炸） | | |
 
 
 ## 十、当前工程状态（一屏速览；历史详情见附 A 与调试记录）

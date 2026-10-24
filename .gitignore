@@ -120,3 +120,4 @@ tmp_*/
 # json_storm 重组产物（可由 SHA 证据+run 日志复现；10MB/份，不入库）
 *.recomposed.jsonl
 *.bak-*
+.tmp/
