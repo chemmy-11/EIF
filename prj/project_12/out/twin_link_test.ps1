@@ -61,10 +61,12 @@ function Step-Preflight {
             $v = [string]$bd.$k
             if ($v -eq '' -or $v -match '^<.*>$') { Log-Warn "board $b : $k 未配置（上板前必须填）" }
         }
-        # COM 口是否在系统里（dry-run 也查，成本低）
+        # COM 口是否在系统里（dry-run 也查，成本低；板卡不在场时 dry-run 只告警）
         if ($bd.com -match '^COM\d+$') {
             $has = [System.IO.Ports.SerialPort]::GetPortNames() -contains $bd.com
-            if ($has) { Say "board $b : $($bd.com) present" } else { Log-Fail "board $b : $($bd.com) not present" }
+            if ($has) { Say "board $b : $($bd.com) present" }
+            elseif ($dry) { Log-Warn "board $b : $($bd.com) not present（dry-run 允许：板卡不在场）" }
+            else { Log-Fail "board $b : $($bd.com) not present" }
         }
         # hw_server TCP 端口
         if ($bd.hw_server -match '^(.*):(\d+)$') {

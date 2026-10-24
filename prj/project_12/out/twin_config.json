@@ -5,7 +5,7 @@
   "artifacts": {
     "bit": "out/aurora_mem_bridge.bit",
     "elf": "out/j3_soft_r2_BA3C0220.elf",
-    "expect_bit_sha256": "",
+    "expect_bit_sha256": "c856ba83781fe85ccdcb684b6cd3c60873aa43e92f89ad30000b5954e5667401",
     "expect_elf_sha256": "ba3c02209720b59d9f0fbc4083c2ab80b16efc9a148448b9dcfbcda001bb3559",
     "baseline_bit": "out/baseline_F6012BA0.bit",
     "baseline_bit_sha256": "f6012ba0ff8f9d7f3bcd9ac848a97f1c5e1b6dd7016dad5bebe93755e73c54c4"
