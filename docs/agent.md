@@ -140,7 +140,7 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 
 ## ★ 外部 AI 技能与官方文档检索（2026-10-18 新增）
 
-- **技能（项目级，仅本工作区）**：`毕设\.dsh\skills\` 下 7 个，清单与「AMD 基线 / 本机实测」状态见下方自动生成表（**勿手改**）。**全局技能根 `~/.agents/skills` 不放 Vivado 技能**（2026-10-18 定案，避免污染其他 Agent 上下文）。
+- **技能（由 `dsh-vivado` 插件携带，仅 `Vivado` 预设会话可见）**：实体在 `D:\dsh-vivado\skills\`（8 个 = AMD 官方 6 + `amd-doc-search` + `vivado-workflow-discipline`），安装后从 `~/.dsh/bundles/dsh-vivado/skills\` 以 rank 300 `customSkillDirs` 挂载；**全局技能根 `~/.agents/skills` 与项目级 `.dsh\skills\` 都不再放 Vivado 技能**。本工作区 `.dsh\skills\` 只保留 `MANIFEST.json` 快照（2026-10-24 迁移；旧副本归档在 `归档\dsh-vivado_迁移归档_2026-10-24\`），下方表即该快照。
 
 <!-- BEGIN:skills · 由 `D:\FPGA\scripts\render_agent_skills_block.py` 从 `.dsh\skills\MANIFEST.json` 生成，**勿手改**；数据源 = 各 `SKILL.md` frontmatter，生成器 `D:\FPGA\scripts\gen_skills_manifest.py` -->
 
@@ -157,7 +157,7 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 <sub>source_hash `0ebaa1026c239693…` · mcp 工具目录 32 项 · 重算命令 `py D:\FPGA\scripts\gen_skills_manifest.py`</sub>
 
 <!-- END:skills -->
-- **官方文档检索**：AMD hosted `amd-doc-search`（`https://ross.amd.com/mcp/doc-search`，免 key，英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+）。原生 MCP 已配置在 DSH web profile（**重启 `dsh web` 后**工具名 `mcp__amd_doc_search__vivado_doc_search`）；未重启时用项目桥：`py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>" --limit 5`。
+- **官方文档检索**：AMD hosted `amd-doc-search`（`https://ross.amd.com/mcp/doc-search`，免 key，英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+）。原生 MCP 已配置在 DSH web profile（**重启 `dsh web` 后**工具名 `mcp__amd_doc_search__vivado_doc_search`）；未重启时用随包 CLI 桥：`py D:\dsh-vivado\skills\amd-doc-search\doc_search.py "<query>" --limit 5`。
 - **触发纪律**：AMD/Xilinx 官方依据类问题**先检索再回答**，结论带 `docs.amd.com` / `adaptivesupport.amd.com` URL；检索不到就写「未检索到」，**禁止臆造**命令/参数/约束。官方文档在事实源排序中 = **官方文档层**（高于 AI 生成文档、低于官方例程/已验证 prj，只作 L3/L4 旁证）。
 - **过滤要核对**：`family`/`version` 是提示性过滤，返回里仍可能混 `All` 条目，引用前逐条核对（坑 #64）。
 - **执行层不变**：技能只是知识与流程；官方 skill 里的 `vivadoExecute`/`vivado_start`/`vivado_doc_search` 按技能顶部「本机适配注记」映射到本工程 `run_tcl`/`start_session`/`mcp_ctl.py` CLI 桥。只读日志分析**不启动 Vivado、不占全局串行锁**；原始日志先复制到 C: 侧副本再解析。

@@ -139,10 +139,9 @@ D:\FPGA\prj\project_N\
 | 资产 | 位置 | 作用域 | 现状 |
 |---|---|---|---|
 | **Vivado 会话预设（`Vivado` 纪律 + 32 个 `mcp__vivado__*`）** | profile `~/.dsh/profiles/desktop`；bundle 源码 `<vault>\.dsh\bundles\vivado-preset\` | DSH desktop profile，**按会话选择** | **2026-10-24 新建**：建会话时选 `Vivado` 预设才挂这 32 个工具（默认 `standard` 会话一个都没有，每请求省 ≈8k tokens 工具定义）；预设内含全局串行/ASCII 路径/证据纪律 persona；改它需重启宿主（`dsh-hmr` 在 Electron 下不生效） |
-| 项目级 AI 技能（7 个：6 官方 AMD 技能 + `amd-doc-search` CLI 桥） | `<vault>\.dsh\skills\` | **仅本工作区**（DSH `projectRoot/.dsh/skills`，rank 100） | 已生效（热加载）。**注意**：`hw-ila-debug`/`hw-vio-debug` 依赖的 `vivado-mcp`（32 工具，`mcp__vivado__*`，stdio，`toolCallTimeoutMs=1800000` 等三条硬约束写在上行的 bundle 里）——**2026-10-24 起不再全局挂载**，改由 `Vivado` 预设携带：**新会话选该预设才有工具**；没选预设时仍走 CLI 桥 `D:\vivado-mcp\mcp_ctl.py` 或 Vivado batch Tcl（两技能文首「本机适配注记」同口径） |
+| AI 技能（8 个：6 官方 AMD + `amd-doc-search` + `vivado-workflow-discipline`） | 仓库 `D:\dsh-vivado\skills\`；安装后 staging `~/.dsh/bundles/dsh-vivado/skills\` | **仅 `Vivado` 预设会话**（rank 300 `customSkillDirs`） | **2026-10-24 迁出 vault**：与 32 工具同一来源、同一仓库维护，不再走项目级 rank 100；vault `.dsh\skills\` 只保留 `MANIFEST.json` 快照（供门禁检查 12），旧副本已归档 `<vault>\归档\dsh-vivado_迁移归档_2026-10-24\`。**注意**：`hw-ila-debug`/`hw-vio-debug` 依赖的 `vivado-mcp`（32 工具，`mcp__vivado__*`，stdio，`toolCallTimeoutMs=1800000` 等三条硬约束写在上行的 bundle 里）——**2026-10-24 起不再全局挂载**，改由 `Vivado` 预设携带：**新会话选该预设才有工具**；没选预设时仍走 CLI 桥 `D:\vivado-mcp\mcp_ctl.py` 或 Vivado batch Tcl（两技能文首「本机适配注记」同口径） |
 | 官方文档检索（原生 MCP） | `~/.dsh/profiles/web/cordis.patch.yml` 的 `mcp-amd-doc-search` 条目 | DSH **web profile 全局**（所有工作区；重启 `dsh web` 后生效） | **已配置但当前进程未加载**（会话工具清单无 `mcp__amd_doc_search`）；重启后生效，工具名 `mcp__amd_doc_search__vivado_doc_search`。**desktop profile 亦未配置该条目，仅 web profile 有** |
-| 官方文档检索（项目级 CLI 桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | **当前实际生效**：`py doc_search.py "<query>"`（stdlib 直连，无需重启） |
-| 官方文档检索（项目桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | 已生效：`py doc_search.py "<query>"`（stdlib 直连 MCP，无需重启） |
+| 官方文档检索（CLI 桥，随包发布） | `D:\dsh-vivado\skills\amd-doc-search\doc_search.py`（或 staging 同名路径） | 任意会话可直接跑 | 生效：`py <该路径> "<query>"`（stdlib 直连 AMD 服务，无需重启）；`Vivado` 预设会话里也可直接让 agent 用该技能 |
 | 服务端点 | `https://ross.amd.com/mcp/doc-search` | AMD 托管、免 key、英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+；**query 会发往 AMD**（官方称不存 query 文本）；NDA/EA/项目私有资料不在索引内 | — |
 
 **使用纪律**：
@@ -287,6 +286,7 @@ D:\FPGA\prj\project_N\
 | 5 | Tcl 可解析 | 引号/括号/花括号未闭合的 .tcl（`info complete`）；不含 XDC 行尾注释坑（那是运行期 CRITICAL WARNING，语法层测不出） | #19（同族提醒）|
 | 6 | docs/README.md 索引与磁盘一致性（2026-10-17 新增；口径 = docs/ 下除**任意** `README.md` 外的全部 .md） | docs/ 增删文件后索引漂移——列了不存在的文件、或磁盘新文件没进索引 | — |
 | 7 | 技能清单一致性（2026-10-24 新增，**本地专用**） | `SKILL.md` frontmatter 与 `MANIFEST.json` 不一致（手改清单 / 技能增删后没重跑生成器）；`baseline` 缺失；`status=verified` 却没有 `tested_on`+`evidence` | — |
+| 7a | （状态说明）2026-10-24 起技能实体迁到 `dsh-vivado` 仓库 ⇒ vault 技能目录为空，**检查 7–10 自动 SKIP**；`MANIFEST.json` 作为快照保留，检查 12 仍有效。重生成清单请在 `D:\dsh-vivado` 跑其 `tools/gen_skills_manifest.py` | — |
 | 8 | 技能 references 真实存在（本地专用） | SKILL.md 正文引用的 `references/`·`scripts/`·`examples/` 路径指向不存在的文件 | — |
 | 9 | 技能内绝对路径存在（本地专用） | 技能里写旧/错路径（真实事故：`D:\FPGA\vivado-mcp` 当运行实例） | — |
 | 10 | 技能工具名可解析（本地专用） | 技能声称的工具在本机不存在（真实事故：把条件句「已挂 32 工具」写成事实） | #69 同族 |
@@ -297,7 +297,7 @@ D:\FPGA\prj\project_N\
 
 - **第 11 项 镜像门禁**（2026-10-24 把原「只提示」升级为门禁）：逐文件比对 `docs/**/*.md` ↔ vault，**两侧先归一**（`15266`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节；归一后仍不等、或 docs 独有而 vault 没有 ⇒ 必须在 `scripts/mirror_allowlist.json` 登记 `{path, kind: drift|docs-only, reason, since}`，**reason 必须可复核**（禁「历史遗留」空话），否则 FAIL。白名单自身也受校验（重复 / kind 与实际不符 / reason 空 ⇒ FAIL；过期条目只 `[提示]`，不卡 CI）。
   > 为什么仍以「归一 + 白名单」而不是「零字节 diff」：`docs/` 是 vault 的**脱敏快照**，「字节不一致」在很多情况下**是设计结果**（vault `C:\Users\15266\…` ⇄ docs `C:\Users\***\…`）。零 diff 只能靠取消脱敏实现，等于把用户名写进 git 历史。
-- **第 12 项**把 `agent.md` 的 `BEGIN:skills` 区块也纳入门禁：该区块是 `MANIFEST.json` 的派生物，由 `scripts/render_agent_skills_block.py` 渲染（`--write` 同时把 vault `agent.md` **脱敏**写成 `docs/agent.md`；`--check` 即本项判据）。⇒ 改技能后固定两条命令：`py scripts\gen_skills_manifest.py` → `py scripts\render_agent_skills_block.py --write`。
+- **第 12 项**把 `agent.md` 的 `BEGIN:skills` 区块也纳入门禁：该区块是 `MANIFEST.json` 的派生物，由 `scripts/render_agent_skills_block.py` 渲染（`--write` 同时把 vault `agent.md` **脱敏**写成 `docs/agent.md`；`--check` 即本项判据）。⇒ 改技能后固定两条命令：`py scripts\render_agent_skills_block.py --write`（vault 侧 MANIFEST 已是冻结快照，重生成清单改到 `D:\dsh-vivado` 用它自己的 `tools/gen_skills_manifest.py`）。
 - ⇒ **纪律：绝不「为了对齐」把 vault 原文覆盖进 docs/**（会把用户名等敏感信息写进 git 历史）；确实要同步时：内容更新以「更晚、有实测证据」的版本为准，**同步后必须重新脱敏**，同步完再跑门禁。
 
 ### 本地怎么跑
