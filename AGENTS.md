@@ -14,7 +14,7 @@
 - [§七 验证判据规范](#七验证判据规范)（链路/通路/数据三层判据）· [§八 git 与文档规范](#八git-与文档规范)（提交前缀 / 命名规范 / 两类文档分放）
 - [§九 坑账本 #1–#64](#九correction坑账本踩过的坑--规范的来源)（**踩坑实录 = 规范的来源，排障先查这里**）
 - [§十 当前工程状态](#十当前工程状态一屏速览内部详表见本节附录)（**一屏速览：现在做到哪、下一步是什么**）
-- [§十一 跨目录约定](#十一跨目录约定) · [§十二 CI 与远程仓库规范](#十二ci-与远程仓库规范)（**CI 五+1 项检查各防什么、本地怎么跑、新增文件自检清单**）
+- [§十一 跨目录约定](#十一跨目录约定) · [§十二 CI 与远程仓库规范](#十二ci-与远程仓库规范)（**CI 6 项静态检查 + 6 项本地专用门禁各防什么、本地怎么跑、新增文件自检清单**）
 
 ## 一、角色与红线
 
@@ -134,12 +134,13 @@ D:\FPGA\prj\project_N\
 
 ### 6b. AI 技能与官方文档检索（2026-10-18 增补）
 
-**背景**：2026-10-18 接入 AMD 官方 Ross 技能包（Vivado：elaboration 日志分析 / RTL lint / 时序方法学 / 工程交接 / 仿真排错 / ILA·VIO 手册）与官方文档检索（hosted `amd-doc-search`）。二者是**知识与流程层**；执行层仍是本仓库 `vivado-mcp/`（32 工具）+ xsct + 自研脚本——**装了技能不等于多出 Vivado 工具**。
+**背景**：2026-10-18 接入 AMD 官方 Ross 技能包（Vivado：elaboration 日志分析 / RTL lint / 时序方法学 / 工程交接 / 仿真排错 / ILA·VIO 手册）与官方文档检索（hosted `amd-doc-search`）。二者是**知识与流程层**；执行层仍是本仓库 `vivado-mcp/`（32 工具，**2026-10-24 起经会话预设 `Vivado` 随会话挂载**，见下表）+ xsct + 自研脚本——**装了技能不等于多出 Vivado 工具**。
 
 | 资产 | 位置 | 作用域 | 现状 |
 |---|---|---|---|
-| 项目级 AI 技能（7 个：6 官方 AMD 技能 + `amd-doc-search` CLI 桥） | `<vault>\.dsh\skills\` | **仅本工作区**（DSH `projectRoot/.dsh/skills`，rank 100） | 已生效（热加载）。**注意**：`hw-ila-debug`/`hw-vio-debug` 依赖的 `vivado-mcp` MCP 未挂进当前会话；两技能文首有「本机适配注记」→ 走 CLI 桥 `D:\vivado-mcp\mcp_ctl.py` 或 Vivado batch Tcl |
-| 官方文档检索（原生 MCP） | `~/.dsh/profiles/web/cordis.patch.yml` 的 `mcp-amd-doc-search` 条目 | DSH **web profile 全局**（所有工作区；重启 `dsh web` 后生效） | **已配置但当前进程未加载**（会话工具清单无 `mcp__amd_doc_search`）；重启后生效，工具名 `mcp__amd_doc_search__vivado_doc_search` |
+| **Vivado 会话预设（`Vivado` 纪律 + 32 个 `mcp__vivado__*`）** | profile `~/.dsh/profiles/desktop`；bundle 源码 `<vault>\.dsh\bundles\vivado-preset\` | DSH desktop profile，**按会话选择** | **2026-10-24 新建**：建会话时选 `Vivado` 预设才挂这 32 个工具（默认 `standard` 会话一个都没有，每请求省 ≈8k tokens 工具定义）；预设内含全局串行/ASCII 路径/证据纪律 persona；改它需重启宿主（`dsh-hmr` 在 Electron 下不生效） |
+| 项目级 AI 技能（7 个：6 官方 AMD 技能 + `amd-doc-search` CLI 桥） | `<vault>\.dsh\skills\` | **仅本工作区**（DSH `projectRoot/.dsh/skills`，rank 100） | 已生效（热加载）。**注意**：`hw-ila-debug`/`hw-vio-debug` 依赖的 `vivado-mcp`（32 工具，`mcp__vivado__*`，stdio，`toolCallTimeoutMs=1800000` 等三条硬约束写在上行的 bundle 里）——**2026-10-24 起不再全局挂载**，改由 `Vivado` 预设携带：**新会话选该预设才有工具**；没选预设时仍走 CLI 桥 `D:\vivado-mcp\mcp_ctl.py` 或 Vivado batch Tcl（两技能文首「本机适配注记」同口径） |
+| 官方文档检索（原生 MCP） | `~/.dsh/profiles/web/cordis.patch.yml` 的 `mcp-amd-doc-search` 条目 | DSH **web profile 全局**（所有工作区；重启 `dsh web` 后生效） | **已配置但当前进程未加载**（会话工具清单无 `mcp__amd_doc_search`）；重启后生效，工具名 `mcp__amd_doc_search__vivado_doc_search`。**desktop profile 亦未配置该条目，仅 web profile 有** |
 | 官方文档检索（项目级 CLI 桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | **当前实际生效**：`py doc_search.py "<query>"`（stdlib 直连，无需重启） |
 | 官方文档检索（项目桥） | `<vault>\.dsh\skills\amd-doc-search\doc_search.py` | **仅本工作区** | 已生效：`py doc_search.py "<query>"`（stdlib 直连 MCP，无需重启） |
 | 服务端点 | `https://ross.amd.com/mcp/doc-search` | AMD 托管、免 key、英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+；**query 会发往 AMD**（官方称不存 query 文本）；NDA/EA/项目私有资料不在索引内 | — |
@@ -185,7 +186,7 @@ D:\FPGA\prj\project_N\
 
 ## 九、Correction（坑账本索引；全文见仓库根 `PITFALLS.md`）
 
-> 踩过的坑 = 规范的来源。**#1–#68 的完整「坑 / 根因与修法」已移至 `PITFALLS.md`（2026-10-20 拆分）**；本节只保留编号+主题索引（长标题截断，全文以 `PITFALLS.md` 为准）。
+> 踩过的坑 = 规范的来源。**#1–#70 的完整「坑 / 根因与修法」已移至 `PITFALLS.md`（2026-10-20 拆分，2026-10-24 续至 #70）**；本节只保留编号+主题索引（长标题截断，全文以 `PITFALLS.md` 为准）。
 > 维护：新增坑只在 `PITFALLS.md` 表尾追加（编号连续、不重排、不删旧条），并在此索引加一行。
 
 | # | 主题 | # | 主题 |
@@ -224,6 +225,7 @@ D:\FPGA\prj\project_N\
 | 32 | 数据通路 TB 必须逐字节校验内容，不能只数帧数/字节数 | 66 | hw-ila 抓取脚本三处官方 API 口径（过去踩错） |
 | 33 | RAM 推断对 always 块划分极敏感：把 `ram[addr] <= data` 与… | 67 | Vivado 2023.1 ILA `C_DATA_DEPTH` 合法值最小 1024（5… |
 | 34 | 拆分 always 块时必须同时复核驱动归属（拆块与多驱动是一体两面） | 68 | module-ref IP cache 不随 RTL 源文件失效（BD 模块引用会用旧网表） |
+| 69 | `is_error=false` 但文本是 `[ERROR]` ⇒ CLI 桥假成功（判据只看传输层） | 70 | CLI 桥一进程一调用 ⇒ 会话类工具在桥下不可用（写单进程脚本/长连接） |
 
 
 ## 十、当前工程状态（一屏速览；历史详情见附 A 与调试记录）
@@ -281,9 +283,19 @@ D:\FPGA\prj\project_N\
 | 4 | `.ps1` 必须 UTF-8 BOM | PS 5.1 按 CP936 解码无 BOM 中文脚本 ⇒ 一堆假语法错（**不是代码坏了**） | #17 / #18 |
 | 5 | Tcl 可解析 | 引号/括号/花括号未闭合的 .tcl（`info complete`）；不含 XDC 行尾注释坑（那是运行期 CRITICAL WARNING，语法层测不出） | #19（同族提醒）|
 | 6 | docs/README.md 索引与磁盘一致性（2026-10-17 新增；口径 = docs/ 下除**任意** `README.md` 外的全部 .md） | docs/ 增删文件后索引漂移——列了不存在的文件、或磁盘新文件没进索引 | — |
+| 7 | 技能清单一致性（2026-10-24 新增，**本地专用**） | `SKILL.md` frontmatter 与 `MANIFEST.json` 不一致（手改清单 / 技能增删后没重跑生成器）；`baseline` 缺失；`status=verified` 却没有 `tested_on`+`evidence` | — |
+| 8 | 技能 references 真实存在（本地专用） | SKILL.md 正文引用的 `references/`·`scripts/`·`examples/` 路径指向不存在的文件 | — |
+| 9 | 技能内绝对路径存在（本地专用） | 技能里写旧/错路径（真实事故：`D:\FPGA\vivado-mcp` 当运行实例） | — |
+| 10 | 技能工具名可解析（本地专用） | 技能声称的工具在本机不存在（真实事故：把条件句「已挂 32 工具」写成事实） | #69 同族 |
+| 11 | 镜像门禁（本地专用，取代 2026-10-17 版「只提示」） | `docs/` 快照与 vault 漂移未登记 | — |
+| 12 | `agent.md` 技能区块一致性（本地专用） | `BEGIN:skills` 区块过期（MANIFEST 变了、区块没重渲染）、`docs/agent.md` 镜像未同步 | — |
 
-另有一条**本地专用提示**（不计入失败、不卡 CI）：检测到本机 vault（`C:\Users\15266\Desktop\毕设\`）时，比对 docs/ 快照与 vault 对应文件的字节一致性，不一致则打印 `[提示]` 清单。**为什么它只提示不卡 CI（2026-10-17 实测定性）**：`docs/` 是 vault 的**脱敏快照**，因此「字节不一致」在很多情况下**是设计结果、不是缺陷**——当日抽查 9 个不一致文件中的 `阶段二之十_prj9_json_storm改造…` 第 601 行：vault 为 `C:\Users\15266\…`，docs 为 `C:\Users\***\…`，差异全部来自脱敏替换。另有一批 vault 侧文件已移入 `归档/` 或改目录（docs 保留历史快照）。
-⇒ **纪律：绝不「为了对齐」把 vault 原文覆盖进 docs/**（会把用户名等敏感信息写进 git 历史）；确需同步时先判断差异类型（脱敏 / 内容更新），内容更新以「更晚、有实测证据」的版本为准，且**同步后必须重新脱敏**。
+**第 7–12 项 = 本地专用门禁**（2026-10-24 新增）：检测不到本机 vault（`C:\Users\15266\Desktop\毕设\`）时整段 `SKIP`，**远程 GitHub CI 自动跳过**（技能与 vault 都不进仓库——这是刻意选择，代价是远程 CI 只覆盖第 1–6 项）。
+
+- **第 11 项 镜像门禁**（2026-10-24 把原「只提示」升级为门禁）：逐文件比对 `docs/**/*.md` ↔ vault，**两侧先归一**（`15266`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节；归一后仍不等、或 docs 独有而 vault 没有 ⇒ 必须在 `scripts/mirror_allowlist.json` 登记 `{path, kind: drift|docs-only, reason, since}`，**reason 必须可复核**（禁「历史遗留」空话），否则 FAIL。白名单自身也受校验（重复 / kind 与实际不符 / reason 空 ⇒ FAIL；过期条目只 `[提示]`，不卡 CI）。
+  > 为什么仍以「归一 + 白名单」而不是「零字节 diff」：`docs/` 是 vault 的**脱敏快照**，「字节不一致」在很多情况下**是设计结果**（vault `C:\Users\15266\…` ⇄ docs `C:\Users\***\…`）。零 diff 只能靠取消脱敏实现，等于把用户名写进 git 历史。
+- **第 12 项**把 `agent.md` 的 `BEGIN:skills` 区块也纳入门禁：该区块是 `MANIFEST.json` 的派生物，由 `scripts/render_agent_skills_block.py` 渲染（`--write` 同时把 vault `agent.md` **脱敏**写成 `docs/agent.md`；`--check` 即本项判据）。⇒ 改技能后固定两条命令：`py scripts\gen_skills_manifest.py` → `py scripts\render_agent_skills_block.py --write`。
+- ⇒ **纪律：绝不「为了对齐」把 vault 原文覆盖进 docs/**（会把用户名等敏感信息写进 git 历史）；确实要同步时：内容更新以「更晚、有实测证据」的版本为准，**同步后必须重新脱敏**，同步完再跑门禁。
 
 ### 本地怎么跑
 

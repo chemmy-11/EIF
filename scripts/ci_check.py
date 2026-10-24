@@ -11,15 +11,35 @@
   6. 索引一致性     docs/README.md 索引须覆盖 docs/ 下全部 .md 且不列不存在的文件
                     （2026-10-17 增补；口径 = 除 docs/README.md 自身外全部 .md，含 agent.md）
 
-另有一条**本地专用提示**（不计入失败、不卡 CI）：检测到本机 vault
-（C:/Users/15266/Desktop/毕设/）时比对 docs/ 快照与 vault 的字节一致性，
-不一致仅打印 [提示]（镜像存在既知的归档/漂移，见 AGENTS.md §十二）。
+本地专用检查（vault 不存在时 [跳过]，不影响远程 GitHub CI；用户裁决 D2）：
+  7. 技能清单一致性    vault `.dsh/skills/MANIFEST.json` 与磁盘 7 个 SKILL.md 的
+                       source_hash / 技能集合 / name==dir / version / baseline 四键一致
+  8. 技能 references   SKILL.md 里的 Markdown 链接与 references|scripts|examples 反引号
+                       相对路径必须真实存在（占位符跳过）
+  9. 技能绝对路径      SKILL.md 里出现的 Windows 盘符路径必须真实存在
+                       （允许侧文件 `.dsh/skills/.path-allowlist.json` 登记例外并写理由）
+ 10. 技能工具名        ① `mcp__vivado__<x>` 必须在 MANIFEST.tool_catalog.mcp_vivado 内；
+                       ② 提及 AMD 官方工具原名（vivadoExecute/vivado_execute/vivado_start/
+                       vivado_stop/vivado_list_sessions/vivado_status/vivado_log_messages）
+                       的技能，须至少一行 `→` 映射到本机 MCP 工具名。
+                       （`vivado_doc_search` 刻意豁免，理由见 AMD_ORIGINAL 处注释）
+ 11. 镜像门禁          docs/**/*.md 归一（去 UTF-8 BOM、两侧 15266→***、CRLF→LF）后
+                       须与 vault 同相对路径字节相等；真漂移与 docs 独有文件须登记在
+                       `scripts/mirror_allowlist.json`（每条带 kind/reason/since）。
+                       用户裁决 D1：白名单外新增不一致 → FAIL。
+ 12. 技能区块门禁      vault `agent.md` 的 `BEGIN:skills` 区块（由
+                       `scripts/render_agent_skills_block.py` 从 MANIFEST 渲染）与
+                       `docs/agent.md` 脱敏镜像都必须与 MANIFEST 一致 —— 直接跑渲染器的
+                       `--check`，rc≠0 即 FAIL（不复制渲染逻辑，避免两处实现漂移）。
 
-用法：python scripts/ci_check.py    （在仓库根目录运行）
+用法：py scripts/ci_check.py    （在仓库根目录运行）
 退出码：0 = 全过；1 = 有失败项
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
 import subprocess
 import sys
@@ -200,28 +220,600 @@ def check_docs_index() -> None:
         FAILS.append("docs/README.md 索引与磁盘不一致:\n" + "\n".join(parts))
 
 
-# ---------- 本地提示：docs/ 快照与 vault 镜像一致性（不计失败） ----------
-def check_mirror_hint() -> None:
-    if not VAULT.is_dir():
-        return  # 远程 CI / 异机环境：无 vault，自动跳过
-    diff: list[str] = []
-    for p in sorted(DOCS.rglob("*.md")):
-        if p.name in ("README.md", "agent.md"):
-            continue  # 协议/索引文件不参与镜像比对
-        v = VAULT / p.relative_to(DOCS)
-        if v.exists() and v.read_bytes() != p.read_bytes():
-            diff.append(str(p.relative_to(DOCS)).replace("\\", "/"))
-    if diff:
-        HINTS.append(
-            f"docs/ 快照与 vault 有 {len(diff)} 个文件字节不一致（仅提示，不卡 CI）。"
-            "差异多为脱敏所致（vault 用户名/人名 → ***/前辈），属设计而非缺陷；"
-            "禁止把 vault 原文直接覆盖进 docs/，确需同步须重新脱敏，详见 AGENTS.md 十二节:\n    "
-            + "\n    ".join(diff[:20])
-            + ("\n    ……" if len(diff) > 20 else "")
+# ======================================================================
+# 7~10 本地专用：vault 内 .dsh/skills 的技能校验（SPEC §4）
+# ======================================================================
+SKILLS_ROOT = VAULT / ".dsh" / "skills"
+SKILL_MANIFEST = SKILLS_ROOT / "MANIFEST.json"
+SKILL_PATH_ALLOWLIST = SKILLS_ROOT / ".path-allowlist.json"
+
+# 占位符 / 演示路径：不当作真实引用（与 gen_skills_manifest.py 同口径）
+PLACEHOLDER = re.compile(r"path/to|\.\.\.|xxx|[<>*{}]")
+BACKTICK = re.compile(r"`([^`\n]+)`")
+SKILL_REF_PREFIXES = ("references/", "scripts/", "examples/")
+# SPEC §4 检查 9 的盘符路径正则；`s://` 这类 URL 残片由 _abs_path_candidates 过滤掉
+WINDOWS_ABS = re.compile(r"[A-Za-z]:[\\/][^\s`\"')\],，。；]*")
+# 任何 scheme 的 URL（https://、file:// …）：先整段抹成等长空白，避免 `https://x` 里的
+# `s://x` 被盘符正则吃成绝对路径（实测 amd-doc-search/SKILL.md 有 3 处这类假阳性）
+URL_ANY = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://[^\s]*")
+MCP_MENTION = re.compile(r"mcp__vivado__([A-Za-z0-9_]+)")
+# 「AMD 官方 MCP 工具原名」清单 —— 提到就必须给本机映射（检查 10-2）。
+#
+# **刻意不含 `vivado_doc_search`**（2026-10-24 用户裁决，理由写在此处防止后人误以为是凑绿）：
+#   本机的文档检索引擎不是 MCP 工具 —— `amd-doc-search` 技能用自带的 `scripts/doc_search.py`；
+#   另一个 server 的 `mcp__amd_doc_search__vivado_doc_search` 要重启 `dsh web` 才会出现。
+#   也就是说 `mcp_vivado` 的 32 个工具里**根本不存在**与 `vivado_doc_search` 对应的名字，
+#   硬要求「映射到 mcp_vivado 成员」等于要求技能写假话。
+#   本判据的原意是「别让模型去调一个本机不存在的工具名」，不是「每个 AMD 名词都必须在
+#   mcp_vivado 里有同义词」——`amd-doc-search` 已明确写「实际调用 doc_search.py」，
+#   不会误导模型，故豁免。其余 7 个原名（同步/异步两套写法）保留严格映射要求。
+AMD_ORIGINAL = re.compile(
+    r"vivadoExecute|vivado_execute|vivado_start|vivado_stop"
+    r"|vivado_list_sessions|vivado_status|vivado_log_messages"
+)
+BASELINE_KEYS = ("amd_doc", "tested_on", "status", "evidence")
+
+_SKILL_DIRS: list[Path] | None = None
+
+
+def _skills_ready() -> bool:
+    """技能类检查为本地专用：vault 技能目录不存在/为空时统一 [跳过] 一次（D2）。"""
+    global _SKILL_DIRS
+    if _SKILL_DIRS is None:
+        if SKILLS_ROOT.is_dir():
+            _SKILL_DIRS = sorted(
+                p for p in SKILLS_ROOT.iterdir() if p.is_dir() and (p / "SKILL.md").is_file()
+            )
+            if not _SKILL_DIRS:
+                SKIPS.append(f"技能目录下没有含 SKILL.md 的技能（{SKILLS_ROOT.as_posix()}）：跳过检查 7-10")
+        else:
+            _SKILL_DIRS = []
+            SKIPS.append(
+                f"vault 技能目录不存在（{SKILLS_ROOT.as_posix()}）：跳过检查 7-10"
+                "（本地专用；远程 CI 自动跳过，用户裁决 D2）"
+            )
+    return bool(_SKILL_DIRS)
+
+
+def _read_text(p: Path) -> str:
+    return p.read_bytes().decode("utf-8-sig", errors="replace")
+
+
+def _line_of(text: str, pos: int) -> int:
+    return text.count("\n", 0, pos) + 1
+
+
+def _txt(val: object) -> str:
+    return val.strip() if isinstance(val, str) else ""
+
+
+def skills_source_hash(dirs: list[Path]) -> str:
+    """MANIFEST.source_hash 的复算（与 gen_skills_manifest.py 唯一实现同算法）：
+    按技能目录名排序 → 每个 SKILL.md 的 UTF-8 字节 sha256 十六进制串 → 依次拼接 → 再 sha256。
+    """
+    digest = hashlib.sha256()
+    for d in sorted(dirs, key=lambda p: p.name):
+        digest.update(hashlib.sha256((d / "SKILL.md").read_bytes()).hexdigest().encode("ascii"))
+    return digest.hexdigest()
+
+
+def load_skill_manifest() -> dict:
+    """读 MANIFEST.json；不存在/坏 JSON 返回 {}（由检查 7 报 FAIL）。"""
+    if not SKILL_MANIFEST.is_file():
+        return {}
+    try:
+        data = json.loads(SKILL_MANIFEST.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _manifest_catalog() -> list[str]:
+    cat = load_skill_manifest().get("tool_catalog")
+    names = cat.get("mcp_vivado") if isinstance(cat, dict) else None
+    return [str(x) for x in names] if isinstance(names, list) else []
+
+
+# ---------- 7. 技能清单一致性 ----------
+def check_skills_manifest() -> None:
+    if not _skills_ready():
+        return
+    dirs = _SKILL_DIRS or []
+    rel_man = SKILL_MANIFEST.as_posix()
+    if not SKILL_MANIFEST.is_file():
+        FAILS.append(
+            f"技能清单 MANIFEST.json 不存在（{rel_man}）\n"
+            "    请运行 `py scripts/gen_skills_manifest.py` 生成（MANIFEST 禁手写）"
+        )
+        return
+    try:
+        man = json.loads(SKILL_MANIFEST.read_text(encoding="utf-8"))
+    except Exception as exc:
+        FAILS.append(f"技能清单不是合法 JSON（{rel_man}）：{exc} ⇒ 重跑 `py scripts/gen_skills_manifest.py`（禁手写）")
+        return
+    if not isinstance(man, dict):
+        FAILS.append(f"技能清单顶层不是 JSON 对象（{rel_man}）⇒ 重跑 `py scripts/gen_skills_manifest.py`（禁手写）")
+        return
+
+    problems: list[str] = []
+    if man.get("schema_version") != 1:
+        problems.append(f"schema_version={man.get('schema_version')!r}，应为 1")
+
+    expect_hash = skills_source_hash(dirs)
+    got_hash = man.get("source_hash")
+    if got_hash != expect_hash:
+        problems.append(
+            f"source_hash 与 {len(dirs)} 个 SKILL.md 现算值不符"
+            f"（MANIFEST={str(got_hash)[:16]}… 现算={expect_hash[:16]}…）"
+            "⇒ MANIFEST 已过期，请重跑 `py scripts/gen_skills_manifest.py`（禁手写）"
+        )
+
+    skills = man.get("skills")
+    if not isinstance(skills, list):
+        FAILS.append(f"技能清单缺 skills 数组（{rel_man}）⇒ 重跑生成器（禁手写）")
+        return
+    names_manifest = {str(s.get("name")) for s in skills if isinstance(s, dict)}
+    names_disk = {d.name for d in dirs}
+    only_m = sorted(names_manifest - names_disk)
+    only_d = sorted(names_disk - names_manifest)
+    if only_m or only_d:
+        problems.append(
+            "磁盘技能目录集合与 MANIFEST 不一致："
+            f"仅在 MANIFEST 中 = {', '.join(only_m) or '无'}；仅在磁盘上 = {', '.join(only_d) or '无'}"
+            " ⇒ 重跑生成器"
+        )
+
+    for i, s in enumerate(skills):
+        if not isinstance(s, dict):
+            problems.append(f"skills[{i}] 不是对象")
+            continue
+        name = str(s.get("name") or "")
+        tag = name or f"skills[{i}]"
+        if name != str(s.get("dir") or ""):
+            problems.append(f"{tag}: name({name!r}) 与 dir({s.get('dir')!r}) 不一致")
+        if not _txt(s.get("version")):
+            problems.append(f"{tag}: version 为空/缺失（补 SKILL.md frontmatter `metadata.version`）")
+        base = s.get("baseline")
+        if not isinstance(base, dict):
+            problems.append(
+                f"{tag}: baseline 为 null ⇒ 在 SKILL.md frontmatter 补 baseline"
+                "（amd_doc / tested_on / status / evidence 四键）"
+            )
+            continue
+        miss = [k for k in BASELINE_KEYS if k not in base]
+        if miss:
+            problems.append(f"{tag}: baseline 缺键 {', '.join(miss)}")
+        status = base.get("status")
+        if status not in ("verified", "unverified"):
+            problems.append(f"{tag}: baseline.status={status!r} 非法（须 verified | unverified）")
+        elif status == "verified":
+            empty = [k for k in ("tested_on", "evidence") if not _txt(base.get(k))]
+            if empty:
+                problems.append(
+                    f"{tag}: status=verified 但 {', '.join(empty)} 为空"
+                    "（裁决 D3：verified 必须写实测版本与证据出处，否则改 unverified + tested_on=null）"
+                )
+
+    if problems:
+        FAILS.append(
+            f"技能清单一致性（{rel_man}）:\n    " + "\n    ".join(problems)
         )
 
 
+# ---------- 8. 技能 references 真实存在 ----------
+def check_skills_references() -> None:
+    if not _skills_ready():
+        return
+    bad: list[str] = []
+    for d in _SKILL_DIRS or []:
+        md = d / "SKILL.md"
+        text = _read_text(md)
+        picked: list[tuple[int, str, str]] = []
+        for m in LINK.finditer(text):
+            picked.append((m.start(), "链接", m.group(1)))
+        for m in BACKTICK.finditer(text):
+            cand = m.group(1).strip()
+            if cand.startswith(SKILL_REF_PREFIXES):
+                picked.append((m.start(), "代码内路径", cand))
+        for pos, kind, raw in picked:
+            t = raw.strip()
+            if not t or t.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            # markdown 链接可能带 title：[x](path "标题")
+            if re.search(r"\s[\"']", t):
+                t = t.split("\"", 1)[0].split("'", 1)[0].strip()
+            t = t.split("#", 1)[0].strip()
+            if not t or PLACEHOLDER.search(t):
+                continue
+            if re.match(r"^[A-Za-z]:[\\/]", t):
+                target = Path(t)
+            else:
+                target = md.parent / t
+            try:
+                exists = target.exists()
+            except OSError:
+                exists = False
+            if not exists:
+                bad.append(f"{d.name}/SKILL.md:{_line_of(text, pos)}  [{kind}] {raw.strip()}")
+    if bad:
+        FAILS.append(
+            "技能 SKILL.md 里的引用指向不存在的文件（解析基准 = 该 SKILL.md 所在目录；"
+            "占位符 path/to|...|xxx|<>*{} 已跳过）:\n    " + "\n    ".join(bad)
+        )
+
+
+# ---------- 9. 技能内绝对路径存在 ----------
+_TRAILING_PUNCT = ".,;:!?。，；：、"
+
+
+def _abs_path_candidates(text: str):
+    """产出 (match_start, 原始串)：先抹掉 URL，再过滤 URL 残片（https:// 里的 `s://`）。"""
+    # 抹成等长空白 ⇒ 后续 match.start() 与原文偏移一致，行号仍然准确
+    scan = URL_ANY.sub(lambda m: " " * len(m.group(0)), text)
+    for m in WINDOWS_ABS.finditer(scan):
+        raw = m.group(0)
+        if "://" in raw:
+            continue
+        # 只有「独立出现」的盘符路径才算：排除前面紧贴字母数字的情况（xxxC:\ 之类）
+        if m.start() > 0 and (scan[m.start() - 1].isalnum() or scan[m.start() - 1] in "+._-/"):
+            continue
+        yield m.start(), raw
+
+
+def _strip_path(raw: str) -> str:
+    s = raw.rstrip(_TRAILING_PUNCT).rstrip()
+    s = s.rstrip(")]}\"'")
+    return s
+
+
+def _path_exists_variants(raw: str) -> tuple[str, bool]:
+    """去掉尾部标点/引号/尾部分隔符后再判存在；返回 (报告用的最干净形式, 是否存在)。"""
+    cand = _strip_path(raw)
+    variants = [cand, cand.rstrip("\\/")]
+    for v in variants:
+        if not v:
+            continue
+        try:
+            if Path(v).exists():
+                return v, True
+        except (OSError, ValueError):
+            pass
+    return variants[0] if variants else cand, False
+
+
+def _load_skill_path_allowlist() -> tuple[dict[str, str], list[str]]:
+    """可选侧文件 <skills_root>\\.path-allowlist.json：{"<绝对路径>": "<理由>"}。"""
+    if not SKILL_PATH_ALLOWLIST.is_file():
+        return {}, []
+    try:
+        data = json.loads(SKILL_PATH_ALLOWLIST.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {}, [f".path-allowlist.json 不是合法 JSON：{exc}"]
+    if not isinstance(data, dict):
+        return {}, [".path-allowlist.json 顶层必须是 {路径: 理由} 对象"]
+    out: dict[str, str] = {}
+    problems: list[str] = []
+    for key, val in data.items():
+        norm_key = str(key).replace("\\", "/")
+        if not _txt(val if isinstance(val, str) else None) and not (isinstance(val, str) and val.strip()):
+            problems.append(f".path-allowlist.json 条目 {key!r} 的 reason 为空（必须写可复核理由）")
+        out[norm_key] = str(val)
+    return out, problems
+
+
+def check_skills_paths() -> None:
+    if not _skills_ready():
+        return
+    allow, problems = _load_skill_path_allowlist()
+    bad: list[str] = list(problems)
+    for d in _SKILL_DIRS or []:
+        md = d / "SKILL.md"
+        text = _read_text(md)
+        for pos, raw in _abs_path_candidates(text):
+            if PLACEHOLDER.search(raw):
+                continue
+            clean, ok = _path_exists_variants(raw)
+            if ok:
+                continue
+            key = clean.replace("\\", "/")
+            if key in allow or raw.replace("\\", "/") in allow:
+                continue
+            bad.append(f"{d.name}/SKILL.md:{_line_of(text, pos)}  {clean}")
+    if bad:
+        FAILS.append(
+            "技能 SKILL.md 里的 Windows 绝对路径不存在（只查 SKILL.md，技能内其它 .md 是 AMD 原文不查）。"
+            "处置：① 改成本机真实路径；② 若确属示例 → 改写成占位符；"
+            "③ 若确需保留 → 登记 <skills_root>\\.path-allowlist.json 并写理由:\n    "
+            + "\n    ".join(bad)
+        )
+
+
+# ---------- 10. 技能工具名可解析 ----------
+def _mentions_token(line: str, token: str) -> bool:
+    return re.search(r"(?<![A-Za-z0-9])" + re.escape(token) + r"(?![A-Za-z0-9])", line) is not None
+
+
+def check_skills_tools() -> None:
+    if not _skills_ready():
+        return
+    catalog = _manifest_catalog()
+    cset = set(catalog)
+    if not catalog:
+        HINTS.append(
+            "MANIFEST.tool_catalog.mcp_vivado 为空/不可读：检查 10 的工具名解析无从进行"
+            "（先跑 `py scripts/gen_skills_manifest.py`）"
+        )
+    bad: list[str] = []
+    for d in _SKILL_DIRS or []:
+        md = d / "SKILL.md"
+        text = _read_text(md)
+        # 10-1：mcp__vivado__<x> 必须在 catalog 内
+        for m in MCP_MENTION.finditer(text):
+            name = m.group(1)
+            if name not in cset:
+                bad.append(
+                    f"{d.name}/SKILL.md:{_line_of(text, m.start())}  "
+                    f"mcp__vivado__{name} 不在 MANIFEST.tool_catalog.mcp_vivado（{len(catalog)} 项）"
+                )
+        # 10-2：提到 AMD 原名 ⇒ 须有 `→` 映射到本机 MCP 工具名
+        #   判定口径 = 「同一行里既有 AMD 原名、又在 `→` 右侧给出本机 MCP 工具名」。
+        #   要求同行是刻意的（比 SPEC 原文「至少含一行 `→`」更严一点）：否则任何带 → 的行
+        #   只要右侧偶然出现一个 catalog 词（如「工具链不同 … start_session …」说明行）就会
+        #   白送通过 —— 2026-10-24 反例验证实测到过这种假通过。
+        mentions = sorted(set(AMD_ORIGINAL.findall(text)))
+        if not mentions:
+            continue
+        first = min(m.start() for m in AMD_ORIGINAL.finditer(text))
+        mapped = False
+        for line in text.splitlines():
+            if "→" not in line or AMD_ORIGINAL.search(line) is None:
+                continue
+            for chunk in line.split("→")[1:]:
+                if any(_mentions_token(chunk, name) for name in catalog):
+                    mapped = True
+                    break
+            if mapped:
+                break
+        if not mapped:
+            bad.append(
+                f"{d.name}/SKILL.md:{_line_of(text, first)}  提到 AMD 原名 "
+                f"{'/'.join(mentions)}，但没有一行**同时**含 AMD 原名与 `→` 右侧的本机 MCP 工具名"
+                f"（本机名 = MANIFEST.tool_catalog.mcp_vivado 成员，共 {len(catalog)} 项）"
+                " ⇒ 补一行映射，例如 `vivadoExecute → run_tcl`"
+            )
+    if bad:
+        FAILS.append(
+            "技能 SKILL.md 的工具名不可解析（本地 MCP 工具清单 = MANIFEST.tool_catalog.mcp_vivado）:\n    "
+            + "\n    ".join(bad)
+        )
+
+
+# ======================================================================
+# 11. 镜像门禁：docs/ 快照 vs vault（用户裁决 D1 = 脱敏归一 + 带理由白名单）
+# ======================================================================
+MIRROR_ALLOWLIST = ROOT / "scripts" / "mirror_allowlist.json"
+# 脱敏归一：用户名/人名 → docs 里的 ***。
+# 注意：**两侧都替换**（SPEC §4.11 原文只写「vault 侧」）。实测理由——docs 里另有 5 篇本身
+# 就含 `15266`（未脱敏的路径/命令片段），其中 4 篇与 vault 逐字节完全相同；若只替换 vault 侧，
+# 这 4 篇会被误判成 drift（2026-10-24 实测：复现_prj9_指南、阶段三_cross_上板操作优先级清单、
+# 阶段三_prj10_W4两级内存联调上板验证单、阶段三_prj11_B2软核J3上板验证单）。对称替换后
+# 「原始就相同」的文件仍相同，11 篇纯脱敏差异仍归一到相等。
+DESENSITIZE = (("15266", "***"),)
+MIRROR_KINDS = ("drift", "docs-only")
+
+
+def mirror_normalize(text: str) -> str:
+    """SPEC §4 检查 11 的归一：① 去 UTF-8 BOM；② 统一 CRLF→LF。"""
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _mirror_decode(p: Path) -> str:
+    return p.read_bytes().decode("utf-8", errors="replace")
+
+
+def mirror_canonical(p: Path) -> str:
+    """归一后的比较用文本：BOM/换行归一 + 脱敏替换（两侧同一规则）。"""
+    text = mirror_normalize(_mirror_decode(p))
+    for old, new in DESENSITIZE:
+        text = text.replace(old, new)
+    return text
+
+
+def _load_mirror_allowlist() -> tuple[dict[str, dict], list[str]]:
+    """读白名单并自检结构；返回 (path→entry, 自身问题)。reason 空 ⇒ 自身 FAIL。"""
+    if not MIRROR_ALLOWLIST.is_file():
+        return {}, []
+    try:
+        data = json.loads(MIRROR_ALLOWLIST.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {}, [f"不是合法 JSON：{exc}"]
+    if not isinstance(data, dict):
+        return {}, ["顶层必须是 JSON 对象 {generated_at, entries[]}"]
+    entries = data.get("entries", [])
+    if not isinstance(entries, list):
+        return {}, ["entries 必须是数组"]
+    out: dict[str, dict] = {}
+    problems: list[str] = []
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            problems.append(f"entries[{i}] 不是对象")
+            continue
+        path = str(e.get("path") or "").strip().replace("\\", "/")
+        if not path:
+            problems.append(f"entries[{i}] 缺 path")
+            continue
+        if path in out:
+            problems.append(f"{path}: 重复登记")
+        kind = e.get("kind")
+        if kind not in MIRROR_KINDS:
+            problems.append(f"{path}: kind={kind!r} 非法（须 {' | '.join(MIRROR_KINDS)}）")
+        if not _txt(e.get("reason")):
+            problems.append(f"{path}: reason 为空（每条白名单必须写可复核的具体理由）")
+        if not _txt(e.get("since")):
+            problems.append(f"{path}: since 为空（每条白名单必须写日期）")
+        out[path] = e
+    return out, problems
+
+
+def check_mirror_gate() -> None:
+    """docs → vault 单方向门禁。
+
+    方向性（SPEC §4.11）：只查 docs 里有、按相对路径去 vault 找；vault 侧新增但还没镜像的
+    文档不算失败（现状已分叉，且本轮会新增文档）。
+    """
+    if not VAULT.is_dir():
+        SKIPS.append(
+            f"vault 不存在（{VAULT.as_posix()}）：跳过镜像门禁（本地专用；远程 CI 自动跳过）"
+        )
+        return
+    if not DOCS.is_dir():
+        FAILS.append("docs/ 目录不存在，镜像门禁无从进行")
+        return
+
+    allow, problems = _load_mirror_allowlist()
+    if problems:
+        FAILS.append(
+            f"镜像白名单自身不合法（{MIRROR_ALLOWLIST.as_posix()}）:\n    " + "\n    ".join(problems)
+        )
+
+    unresolved: list[str] = []
+    kind_bad: list[str] = []
+    used: set[str] = set()
+    same = whitelisted = 0
+    docs_files = sorted(DOCS.rglob("*.md"))
+
+    for p in docs_files:
+        rel = p.relative_to(DOCS).as_posix()
+        entry = allow.get(rel)
+        v = VAULT / p.relative_to(DOCS)
+        if not v.is_file():
+            if entry is None:
+                unresolved.append(f"{rel}   [kind=docs-only：vault 无此相对路径，未登记]")
+            else:
+                used.add(rel)
+                if entry.get("kind") != "docs-only":
+                    kind_bad.append(
+                        f"{rel}: 登记为 {entry.get('kind')!r}，但 vault 里没有该文件 ⇒ 应为 docs-only"
+                    )
+            continue
+        if mirror_canonical(p) == mirror_canonical(v):
+            same += 1
+            continue
+        if entry is None:
+            unresolved.append(f"{rel}   [kind=drift：归一后仍与 vault 不一致，未登记]")
+        else:
+            used.add(rel)
+            if entry.get("kind") != "drift":
+                kind_bad.append(
+                    f"{rel}: 登记为 {entry.get('kind')!r}，但两侧都存在且归一后不等 ⇒ 应为 drift"
+                )
+
+    whitelisted = len(used)
+    # 白名单过期条目只提示（不 FAIL）：允许后续清理时不阻塞 CI
+    stale: list[str] = []
+    for rel in sorted(set(allow) - used):
+        cand = DOCS / rel
+        if not cand.is_file():
+            stale.append(f"{rel}（docs/ 下已无此文件 ⇒ 可删除该条目）")
+            continue
+        v = VAULT / rel
+        if v.is_file() and mirror_canonical(cand) == mirror_canonical(v):
+            stale.append(f"{rel}（归一后已与 vault 相等 ⇒ 可删除该条目）")
+    if stale:
+        HINTS.append(
+            f"镜像白名单有 {len(stale)} 条已无必要的条目（仅提示，可清理）:\n    " + "\n    ".join(stale)
+        )
+
+    if unresolved:
+        FAILS.append(
+            f"镜像门禁：docs/ 有 {len(unresolved)} 个文件与 vault 不一致（或 vault 无对应文件）且不在白名单。"
+            f"白名单文件 = {MIRROR_ALLOWLIST.as_posix()}。处置："
+            "① 内容该更新 → 重新脱敏后同步进 docs/；"
+            "② docs 独有 / 既知真漂移 → 在白名单补一条 {path, kind: drift|docs-only, reason, since}，"
+            "reason 必须写可复核的具体原因（禁「历史遗留」这类空话）:\n    "
+            + "\n    ".join(unresolved)
+        )
+    if kind_bad:
+        FAILS.append("镜像白名单 kind 与实际情况不符:\n    " + "\n    ".join(kind_bad))
+
+    HINTS.append(
+        f"镜像门禁：docs/ 共 {len(docs_files)} 篇 .md；归一后与 vault 相等 {same} 篇；"
+        f"白名单豁免 {whitelisted} 篇（drift "
+        f"{sum(1 for r in used if str(allow[r].get('kind')) == 'drift')}、docs-only "
+        f"{sum(1 for r in used if str(allow[r].get('kind')) == 'docs-only')}）；"
+        f"未登记不一致 {len(unresolved)} 篇"
+    )
+
+
+# ======================================================================
+# 12. 技能区块门禁：agent.md 的 BEGIN:skills 区块必须与 MANIFEST 一致（本地专用）
+# ======================================================================
+RENDER_AGENT_BLOCK = ROOT / "scripts" / "render_agent_skills_block.py"
+AGENT_MD = VAULT / "agent.md"
+
+
+def check_agent_skills_block() -> None:
+    """把渲染器当**唯一实现**，只读它的 `--check` 退出码 —— 不复制渲染逻辑，避免两处漂移。
+
+    为什么需要这一条：agent.md 的技能表是 MANIFEST 的派生物，而它对外宣称「由脚本生成、
+    勿手改」。检查 7 只保 MANIFEST 自身新鲜（source_hash 对 SKILL.md 字节），但「技能改了
+    /MANIFEST 重跑了，agent.md 那块表格还是旧的」没人管 —— 区块会静静过期。这一条补上派生物。
+    """
+    if not AGENT_MD.is_file() or not SKILL_MANIFEST.is_file():
+        missing = [p.as_posix() for p in (AGENT_MD, SKILL_MANIFEST) if not p.is_file()]
+        SKIPS.append(
+            "vault agent.md 或 MANIFEST 不存在，跳过技能区块门禁（检查 12）"
+            f"（缺：{'、'.join(missing)}；本地专用，远程 CI 自动跳过）"
+        )
+        return
+    if not RENDER_AGENT_BLOCK.is_file():
+        FAILS.append(
+            f"技能区块门禁（检查 12）缺渲染器：{RENDER_AGENT_BLOCK.as_posix()} 不存在"
+        )
+        return
+    cmd = [sys.executable, str(RENDER_AGENT_BLOCK), "--check"]
+    # 子进程必须显式 utf-8 io：渲染器输出中文，Windows 管道默认 cp936，父进程按 utf-8 解会花
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=120,
+        )
+    except Exception as exc:
+        FAILS.append(
+            f"技能区块门禁（检查 12）执行渲染器失败：{' '.join(cmd)}（{exc}）"
+        )
+        return
+    if proc.returncode == 0:
+        return
+    detail = "\n".join(
+        x for x in ((proc.stdout or "").rstrip(), (proc.stderr or "").rstrip()) if x.strip()
+    )
+    FAILS.append(
+        "技能区块过期：vault agent.md 的 `BEGIN:skills` 区块 / docs/agent.md 脱敏镜像"
+        f"与 MANIFEST 不一致（`{RENDER_AGENT_BLOCK.name} --check` rc={proc.returncode}）。"
+        "处置：跑 `py D:\\FPGA\\scripts\\render_agent_skills_block.py --write` "
+        "重新渲染并同步镜像。渲染器输出:\n    "
+        + (detail.replace("\n", "\n    ") if detail else "（渲染器无输出）")
+    )
+
+
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # 中文 + → 在 GBK 管道下会 UnicodeEncodeError
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     files = tracked_files()
     print(f"仓库体检：{len(files)} 个已跟踪文件\n")
     check_doc_names(files)
@@ -230,7 +822,13 @@ def main() -> int:
     check_ps1_bom(files)
     check_tcl(files)
     check_docs_index()
-    check_mirror_hint()
+    # ---- 本地专用（vault 不存在时整段跳过）----
+    check_skills_manifest()
+    check_skills_references()
+    check_skills_paths()
+    check_skills_tools()
+    check_mirror_gate()
+    check_agent_skills_block()
 
     for h in HINTS:
         print(f"  [提示] {h}")

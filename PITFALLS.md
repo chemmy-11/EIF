@@ -1,4 +1,4 @@
-# PITFALLS.md — 工程坑账本（#1–#68，全文）
+# PITFALLS.md — 工程坑账本（#1–#70，全文）
 
 > 本文件是 `AGENTS.md` **§九** 的全文拆分（2026-10-20，用户批准）。
 > 定位：**踩过的坑 = 规范的来源**；本文是坑账本的唯一全文，`AGENTS.md §九` 只保留「编号 + 主题」索引。
@@ -76,6 +76,8 @@
 | 66 | **hw-ila 抓取脚本三处官方 API 口径（过去踩错）** | 2026-10-18 对照官方 `hw-ila-debug` 技能修正：① 基本触发必须显式 `set_property CONTROL.TRIGGER_MODE BASIC_ONLY` + `CONTROL.TRIGGER_CONDITION AND`（多 probe 的 `TRIGGER_COMPARE_VALUE` 才按 AND 合成）；② **`wait_on_hw_ila -timeout N` 的单位是分钟**（不是秒；旧脚本传 30 会挂 30 分钟）；③ `write_hw_ila_data -csv_file` 用**基名**（不带 `.csv`）。官方比对值语法 `eq<width>'<radix><value>`。证据：`out/evidence_2026-10-18/tools/r2_ila5_capture.tcl` 修正 + 参考文档 §3.1 |
 | 67 | **Vivado 2023.1 ILA `C_DATA_DEPTH` 合法值最小 1024（512 非法）** | 2026-10-19 实证（prj11 R2 round3b）：为省 300MHz 面积把 `u_ila_5` 深度设 512，综合阶段 `open_run` 后 `create_debug_core` 报 `[Vivado 12-206] Invalid value '512' for 'C_DATA_DEPTH'. Valid values are 1024 2048 ...`，4 次重试全败；改回 1024 即过。⇒ 降 300MHz ILA 压力时**只能从 2048→1024**（ILA3 本轮即如此），不能低于 1024；要再省只能裁 probe 或换更小核 |
 | 68 | **module-ref IP cache 不随 RTL 源文件失效（BD 模块引用会用旧网表）** | 2026-10-19 实证（prj11 R2 round3c）：`axi_lite_regs.v` 在 10-18 有 fix1/fix2 两次修改，但 round2f/round3/round3b 位流的 synth 日志均读 `mb_ctrl_axi_lite_regs_0_0_9/...dcp`；旧 IPCACHE `1f8570ac…` 文件 mtime=**10-17 22:22:03**、`stats.txt` NumberHits=19/最后命中 **10-19 00:10:59（=round3b 构建）** ⇒ **fix1/fix2 从未进入任何位流**，板上表现为 lite 总线协议违例（读回冻结/UART 静默）。**判别法**：build 日志中 module-ref IP 目录 `<N>` 的 dcp mtime 应晚于对应 RTL mtime；或查 `vivado/gen/…/ip_cache/…/stats.txt` 命中历史。**修法**：改 module-ref RTL 后**重新 generate BD**（实例号会 +1、`IPCACHESYNTHCRC` 改变），或删 cache / `config_ip_cache -disable_cache`；`reset_run`+`MODULE_REF_RESET` 只刷新 OOC run，**不足以**让 IP cache 失效（与坑 #35 同族） |
+| 69 | **`is_error=false` 但文本是 `[ERROR]` —— CLI 桥假成功（判据只看传输层）** | 2026-10-24 实证：MCP 协议层的 `is_error` 只反映**传输/协议**失败，Vivado 把 `[ERROR] ...` 打进返回文本时 `is_error` 仍是 `false`；`mcp_ctl.py` 原先只按 `isError` 判退出码 ⇒ 输出 `[ERROR]` 却 `EXIT=0`。证据：`D:\vivado-mcp\tmp\report_tools_result.json` 3 个调用里 **2 个** `is_error:false` 而 text 是 `[ERROR] 会话 'default' 不存在`（`get_utilization_report` / `get_io_report`），被套2 记成 PASS；同一陷阱 10-07 已在 `recheck_v2.py` 里修过（`tcl_bad()`），但 `count_fail` 只数 `is_error`、`live_tools.py` 只对 `tcl=True` 启用文本判据，故又漏两处。**修法 = 判据必须同时扫文本（`[ERROR]` / `ERROR:` / `MCPError`），不能只看 `is_error`；桥已加文本判据 + `--lax` 逃生口（2026-10-24 修），离线报告解析的两项按「工具无 `report_file`」判为不适用**。与 #20/#43 同属「工具结论口径」族 |
+| 70 | **CLI 桥一进程一调用 ⇒ 会话类工具在桥下不可用** | 2026-10-24 实证：`mcp_ctl.py` 每次调用都 `stdio_client` 新起一个 MCP server 进程，**会话不跨进程**；`start_session` 返回 ready 只在那一次进程内有效，下一条 `run_tcl` / `get_utilization_report` / `get_io_report` 必报「会话 'default' 不存在」。`run_synthesis` 默认 `wait=True`（实测单掷 137s），桥下另受调用超时约束。**修法 = 多步操作写成单进程脚本（模板 `D:\vivado-mcp\tmp\bridge_template.py`），或接入长连接 MCP 客户端（2026-10-24 已在 desktop profile 配置 `mcp__vivado__*`，重启生效）；桥下只做单命令与离线工具**。与 #21（安装路径必须纯 ASCII）同为 vivado-mcp 部署族 |
 
 ---
-*拆出自 `AGENTS.md §九`（2026-10-20）；原文三列格式与全部 68 条未改动。索引见 `AGENTS.md §九`。*
+*拆出自 `AGENTS.md §九`（2026-10-20）；原文三列格式与 #1–#68 未改动（#69/#70 于 2026-10-24 追加）。索引见 `AGENTS.md §九`。*

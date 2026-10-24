@@ -4,6 +4,30 @@
 > 工程规范权威版本 = `D:\FPGA\AGENTS.md`；本文件与它冲突时，以 AGENTS.md 为准并回改本文件。
 > 状态提示：**路线 A（prj10）冻结、路线 B（prj11）已于 2026-10-19 全量收口**；最新发布见「30 秒导航」的 Release 行，当前入口见下方「30 秒导航」。
 
+## ★ 场景路由表（2026-10-24 新增，新会话先看这张表）
+
+| 场景（我手上是什么） | 去哪 / 用什么 | 需要 vivado-mcp？ |
+|---|---|---|
+| 找当前入口、今天该干什么 | 本文件「30 秒导航」+ `追踪_cross_短期待办_2026-10-10.md` | 否 |
+| 工程规范全文 / 依据等级 / 红线 | `D:\FPGA\AGENTS.md`（§6a 依据等级 · §九 坑索引 · §十二 CI） | 否 |
+| 报错 / 坑查账（#1–#70） | `D:\FPGA\PITFALLS.md` | 否 |
+| 综合/实现日志报错、`[Synth 8-XXXX]` | skill **`vivado-rtl-elaboration-analysis`**（读日志为主，不启动 Vivado） | 否 |
+| 综合前 RTL 体检（lint） | skill **`vivado-rtl-lint`** | 否 |
+| 跑仿真 / 排 XSim / 覆盖率 / 波形 | skill **`vivado-simulate-rtl`** | 建议（`run_tcl`） |
+| 工程导出 / 交接 / 重建、Git 策略 | skill **`vivado-revision-control`** | 否 |
+| ILA 抓波形、触发配置 | skill **`hw-ila-debug`** | **是**（或 batch Tcl 兜底） |
+| VIO 读写探针 | skill **`hw-vio-debug`** | **是** |
+| AMD 官方依据（Tcl/属性/UG/报错） | skill **`amd-doc-search`** → `py .dsh\skills\amd-doc-search\doc_search.py "<query>"` | 否（HTTP 直连） |
+| 上板烧录 / 串口 / JTAG 验收 | `复现/复现_prj11_指南_2026-10-19.md` §2–§3、`D:\FPGA\prj\project_11\out\r2_board.ps1` | 否 |
+| 真跟 Vivado 交互（起会话 / 跑 run / 取结构化报告） | 见下方「★ Vivado 会话预设」 | **是**（`mcp__vivado__*` 32 个） |
+| 文档入库 / 镜像 / CI | `D:\FPGA\docs\README.md` 索引 + `py D:\FPGA\scripts\ci_check.py` | 否 |
+
+## ★ Vivado 会话预设（2026-10-24 新增，重要）
+
+- 32 个 Vivado MCP 工具（`mcp__vivado__run_tcl` / `start_session` / `run_synthesis` …）**不再全局挂载**，改为随 **`Vivado` 预设**走：**只有新建会话时选了 `Vivado` 预设，才有这些工具 + Vivado 纪律 persona**；默认 `standard` 预设会话一个 `mcp__vivado__*` 都没有。
+- 取舍：每请求省 ≈8k tokens 的工具定义；代价是**忘了切预设就没有 Vivado 工具**。遇到「工具不见」先查会话预设，再用 CLI 桥兜底（`py D:\vivado-mcp\mcp_ctl.py list|call`）。
+- 预设声明在 bundle `@local/dsh-vivado-preset`（源码 `毕设\.dsh\bundles\vivado-preset\`），装进 `~/.dsh/profiles/desktop`；改它要重启宿主才生效（`dsh-hmr` 在 Electron 下不生效）。
+
 ## 目录定位
 
 | 路径 | 角色 |
@@ -39,13 +63,15 @@
 - **「字节不一致」多数是脱敏设计的结果，不是缺陷**：当日抽查的差异样本中，vault `C:\Users\***\…` 对应 docs `C:\Users\***\…`，差异全部来自脱敏替换。
 - ⇒ **纪律：绝不「为了对齐」把 vault 原文覆盖进 `docs/`**（会把敏感信息写进 git 历史）。确需同步时先判定差异类型（脱敏 / 内容更新），内容更新以「更晚、有实测证据」的版本为准，**同步后必须重新脱敏**。
 - **vault 增删文档后，镜像入 `docs/` 时必须同步 `docs/README.md` 全量索引**（口径 = docs/ 下除任意 `README.md` 外的全部 .md），否则远程 CI 第 6 项会红。
-- CI 里另有一条**本机专用提示**（不卡 CI）：存在 vault 时比对镜像字节一致性，打印差异清单——**它是提示，不是待办清单**，逐条判定后才动。
+- **CI 门禁（2026-10-24 起，`ci_check.py` 第 7 项）**：存在 vault 时逐文件比对 `docs/**/*.md` ↔ vault 对应文件，**先归一（两侧 `***`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节**；归一后仍不等、或 docs 独有而 vault 没有 → 必须在 `D:\FPGA\scripts\mirror_allowlist.json` 登记（每项带可复核理由），否则 **CI FAIL**。现状：83 篇 = 归一相等 68 + 白名单 15（drift 9 / docs-only 6），未登记不一致 **0**（2026-10-24 已把 `W5随机读上板验证单` 按 vault 新版重新脱敏同步并删掉那条白名单）。
+- 白名单不是垃圾桶：新增条目要写清**为什么**不等（脱敏未覆盖 / vault 目录改名 / 内容新旧 / docs 独有），写「历史遗留」视为无效理由（门禁自身会校验 reason 非空）。
 
 ## 文档地图（本目录）
 
 | 条目 | 内容 |
 |---|---|
 | `追踪_cross_短期待办_2026-10-10.md` | 任务清单与里程碑（当前任务的水位线）|
+| `结论_cross_Vivado环境DSH规范化_2026-10-24.md` | **本轮三件套验收**（Vivado 预设 / 技能清单+门禁 / 镜像门禁）：逐条 PASS/FAIL、变更清单、回退步骤 |
 | `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` | **路线 B 收口记录（新对话第一份读）**：全过程/判据/速率/重审，§十九–§二十二 为收口结论 |
 | `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18.md` | 官方 AI 技能与文档检索：接入、调用、2023.1 待实测（2026-10-18）|
 | `规划_cross_长期路线图_2026-09-04.md` | 长期路线与决策记录 |
@@ -114,7 +140,23 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 
 ## ★ 外部 AI 技能与官方文档检索（2026-10-18 新增）
 
-- **技能（项目级，仅本工作区）**：`毕设\.dsh\skills\` 下 7 个——`vivado-rtl-elaboration-analysis`（综合日志分析 + **560 个** `[Synth 8-XXX]` 修复卡）· `vivado-rtl-lint`（20 个 lint 规则修复模板）· `vivado-revision-control`（工程导出/交接/重建）· `vivado-simulate-rtl`（XSim 排错/覆盖率/波形）· `hw-ila-debug` · `hw-vio-debug` · `amd-doc-search`（官方文档检索桥）。**全局技能根 `~/.agents/skills` 不放 Vivado 技能**（2026-10-18 定案，避免污染其他 Agent 上下文）。
+- **技能（项目级，仅本工作区）**：`毕设\.dsh\skills\` 下 7 个，清单与「AMD 基线 / 本机实测」状态见下方自动生成表（**勿手改**）。**全局技能根 `~/.agents/skills` 不放 Vivado 技能**（2026-10-18 定案，避免污染其他 Agent 上下文）。
+
+<!-- BEGIN:skills · 由 `D:\FPGA\scripts\render_agent_skills_block.py` 从 `.dsh\skills\MANIFEST.json` 生成，**勿手改**；数据源 = 各 `SKILL.md` frontmatter，生成器 `D:\FPGA\scripts\gen_skills_manifest.py` -->
+
+| 技能 | 版本 | AMD 基线 | 本机实测 | 状态 | 目录内脚本 |
+|---|---|---|---|---|---|
+| `amd-doc-search` | 1.0.0 | unspecified | — | ⚠️ 未在本机实测 | `doc_search.py` |
+| `hw-ila-debug` | 1.2.2 | 2026.1 | — | ⚠️ 未在本机实测 | — |
+| `hw-vio-debug` | 1.2.2 | 2026.1 | — | ⚠️ 未在本机实测 | — |
+| `vivado-revision-control` | 1.0.0 | 2026.1 | — | ⚠️ 未在本机实测 | `helper-procedures/helper_scripts.tcl` |
+| `vivado-rtl-elaboration-analysis` | 1.0.0 | 2026.1 | 2023.1 | ✅ 本机实测 | `csv_to_per_file_parts.py`、`parse_elab_messages.py` |
+| `vivado-rtl-lint` | 1.0.0 | 2026.1 | — | ⚠️ 未在本机实测 | `parse_lint_report.py` |
+| `vivado-simulate-rtl` | 1.0.0 | 2025.2, 2026.1 | — | ⚠️ 未在本机实测 | `scripts/sim_env_doctor.py`、`scripts/validate_skill.py` |
+
+<sub>source_hash `f3c39b9ac2804b0f…` · mcp 工具目录 32 项 · 重算命令 `py D:\FPGA\scripts\gen_skills_manifest.py`</sub>
+
+<!-- END:skills -->
 - **官方文档检索**：AMD hosted `amd-doc-search`（`https://ross.amd.com/mcp/doc-search`，免 key，英文；`version` 含 2023.1、`family` 含 Kintex UltraScale+）。原生 MCP 已配置在 DSH web profile（**重启 `dsh web` 后**工具名 `mcp__amd_doc_search__vivado_doc_search`）；未重启时用项目桥：`py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>" --limit 5`。
 - **触发纪律**：AMD/Xilinx 官方依据类问题**先检索再回答**，结论带 `docs.amd.com` / `adaptivesupport.amd.com` URL；检索不到就写「未检索到」，**禁止臆造**命令/参数/约束。官方文档在事实源排序中 = **官方文档层**（高于 AI 生成文档、低于官方例程/已验证 prj，只作 L3/L4 旁证）。
 - **过滤要核对**：`family`/`version` 是提示性过滤，返回里仍可能混 `All` 条目，引用前逐条核对（坑 #64）。
