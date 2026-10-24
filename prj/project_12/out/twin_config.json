@@ -1,0 +1,45 @@
+{
+  "_comment": "prj12 twin-board burn config. ASCII only on purpose (PS 5.1 + GBK console safety).",
+  "prj": "project_12",
+  "stage": "P1",
+  "artifacts": {
+    "bit": "out/aurora_mem_bridge.bit",
+    "elf": "out/j3_soft_r2_BA3C0220.elf",
+    "expect_bit_sha256": "",
+    "expect_elf_sha256": "ba3c02209720b59d9f0fbc4083c2ab80b16efc9a148448b9dcfbcda001bb3559",
+    "baseline_bit": "out/baseline_F6012BA0.bit",
+    "baseline_bit_sha256": "f6012ba0ff8f9d7f3bcd9ac848a97f1c5e1b6dd7016dad5bebe93755e73c54c4"
+  },
+  "boards": {
+    "A": {
+      "role": "PC1 / left",
+      "jtag_serial": "210512180081",
+      "hw_server": "localhost:3121",
+      "cable_serial": "210512180081",
+      "com": "COM5",
+      "baud": 9600,
+      "board_ip": "192.168.1.10",
+      "board_mac": "00:11:22:33:44:55",
+      "pc_ip": "192.168.1.102",
+      "pc_nic": "Ethernet"
+    },
+    "B": {
+      "role": "PC2 / right",
+      "jtag_serial": "<FILL>",
+      "hw_server": "localhost:3121",
+      "cable_serial": "<FILL>",
+      "com": "<FILL>",
+      "baud": 9600,
+      "board_ip": "192.168.1.10",
+      "board_mac": "00:11:22:33:44:55",
+      "pc_ip": "192.168.1.102",
+      "pc_nic": "<FILL>"
+    }
+  },
+  "sfp": {
+    "link_port": "SFPA=X1Y11",
+    "unused_port": "SFPB=X1Y9 (B core idle in P1)",
+    "module": "10G SFP+",
+    "refclk_mhz": 156.25
+  }
+}

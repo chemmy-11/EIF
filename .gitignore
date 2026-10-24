@@ -85,6 +85,7 @@ prj/project_10/prj_loop/.tmpCRC/
 
 # ===== Vivado 工程目录(prj11起统一, 可再生不提交) =====
 prj/project_11/vivado/
+prj/project_12/vivado/
 
 # ===== prj11 软件构建产物(Vitis 工作区, 可再生) =====
 prj/project_11/sw/.metadata/
@@ -121,3 +122,8 @@ tmp_*/
 *.recomposed.jsonl
 *.bak-*
 .tmp/
+
+# ===== prj12 本地测试产物（可由 pc/make_test_pcap.py 与 p2_candidate/sim/run_p2_tb.cmd 重建）=====
+prj/project_12/out/*.pcap
+prj/project_12/out/evidence_*/
+prj/project_12/p2_candidate/*.done

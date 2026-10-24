@@ -259,6 +259,55 @@ Lead 独立复算（`RECORD` 的 sha256 是 **base64url**，需先解码再比�
 
 ---
 
+## 4.8 环境收身：本地只留一份（2026-10-24 晚）
+
+用户裁决：本地只用 `dsh-vivado` 插件，避免与旧的手工 bundle/项目级技能互相遮蔽，也方便后续开发验证。
+
+**归档（不删证据）**：`<vault>\归档\dsh-vivado_迁移归档_2026-10-24\`（697 文件 / 1.83 MiB，附 `README.md` 写明每项来源与回滚命令）
+
+| 归档子目录 | 原位置 | 处置 |
+|---|---|---|
+| `old-bundle-vivado-preset/` | `<vault>\.dsh\bundles\vivado-preset\` | 已删；profile 早已解绑 |
+| `vault-skills/` | `<vault>\.dsh\skills\<7 个技能目录>` | 已删；技能实体改由插件 rank 300 提供（脱敏版） |
+| `profile-backups/` | `~\.dsh\profiles\desktop\*.bak-*`（14 个） | 已从 profile 目录移出 |
+| `kit-dev-reports/` | `<vault>\.vivado-scratch\kit-2026-10-24\` | 已移出 |
+| `dev-scratch/` | `D:\FPGA\.tmp\kit-recon-2026-10-24\` 的取证副本/图标草稿/探针 dump | 已移出（验收脚本正规迁进插件仓库 `dev/`） |
+| `stray-files/` | vault 根两个 0 字节 `.sv` 残骸 | 已移出 |
+
+**清理量**（逐项实测）：`.vivado-scratch` **112 MiB → 5.95 MiB**（8 个 PyInstaller `_MEI*` = 106 MiB）；
+3 个探针家目录（`dshprobe-home/accept/collide`，各 ~350 MB）已删；`%TEMP%\dsh-vivado-dev`（新验收脚本的隔离 home）**763 MB 已删**；
+`D:\FPGA\.tmp\kit-recon-2026-10-24` 已删（取证副本进归档）；vault `.dsh` 只剩 `skills\MANIFEST.json`；归档目录 2 053 文件 / 5.67 MiB（含 6 份队友报告）。
+
+**顺带把验收脚本正规化进插件仓库**（`dev/`，4 文件 1 653 行，**不进安装包**）：`accept_all.py`（6 组 49 条断言）、
+`make_probe_home.py`（隔离 `DSH_HOME`，源 profile 只读）、`validate_patch.py`、`dev/README.md`（含「不覆盖项」）。
+实测：**全量 49/49 passed**、`--only install,uninstall` 25/25、live profile 指纹 UNCHANGED（脚本自带 `[GUARD]`）。
+`lib/install-helpers.ps1` 的 staging `/XD` 已加 `dev`（staged 683 文件里确认没有 `dev/`）。
+
+**门禁口径同步（EIF `78b8802`）**：`AGENTS.md` §六 资产表改为「8 个技能随 bundle 携带、仅 Vivado 预设会话可见」，
+doc-search CLI 桥指向 `D:\dsh-vivado\skills\amd-doc-search\doc_search.py`；§十二 增 7a 说明「技能目录为空 ⇒ 检查 7–10 自动 SKIP，
+MANIFEST 作为冻结快照保留，检查 12 仍有效」；`docs/agent.md` 重新脱敏镜像。`ci_check.py` → PASS（相等 76 / 豁免 8 / 未登记 0）。
+
+**清理后实测**：`doctor.ps1` **12 PASS / 1 WARN（license）/ 0 FAIL**；profile 只剩 `dsh-vivado`（14 bundle 总数不变）；
+`node_modules\@local\` 消失、只剩 `node_modules\dsh-vivado` 链接；Vivado 预设会话 persona 正常、**8 个技能全部来自包内**。
+
+**✅ 收尾事故：0 个 MCP 工具 → 真因是「路径不存在」，已修并产品化**
+
+清理期间出现：Vivado 预设会话里 persona 与 8 个技能正常，但 `mcp__vivado__*` 工具数为 **0**；
+`doctor` 第 6/7/12 项全绿、`mcp_ctl.py list` 仍 32 行、宿主重启后依旧 0。
+
+- **真因**：为了公开化把 `config.example.yml` 的示例路径改成 `D:/fpga_project`，后续 `install.ps1 -RenderOnly`
+  用示例值重渲染了 staging ⇒ MCP 行的 `cwd` / `TEMP` / `TMP` 指向**不存在的目录** ⇒ stdio 子进程起不来，
+  而该行是 `failOnStartupError: false` ⇒ **失败静默**，会话只剩「没有工具」一个症状。
+  （我一开始把现象归因为「热重载后子进程不重启」，**是误判**：重启后仍为 0。）
+- **修复**：把 staging `config.yml` 的三个路径改回真实目录 + 重渲染 → **`MCP_COUNT=32 / TOTAL_TOOLS=98 / 8 技能 / persona YES`**（探针会话实测）。
+- **产品化防线**（插件仓库 `d680047`）：`install.ps1` 渲染前拦截不存在的 `project_root` / `vivado_mcp_cwd`
+  （`temp_dir` 缺失自动创建，其余 FAIL 并给「改哪个键 / 怎么改 / 为什么」）；`doctor.ps1` 的 `ascii-paths`
+  增加存在性判据；两者未显式 `-Config` 时**优先用 staging 的有效配置**（重装不再退回示例占位路径）；
+  `docs/troubleshooting.md §2.11` 与 `docs/doctor-checks.md §5` 同步；`dev/` 夹具改为自建 `<work-dir>/project`。
+  全量验收 **49/49 passed**（live profile 指纹 UNCHANGED）。
+
+---
+
 ## 5. 未做 / 限制（如实登记）
 
 | # | 事项 | 说明 |
@@ -301,10 +350,10 @@ kit 对系统**没有**其它写入：不改环境变量、不写注册表、不
 | `…\validate_patch.py` | 渲染产物结构校验（23 行 / persona 关键字 / customSkillDirs / mcp 环境 / 无残留占位符） |
 | `…\make_template.py` 日志 / `templates/shipped-standard-22rows.yml` | 22 行溯源与 sha256 |
 | `…\pkg_*.json` / `probe_dump_*.txt` | 安装前后 `package.json` 与 `--dump-config` 快照（1517 → 1800 行） |
-| `.vivado-scratch\kit-2026-10-24\reports\ps-skills.md` | 技能复制/清单/溯源全记录（含反例 6/6） |
-| `…\reports\ps-docs.md` | 许可/分档/补丁归档全记录（含 `git apply` 4/4 与 persona 双路径校验） |
-| `…\reports\ps-installer.md` | A–H 实测矩阵 + 4 条偏差 |
-| `…\reports\ps-doctor.md` | 13 项检查判据 + 3 个注入故障实测 |
+| `<vault>\归档\dsh-vivado_迁移归档_2026-10-24\kit-dev-reports\reports\ps-skills.md` | 技能复制/清单/溯源全记录（含反例 6/6） |
+| `…\kit-dev-reports\reports\ps-docs.md` | 许可/分档/补丁归档全记录（含 `git apply` 4/4 与 persona 双路径校验） |
+| `…\kit-dev-reports\reports\ps-installer.md` | A–H 实测矩阵 + 4 条偏差 |
+| `…\kit-dev-reports\reports\ps-doctor.md` | 13 项检查判据 + 3 个注入故障实测 |
 | 探针会话 `session-8e0bf762-f1b0-4dd4-bc55-7bf2327f8a4a` | 旧 bundle 口径 97/32/25/persona=YES 的原文 |
 | 探针会话 `session-8fca600b-0a9d-4c82-82f0-94d53c60ee13` | **本包**装进 live profile 后的口径：32 / 98 / 新 persona / `vivado-workflow-discipline` 可见（§4.6） |
 | `https://github.com/chemmy-11/dsh-vivado` | **公开仓库**（public / MIT / 676 文件）：`14fefe5` → `352dfa9`（LF）→ `0a378ed`（MANIFEST）→ `00cc0d3`（许可审查）→ `1f46491`（公开版：MIT+脱敏+徽章）→ `bcd018a`（LICENSE 纯 MIT 文本）。`git ls-remote origin main` == 本地 HEAD |
@@ -328,6 +377,7 @@ kit 对系统**没有**其它写入：不改环境变量、不写注册表、不
 | 7 | `bac42d6` | `docs: 中英双版 README + 面向用户重写；深层内容拆到 docs/architecture.md 与 docs/troubleshooting.md` |
 | 8 | `59f1fe4` | `docs: 补「更新/升级已装版本」流程` |
 | 9 | `0fe9ad3` | `feat(icon): 插件图标 + 中英显示元数据（Vivado 标志按 dsh 配色重上色）` |
+| 10 | `e1d7543` | `feat(dev): 端到端验收脚本搬进仓库 dev/ + 补「热重载后 MCP 子进程不重启」排错` |
 
 - 仓库：`https://github.com/chemmy-11/dsh-vivado`（**public**，默认分支 `main`，license 被 GitHub 识别为 **MIT**，topics: dsh / dsh-bundle / vivado / fpga / amd / xilinx / mcp / agent-preset / agent-skills）
 - 匿名可达性：`git clone https://github.com/chemmy-11/dsh-vivado.git`（无密钥）实测成功；README 6 个徽章 URL 均 HTTP 200
