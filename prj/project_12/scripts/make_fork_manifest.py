@@ -17,6 +17,11 @@ OUT = os.path.join(DST, "fork_manifest_12.json")
 SCOPE = ["rtl", "xdc", "sim", "scripts", "sw", "docs"]
 
 
+# 只对照源码/脚本文本；构建产物扩展名一律跳过（2026-10-24：pre_impl_debug.dcp 曾混进清单）
+SKIP_EXT = {".dcp", ".ltx", ".log", ".jou", ".bit", ".wdb", ".pb", ".csv",
+            ".xpr", ".xci", ".bin", ".elf", ".pcap", ".rpt", ".str"}
+
+
 def sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -31,6 +36,12 @@ def rel_files(root, sub):
     for dirpath, _dirnames, filenames in os.walk(base):
         for fn in filenames:
             p = os.path.join(dirpath, fn)
+            ext = os.path.splitext(fn)[1].lower()
+            # 只对照源码/脚本；构建产物（dcp/ltx/log/jou/wdb...）不进清单
+            if ext in SKIP_EXT:
+                continue
+            if os.path.getsize(p) > (1 << 20):
+                continue
             out.append(os.path.relpath(p, root).replace("\\", "/"))
     return out
 

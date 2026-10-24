@@ -1,5 +1,5 @@
 {
-  "created": "2026-10-24T20:59:05+08:00",
+  "created": "2026-10-24T23:11:00+08:00",
   "purpose": "prj12 fork of prj11 (双板 P1 离线就绪); prj11 只读",
   "source_root": "D:/FPGA/prj/project_11",
   "dest_root": "D:/FPGA/prj/project_12",
@@ -17,10 +17,10 @@
     "*.jou"
   ],
   "summary": {
-    "files": 90,
+    "files": 98,
     "identical": 82,
     "modified": 4,
-    "prj12_only": 4
+    "prj12_only": 12
   },
   "files": [
     {
@@ -523,15 +523,33 @@
     {
       "dst": "scripts/build_impl.tcl",
       "src": "D:/FPGA/prj/project_11/scripts/build_impl.tcl",
-      "sha256": "aa720a8af46a95efa4358e3a434b925443cda7b2c1b53c815933b13c12f8cb23",
+      "sha256": "0c0a86e90c7c864c8f69de13e9ed6b4b59fa5df91d788d9b06831729a43ee6db",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "scripts/build_p1.cmd",
+      "src": "D:/FPGA/prj/project_11/scripts/build_p1.cmd",
+      "sha256": "6305a9ab94636b46eebf1af815a08e6f7fe700571c691eb38e3e98bda409809f",
       "status": "prj12_only"
     },
     {
       "dst": "scripts/build_synth_only.tcl",
       "src": "D:/FPGA/prj/project_11/scripts/build_synth_only.tcl",
-      "sha256": "c47f73fb377044c26e77b0b92246145fdf881079c2282d5d5e797671be4f0e6a",
+      "sha256": "e011bf3c4b2edd2b24585f40f0b1a457b81ae04b8f8a78c7a14f5b0337a07516",
       "src_sha256": "96691c9831fe547cf83adccfe2b5a88f6fc201696ca7aaedacb307dcc4a8ddbf",
       "status": "modified"
+    },
+    {
+      "dst": "scripts/burn_bit_vivado.tcl",
+      "src": "D:/FPGA/prj/project_11/scripts/burn_bit_vivado.tcl",
+      "sha256": "7227084057c6784ced734015cb1379053091d523914c118737ce7a4037bcb243",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "scripts/burn_one.tcl",
+      "src": "D:/FPGA/prj/project_11/scripts/burn_one.tcl",
+      "sha256": "aa11747124230e3edafa8f45f57243872f23da367c612864e06a2915a2e02c40",
+      "status": "prj12_only"
     },
     {
       "dst": "scripts/create_bd_b.tcl",
@@ -548,21 +566,27 @@
       "status": "modified"
     },
     {
-      "dst": "scripts/make_fork_manifest.py",
-      "src": "D:/FPGA/prj/project_11/scripts/make_fork_manifest.py",
-      "sha256": "397aa022c46d1bdf661890d25fff0bf7de5ba07daebf4e19662ed5e1c81ef4ce",
+      "dst": "scripts/ila_capture.tcl",
+      "src": "D:/FPGA/prj/project_11/scripts/ila_capture.tcl",
+      "sha256": "c56ddf5d596b6b4fb4db9d3f069b3aabb97343344d6f021ad5dcef28cf920809",
       "status": "prj12_only"
     },
     {
-      "dst": "scripts/probes_prj11_ref.ltx",
-      "src": "D:/FPGA/prj/project_11/scripts/probes_prj11_ref.ltx",
-      "sha256": "2f8af49895396ebd33d08389ede1bc2158dba83d2398b1b8a4ae350b34baf686",
+      "dst": "scripts/make_fork_manifest.py",
+      "src": "D:/FPGA/prj/project_11/scripts/make_fork_manifest.py",
+      "sha256": "133e56544f51cd834d6e25625f2deaf8b6e08f6c3594cf63dbe8deecfac36bed",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "scripts/p12_build_report.py",
+      "src": "D:/FPGA/prj/project_11/scripts/p12_build_report.py",
+      "sha256": "f7698bebc80b0db35ce537906b7a49bdbacaaf74fd52e025002d57721df5e844",
       "status": "prj12_only"
     },
     {
       "dst": "scripts/run_vivado_batch.ps1",
       "src": "D:/FPGA/prj/project_11/scripts/run_vivado_batch.ps1",
-      "sha256": "5f7e018c90c504e17d8d5544e7428392a170083bc4b0f75d44ac69776e269ffa",
+      "sha256": "5971f5e713322a211b4e1481266c6ccfc4931679baf38c9a7102234cb733f306",
       "status": "prj12_only"
     },
     {
@@ -648,6 +672,30 @@
       "sha256": "fce594525b264001819f2c2f2efeb4cf8ae4183f73acccfb7724f011de35730f",
       "src_sha256": "fce594525b264001819f2c2f2efeb4cf8ae4183f73acccfb7724f011de35730f",
       "status": "identical"
+    },
+    {
+      "dst": "docs/P1_单核观测与ILA清单_2026-10-24.md",
+      "src": "D:/FPGA/prj/project_11/docs/P1_单核观测与ILA清单_2026-10-24.md",
+      "sha256": "4381679b88cbb9a000c729b81f61c9ba1983510390ea6d026d24ac2dc48c6cf7",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "docs/P1_双板上板执行单_2026-10-24.md",
+      "src": "D:/FPGA/prj/project_11/docs/P1_双板上板执行单_2026-10-24.md",
+      "sha256": "35ad2039a7fc02d58779c4a264f2afee1ba7b49665d1b81b1e6905a4d24eedc1",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "docs/P2_候选设计_透明转发_2026-10-24.md",
+      "src": "D:/FPGA/prj/project_11/docs/P2_候选设计_透明转发_2026-10-24.md",
+      "sha256": "67d3e9d416d8946fadded971890249ad2d4247ea9aaa2a1b64d39128f56b7da4",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "docs/构建报告_P1位流_2026-10-24.md",
+      "src": "D:/FPGA/prj/project_11/docs/构建报告_P1位流_2026-10-24.md",
+      "sha256": "a6c1adc3b2dd5d85f971f00aa38a3b109b6146b74dfced40ef7107578a7e62b5",
+      "status": "prj12_only"
     }
   ]
 }

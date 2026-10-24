@@ -35,7 +35,12 @@ route_design       -directive NoTimingRelaxation
 phys_opt_design    -directive AggressiveExplore
 phys_opt_design    -directive Explore
 
-set wns [get_property SLACK [get_timing_paths -delay_type min_max -max_paths 1 -sort_by slack]]
+# ★2026-10-24 实测纠错: 原先写 `-delay_type min_max -max_paths 1 -sort_by slack`,
+#   它返回 setup+hold 里**最差的那条路径**（本例是 hold 0.004），于是日志把 WNS 打成
+#   0.004，而 report_timing_summary 的真实 WNS 是 +0.032。门限结论不变（都 ≥0），
+#   但口径错了 => setup 用 -delay_type max、hold 用 -delay_type min；
+#   对外报告一律以 rpt_impl_timing_summary.rpt 的 Design Timing Summary 为准。
+set wns [get_property SLACK [get_timing_paths -delay_type max -max_paths 1 -sort_by slack]]
 set whs [get_property SLACK [get_timing_paths -delay_type min -max_paths 1 -sort_by slack]]
 puts "IMPL_GATE: directive=$directive WNS=$wns WHS=$whs"
 

@@ -86,9 +86,10 @@ function Step-Burn {
     Say "---- STEP 2: burn both boards ----"
     $burn = Join-Path $Root 'out\twin_burn.ps1'
     $extra = if ($dry) { '' } else { ' -Run' }
-    Say "CMD: powershell -NoProfile -ExecutionPolicy Bypass -File $burn -Board Both$extra"
+    Say "CMD: powershell -NoProfile -ExecutionPolicy Bypass -File $burn -Board Both -Config $Config$extra"
     if (-not $dry) {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $burn -Board Both -Run | ForEach-Object { Say $_ }
+        # 注意：必须把 -Config 透传下去，否则换了 config 的现场会烧到默认配置那两块板
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $burn -Board Both -Config $Config -Run | ForEach-Object { Say $_ }
         if ($LASTEXITCODE -ne 0) { Log-Fail "twin_burn 失败（见 out\burn_*.console.log）" }
     }
 }

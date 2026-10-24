@@ -127,3 +127,10 @@ tmp_*/
 prj/project_12/out/*.pcap
 prj/project_12/out/evidence_*/
 prj/project_12/p2_candidate/*.done
+
+# ===== prj12 构建过程状态文件（每次构建覆盖，过程记录见构建报告）=====
+prj/project_12/out/*.ok
+prj/project_12/out/*.done
+prj/project_12/out/build_status.txt
+prj/project_12/out/*.pid
+prj/project_12/out/*.console.log.err
