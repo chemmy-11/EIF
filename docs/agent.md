@@ -1,16 +1,19 @@
 # agent.md — 会话入口（本目录 = 毕设文档目录）
 
 > 给从本目录启动的 AI 开发会话作第一页：目录定位、工程位置、规矩速览、当前状态。
-> 工程规范权威版本 = `D:\FPGA\AGENTS.md`；本文件与它冲突时，以 AGENTS.md 为准并回改本文件。
+> 工程规范权威版本 = `D:\FPGA\AGENTS.md`（EIF 工程仓）；**A/B 协同与最终交付仓** = 私有 `chemmy-11/GSnFPipe-FPGA-PP`（本地 `D:\GSnFPipe-FPGA-PP`），其规则以该仓 `CONTRIBUTING.md` 为准。
 > 状态提示：**路线 A（prj10）冻结、路线 B（prj11）已于 2026-10-19 全量收口**；最新发布见「30 秒导航」的 Release 行，当前入口见下方「30 秒导航」。
+> **仓库分工（2026-10-26 起）**：`D:\FPGA`（EIF）= 工程源码/历史仓，**不是**最终交付物；`D:\GSnFPipe-FPGA-PP` = **A/B 协同 + 最终交付仓**（issue 任务板 + docs/fpga/pp/config/tests/results/acceptance）；本目录 = 文档库。
 
 ## ★ 场景路由表（2026-10-24 新增，新会话先看这张表）
 
 | 场景（我手上是什么） | 去哪 / 用什么 | 需要 vivado-mcp？ |
 |---|---|---|
-| 找当前入口、今天该干什么 | 本文件「30 秒导航」+ `追踪_cross_短期待办_2026-10-10.md` | 否 |
+| 找当前入口、今天该干什么 | 本文件「30 秒导航」+ **`规划_cross_短期推进计划_2026-10-24.md`（唯一现行计划/状态载体）** | 否 |
+| **A/B 协同、任务看板、最终交付** | **`D:\GSnFPipe-FPGA-PP`**（私有 GitHub `chemmy-11/GSnFPipe-FPGA-PP`）；**issue = 共享任务清单**；规则见该仓 `CONTRIBUTING.md` | 否 |
+| **同门装环境（一键获得同款工具链）** | kit 仓库 `github.com/chemmy-11/dsh-vivado`（本地 `D:\dsh-vivado`）；安装/体检见 `doctor.ps1`；过程记录 [[调试记录/结论_cross_dsh-vivado插件包分发_2026-10-24]] | 否 |
 | 工程规范全文 / 依据等级 / 红线 | `D:\FPGA\AGENTS.md`（§6a 依据等级 · §九 坑索引 · §十二 CI） | 否 |
-| 报错 / 坑查账（#1–#70） | `D:\FPGA\PITFALLS.md` | 否 |
+| 报错 / 坑查账 | `D:\FPGA\PITFALLS.md`（**编号到几以该文件头为准，勿信本文件任何计数**） | 否 |
 | 综合/实现日志报错、`[Synth 8-XXXX]` | skill **`vivado-rtl-elaboration-analysis`**（读日志为主，不启动 Vivado） | 否 |
 | 综合前 RTL 体检（lint） | skill **`vivado-rtl-lint`** | 否 |
 | 跑仿真 / 排 XSim / 覆盖率 / 波形 | skill **`vivado-simulate-rtl`** | 建议（`run_tcl`） |
@@ -26,14 +29,15 @@
 
 - 32 个 Vivado MCP 工具（`mcp__vivado__run_tcl` / `start_session` / `run_synthesis` …）**不再全局挂载**，改为随 **`Vivado` 预设**走：**只有新建会话时选了 `Vivado` 预设，才有这些工具 + Vivado 纪律 persona**；默认 `standard` 预设会话一个 `mcp__vivado__*` 都没有。
 - 取舍：每请求省 ≈8k tokens 的工具定义；代价是**忘了切预设就没有 Vivado 工具**。遇到「工具不见」先查会话预设，再用 CLI 桥兜底（`py D:\vivado-mcp\mcp_ctl.py list|call`）。
-- 预设声明在 bundle `@local/dsh-vivado-preset`（源码 `毕设\.dsh\bundles\vivado-preset\`），装进 `~/.dsh/profiles/desktop`；改它要重启宿主才生效（`dsh-hmr` 在 Electron 下不生效）。
+- 预设与技能由 **dsh-vivado kit** 提供（源码 `D:\dsh-vivado\`，随 `Vivado` 预设装进 profile；改预设/技能后要重启宿主才生效，`dsh-hmr` 在 Electron 下不生效）。
 
 ## 目录定位
 
 | 路径 | 角色 |
 |---|---|
 | `C:\Users\***\Desktop\毕设\`（本目录） | 毕设文档目录：任务清单、路线图、操作文档、汇报、归档 |
-| `D:\FPGA\` | FPGA 工程目录（git 管理，远端 chemmy-11/EIF）：project_1~9、官方例程留档、docs 快照。开发主战场 |
+| `D:\FPGA\` | **EIF 工程源码/历史仓**（git 管理，远端 `chemmy-11/EIF`）：prj/project_1~11、官方例程留档、docs 快照；**工程实现主战场，但不是最终交付仓** |
+| `D:\GSnFPipe-FPGA-PP\` | **A/B 协同 + 最终交付仓**（私有 GitHub `chemmy-11/GSnFPipe-FPGA-PP`）：docs/fpga/pp/config/tests/results/acceptance；issue 是共享任务清单；B 组 v1.1 在 `docs/B组/` |
 | `D:\BaiduNetdiskDownload\1_Verilog\KU060例程\` | 正点原子 KU060 官方例程源码库（56 章，GBK 编码）。事实源最高层 |
 
 多会话协同由用户自行编排（按需加载技能），无固定分工契约。
@@ -44,13 +48,14 @@
 |---|---|
 | **工程规范全文**（权威） | `D:\FPGA\AGENTS.md`；文件头有「目录（30 秒导航）」，覆盖 §一～§十二 |
 | **结论依据等级制度**（L0–L4 + 6 条硬规则） | AGENTS.md **§6a**；速览表见本文件下文「结论依据等级制度」节 |
-| **坑账本**（#1–#68（截至 2026-10-19），踩过的坑与修法） | `PITFALLS.md`（全文，仓库根）+ AGENTS.md **§九**（索引） |
+| **坑账本**（踩过的坑与修法，**编号以 `PITFALLS.md` 文件头为准**） | `PITFALLS.md`（全文，仓库根）+ AGENTS.md **§九**（索引） |
 | **外部 AI 技能 / 官方文档检索**（2026-10-18 新增） | 本文件「★ 外部 AI 技能与官方文档检索」节；细节 `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18`；AGENTS.md **§6b** |
-| **当前入口（新对话从这里开始）** | **当前周期**：`规划_cross_短期推进计划_2026-10-24.md`（对齐 + prj12 离线）→ `操作文档/阶段三_prj12_双板互联开工草案_2026-10-24.md`（P0/P1/P2）→ 对齐包 `汇报/对齐_cross_GSnFPipe方案_2026-10-23/`；**已收口基线**：`调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十九–§二十二、复现 `复现/复现_prj11_指南_2026-10-19.md`；剩余清单 `操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md` §七/§八 |
+| **当前入口（新对话从这里开始）** | **当前周期**：`规划_cross_短期推进计划_2026-10-24.md`（对齐 + prj12 离线）→ `操作文档/阶段三_prj12_双板互联开工草案_2026-10-24.md`（P0/P1/P2）→ 对齐包 `汇报/对齐_cross_GSnFPipe方案_2026-10-23/`；**协作/交付仓** `D:\GSnFPipe-FPGA-PP`（issue 任务板）；**已收口基线**：`调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十九–§二十二、复现 `复现/复现_prj11_指南_2026-10-19.md`；剩余清单 `操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md` §七/§八 |
+| **A/B 协作 / 最终交付仓库** | `D:\GSnFPipe-FPGA-PP`（私有 GitHub `chemmy-11/GSnFPipe-FPGA-PP`）；issue = 任务清单，`CONTRIBUTING.md` = 贡献规则；结构 docs/fpga/pp/config/tests/results/acceptance；**与 EIF 工程仓分开** |
 | **最新发布（Release）** | prj11 路线 B 收口（2026-10-19）— <https://github.com/chemmy-11/EIF/releases/tag/prj11-routeB-closed-2026-10-19> |
 | **已完成工作说明（补充材料）** | `汇报/导览_cross_已完成工作说明_2026-10-22.md`（vault）；GitHub 镜像 `docs/导览_cross_已完成工作说明_2026-10-22.md`（路线 A/B 均已收口） |
 | **当前工程状态**（一屏速览） | AGENTS.md **§十** |
-| **CI 与远程仓库规范**（6 项检查 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
+| **CI 与远程仓库规范**（检查项以 `ci_check.py` 输出为准，2026-10-24 起 12 项 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
 | **文档索引与命名规范** | `D:\FPGA\docs\README.md`（全量索引，CI 第 6 项强制与磁盘一致） |
 | **仓库入口：关键文档 / 提交文档规则** | `D:\FPGA\README.md` 的「关键文档」「提交文档」两节 |
 
@@ -66,23 +71,25 @@
 - **CI 门禁（2026-10-24 起，`ci_check.py` 第 11 项 `check_mirror_gate`；第 7 项是 `check_skills_manifest`，勿混）**：存在 vault 时逐文件比对 `docs/**/*.md` ↔ vault 对应文件，**先归一（两侧 `***`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节**；归一后仍不等、或 docs 独有而 vault 没有 → 必须在 `D:\FPGA\scripts\mirror_allowlist.json` 登记（每项带可复核理由），否则 **CI FAIL**。现状：83 篇 = 归一相等 **75** + 白名单 **8**（drift 2 / docs-only 6），未登记不一致 **0**（2026-10-24 二次收口：7 条纯目录改名漂移按最小编辑 resync 进 docs 并删除登记，白名单 15→8；剩余 drift 2 = `README.md` 定位差异 + `追踪_cross_短期待办_2026-10-10.md` 有意去链接）。
 - 白名单不是垃圾桶：新增条目要写清**为什么**不等（脱敏未覆盖 / vault 目录改名 / 内容新旧 / docs 独有），写「历史遗留」视为无效理由（门禁自身会校验 reason 非空）。
 
-## 文档地图（本目录）
+## 文档地图（本目录；2026-10-26 归位后）
 
 | 条目 | 内容 |
 |---|---|
-| `追踪_cross_短期待办_2026-10-10.md` | 任务清单与里程碑（当前任务的水位线）|
-| `结论_cross_Vivado环境DSH规范化_2026-10-24.md` | **本轮三件套验收**（Vivado 预设 / 技能清单+门禁 / 镜像门禁）：逐条 PASS/FAIL、变更清单、回退步骤 |
-| `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` | **路线 B 收口记录（新对话第一份读）**：全过程/判据/速率/重审，§十九–§二十二 为收口结论 |
-| `参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18.md` | 官方 AI 技能与文档检索：接入、调用、2023.1 待实测（2026-10-18）|
-| `规划_cross_长期路线图_2026-09-04.md` | 长期路线与决策记录 |
-| `操作文档/` | **操作开发类**（照着做）：实操单 / 实施单 / 开工开发文档 / 前置清单 / 验证单 / 作战卡（命名 `[阶段]_prj标识_概要_日期`）；`操作文档/挂起/` 为挂起课题收纳区（状态轴）|
-| `调试记录/` | **调试记录类**（看结果）：调试记录 / 执行记录 / 测试报告 / 独立复核 / 复现记录。**两类分开存放，判据见 README「存放规则」** |
-| `汇报/` | 组会汇报（md/pptx/pdf）|
-| `8.3/` | 导师会议纪要、任务分工、论文拆解、基线工程资料 |
-| `毕设方向与论文大纲/` | 课题定位与论文大纲 |
-| `笔记和开发指南/` | 板卡手册研读笔记 |
+| `规划_cross_短期推进计划_2026-10-24.md` | **★ 唯一"现在"载体**（现行计划与状态；每周期滚动换文件）|
+| `规划_cross_长期路线图_2026-09-04.md` | 长期路线与决策记录（决策史，仍追加 #N）|
+| `追踪_cross_短期待办_2026-10-10.md` | **已退役**（头部横幅指现行规划），历史水位线仅供追溯 |
+| `调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` | **路线 B 收口记录**：全过程/判据/速率/重审，§十九–§二十二 为收口结论 |
+| `调试记录/结论_*` | 结论/核查类证据件（工具链核查、进度体检、文档体系审查等，2026-10-26 自根目录归位于此）|
+| `操作文档/阶段三_prj12_双板互联开工草案_2026-10-24.md` | prj12 双板互联开工单（P0/P1/P2；frontmatter 标 `里程碑: M1`）|
+| `操作文档/任务书_*`、`操作文档/参考_cross_AI工具链_*` | 任务书与工具参考（照着做类）|
+| `操作文档/` | **操作开发类**（照着做）：实操单 / 实施单 / 开工草案 / 验证单 / 任务书 / 参考；`挂起/` 为挂起课题收纳区 |
+| `调试记录/` | **调试记录类**（看结果）：调试记录 / 执行记录 / 测试报告 / 复现记录 / 结论 |
+| `复现/` | 一键复现指南（现行 `复现_prj11_指南_2026-10-19.md`）|
+| `汇报/` | 组会汇报 + 导览 + GSnFPipe 方案对齐包 |
+| `GSnFPipe系统设计与指导文档/` | 导师三份 v1.0 原件（不改名）+ B组 v1.1 + AI Infra 设计报告 |
+| `8.3/`、`毕设方向与论文大纲/`、`笔记和开发指南/` | **已打包待移出**（2026-10-26，桌面 zip 已备）|
+| `归档/` | 旧版文档 + 已收编暗目录（`Agent 协作/`、`_aurora_ref/`、`.ross-recon/`、`面试证据包/`、`ppt_build/` 等）|
 | `截图归档/` | 上板截图 |
-| `Agent 协作/` | **历史归档**（旧协作契约，2026-09-20 废弃，仅供追溯）|
 
 ## 红线速览（全量见 AGENTS.md）
 
@@ -136,7 +143,7 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 - **prj11 主线工具入口**：判据 `D:\FPGA\prj\project_11\out\r2_board.ps1`（S0–S11；工具 README `R2_tools_README.md`）；PC 侧 TX 判别 `out\r2_tx_probe.ps1`；ILA 抓取 `out\r2_ilacap.tcl` 与 `out\evidence_2026-10-18\tools\r2_ila5_capture.tcl`。
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
 - **配套工具 `vivado-mcp`（已随仓库入库）**：MCP 服务，**32 个工具**——会话/Tcl/工程/流程/报告/诊断/CDC/位流探针/IP/波形十类；其中 `parse_xpr`·`parse_bit_header`·`parse_ltx`·`xdc_lint` 为**离线工具**（不启 Vivado）。**上游 = [mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26（Apache-2.0，LICENSE 已随源码入库）**——本仓库副本**零代码改动**、仅目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 平铺入包内；逐字节比对 52 同 / 0 改）。上游基准 **Vivado 2019**，本项目 **2023.1**：离线工具与 Vivado 会话实测可用；**`compare_xci` 不可用**（上游按 XML 版 xci 设计，本项目 2023.1 的 xci 全为 JSON 版）。 仓库内为**可移植副本**（`D:\FPGA\vivado-mcp\`，零本机配置），安装与清单见 `vivado-mcp/README.md`。⚠️ **与下条「工具纪律」里的本机 CLI 壳是两回事**：那层壳是开发者本地设施、不入库。两条硬约束：安装路径必须**纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；Vivado 会话与综合/实现/仿真**全局串行**。
-- **AI 技能与官方文档检索（2026-10-18 新增）**：项目级技能 `毕设\.dsh\skills\`（7 个，**仅本工作区可见**；全局 `~/.agents/skills` 不放 Vivado 技能）；官方文档检索 hosted `amd-doc-search`（MCP 已配置在 DSH web profile，**重启 `dsh web` 后生效**；未重启时用项目桥 `py 毕设\.dsh\skills\amd-doc-search\doc_search.py "<query>"`）。调用与引用纪律见下节。
+- **AI 技能与官方文档检索**：技能实体随 dsh-vivado kit（`D:\dsh-vivado\skills\`，8 个，仅 `Vivado` 预设会话可见）；本工作区 `.dsh\skills\` 只留 MANIFEST 快照；文档检索桥 `py D:\dsh-vivado\skills\amd-doc-search\doc_search.py "<query>"`（DSH web profile 的原生 MCP 见下节）。ZCode 侧另有实体副本 `毕设\.zcode\skills\`（8 技能，改技能后手动重拷）。调用与引用纪律见下节。
 
 ## ★ 外部 AI 技能与官方文档检索（2026-10-18 新增）
 
@@ -163,7 +170,9 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 - **执行层不变**：技能只是知识与流程；官方 skill 里的 `vivadoExecute`/`vivado_start`/`vivado_doc_search` 按技能顶部「本机适配注记」映射到本工程 `run_tcl`/`start_session`/`mcp_ctl.py` CLI 桥。只读日志分析**不启动 Vivado、不占全局串行锁**；原始日志先复制到 C: 侧副本再解析。
 - **细节**：[[参考_cross_AI工具链_AMD官方skill与知识库_2026-10-18]]；坑账本 #62–#64；2023.1 适配待实测项见该文档 §6。
 
-## 当前状态（2026-10-22 更新；主线 = 路线 B 已收口）
+## 当前状态（2026-10-26 起：本节降级为指针，不再维护状态明细）
+
+> **状态唯一化**：现行状态与计划 = `规划_cross_短期推进计划_2026-10-24.md`（唯一权威，随周期滚动）；里程碑全表 = 本目录 `README.md`「里程碑索引表」（只追加不改旧行）；EIF 仓工程状态 = `AGENTS.md` §十。历史状态（≤2026-10-19 路线 A/B 收口记录）见下节。
 
 - ✅ **路线 B（prj11）已全量收口（2026-10-19）**：round3d 位流 `F6012BA0`（WNS +0.002）+ 固件 `BA3C0220`；S0–S11 **13/13 PASS**；四档 / 10MB 100%+SHA / J3 四链 / 双桥对账全过；R3 速率：1466B 可持续 2000fps 零丢、上限≈2560fps；R4 文档收口完成（复现指南 / 探针清单 / 归档索引 0 缺失）。
 - 🧪 **演示固件（2026-10-22，非验收件）**：`B6D3F7B1` 在 `BA3C0220` 同源上仅增串口 `Q`（一行汇总：mode/wr/rd/drop/s2sr 解码/fault/末帧槽长）与 `?`（速查），位流 `F6012BA0` 不变；归档 `prj/project_11/out/archive/fw_q_2026-10-22/`（J3 M/A/B 逐轮 + 四档 UDP 日志）。正式证据仍以 `BA3C0220` 为准。
