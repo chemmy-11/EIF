@@ -7,7 +7,10 @@
   2. 相对链接可解析  所有 Markdown 里的相对链接与图片必须指向真实存在的文件
   3. Python 语法    仓库内全部 .py 可编译
   4. .ps1 编码      仓库内全部 .ps1 必须带 UTF-8 BOM（坑账本 #17/#18）
-  5. Tcl 可解析     仓库内全部 .tcl 可被 tclsh 解析（无 tclsh 时跳过）
+  5. Tcl 可解析     仓库内全部 .tcl 可被 Tcl 解释器解析。解释器探测顺序：
+                    PATH 上的 `tclsh` → Vivado 自带的 `bin/unwrapped/win64.o/tclsh*.exe`
+                    （2026-10-25 起；之前直接判 `tclsh` 不在 PATH 就永久跳过，而 Vivado
+                    2023.1 自带 8.5.14，与工具内解释器同版本）；两者都没有才跳过。
   6. 索引一致性     docs/README.md 索引须覆盖 docs/ 下全部 .md 且不列不存在的文件
                     （2026-10-17 增补；口径 = 除 docs/README.md 自身外全部 .md，含 agent.md）
 
@@ -46,6 +49,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +67,9 @@ def tracked_files() -> list[Path]:
 
     -c core.quotepath=false 必须带：默认 git 会把非 ASCII 文件名输出成八进制转义串
     （docs/\350\247\204...），Path 解析不到 ⇒ 全部中文名文件会被静默跳过检查（坑账本 #46）。
+    - encoding="utf-8" 也必须带（2026-10-25 修）：`text=True` 在中文 Windows 上按 GBK 解码
+    git 的 UTF-8 输出，遇到 0xA8 之类字节直接抛 UnicodeDecodeError，异常被吞后**退回全盘 rglob**
+    （实测：应扫 2730 个已跟踪文件，实际扫了 17969 个，含未跟踪文件与 .gitignore 项）。
     """
     try:
         out = subprocess.run(
@@ -70,6 +77,8 @@ def tracked_files() -> list[Path]:
             cwd=ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         ).stdout
         return [ROOT / p for p in out.splitlines() if p.strip()]
@@ -166,18 +175,90 @@ def check_ps1_bom(files: list[Path]) -> None:
 
 
 # ---------- 5. Tcl 可解析 ----------
+def tclsh_candidates() -> list[tuple[Path, Path | None]]:
+    """(解释器, Vivado 根) 候选，按优先级排列；Vivado 根为 None 表示无需补环境。
+
+    为什么要探测 Vivado 自带解释器（2026-10-25）：`tclsh` 不在 PATH 时旧实现直接 SKIP，
+    于是第 5 项永远是「跳过」；而 Vivado 2023.1 自带 `bin\\unwrapped\\win64.o\\tclsh85t.exe`，
+    就是工具内那个 8.5.14。直接调它会 0xC0000135（缺 DLL），所以同时返回 Vivado 根，
+    由调用方补 PATH=<root>\\lib\\win64.o 与 TCL_LIBRARY=<root>\\tps\\tcl\\tcl8.5。
+    """
+    out: list[tuple[Path, Path | None]] = []
+    which = shutil.which("tclsh") or shutil.which("tclsh85") or shutil.which("tclsh86")
+    if which:
+        out.append((Path(which), None))
+    roots: list[Path] = []
+    xilinx_vivado = os.environ.get("XILINX_VIVADO", "").strip()
+    if xilinx_vivado and Path(xilinx_vivado).is_dir():
+        roots.append(Path(xilinx_vivado))
+    for base in (Path("D:/Xilinx/Vivado"), Path("C:/Xilinx/Vivado"), Path("E:/Xilinx/Vivado")):
+        if not base.is_dir():
+            continue
+        versions = [p for p in base.iterdir() if p.is_dir()]
+        versions.sort(key=lambda p: p.name, reverse=True)
+        roots.extend(versions)
+    for root in roots:
+        for sub in ("bin/unwrapped/win64.o", "bin/unwrapped/win64", "bin"):
+            d = root / sub
+            if not d.is_dir():
+                continue
+            for exe in sorted(d.glob("tclsh*.exe")):
+                out.append((exe, root))
+    return out
+
+
+def tcl_env_for(root: Path | None) -> dict[str, str]:
+    """给自带 tclsh 用的环境：PATH 补 lib\\win64.o，TCL_LIBRARY 补 tps\\tcl\\tcl8.5。"""
+    env = dict(os.environ)
+    if root is None:
+        return env
+    lib = root / "lib" / "win64.o"
+    if lib.is_dir():
+        env["PATH"] = str(lib) + os.pathsep + env.get("PATH", "")
+    tcl_parent = root / "tps" / "tcl"
+    tcl_lib = tcl_parent / "tcl8.5"
+    if not tcl_lib.is_dir() and tcl_parent.is_dir():
+        names = sorted((p for p in tcl_parent.iterdir() if p.is_dir() and p.name.startswith("tcl")),
+                       key=lambda p: p.name, reverse=True)
+        if names:
+            tcl_lib = names[0]
+    if tcl_lib.is_dir():
+        env["TCL_LIBRARY"] = str(tcl_lib)
+    return env
+
+
 def check_tcl(files: list[Path]) -> None:
-    try:
-        subprocess.run(["tclsh", "<<exit>>"], capture_output=True, check=True, text=True)
-    except Exception:
-        SKIPS.append("tclsh 不可用，跳过 Tcl 语法检查")
+    targets = [f for f in files if f.suffix == ".tcl" and f.exists()]
+    if not targets:
+        return
+    tclsh: Path | None = None
+    tcl_env: dict[str, str] = dict(os.environ)
+    tried: list[str] = []
+    for exe, root in tclsh_candidates():
+        probe_env = tcl_env_for(root)
+        try:
+            # `input=exit 0` 才是有效探针：旧实现跑 `tclsh "<<exit>>"`，任何存在的 tclsh 都会
+            # 因读不到这个「文件」而非 0 退出，于是 check=True 抛异常 ⇒ 永远 SKIP。
+            probe = subprocess.run([str(exe)], input="exit 0\n", capture_output=True,
+                                   text=True, encoding="utf-8", errors="replace",
+                                   env=probe_env, timeout=60)
+        except Exception as exc:  # noqa: BLE001 - 探测失败就换下一个候选
+            tried.append(f"{exe}: {exc.__class__.__name__}")
+            continue
+        if probe.returncode != 0:
+            tried.append(f"{exe}: exit {probe.returncode}")
+            continue
+        tclsh, tcl_env = exe, probe_env
+        break
+    if tclsh is None:
+        detail = ("；已探测失败：" + "，".join(tried[:3])) if tried else ""
+        SKIPS.append(f"tclsh 不可用（PATH 与 Vivado 自带 tclsh 都没探到）：跳过 Tcl 语法检查{detail}")
         return
     bad = []
-    for f in files:
-        if f.suffix != ".tcl" or not f.exists():
-            continue
+    for f in targets:
         script = f'if {{![info complete [read [open {{{f.as_posix()}}} r]]]}} {{exit 1}}'
-        r = subprocess.run(["tclsh"], input=script, capture_output=True, text=True)
+        r = subprocess.run([str(tclsh)], input=script, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", env=tcl_env, timeout=120)
         if r.returncode != 0:
             bad.append(f.relative_to(ROOT).as_posix())
     if bad:

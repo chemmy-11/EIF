@@ -2,13 +2,14 @@
 
 > 执行：DSH Team（lead + `ps-skills` / `ps-docs` / `ps-installer` / `ps-doctor`），2026-10-24 16:15–17:0x（Asia/Shanghai）
 > 需求来源：`任务书_dsh-vivado插件包分发_2026-10-24.md`；前序证据：`结论_cross_Vivado环境DSH规范化_2026-10-24.md`（预设三门禁已过）
-> 交付形态：**已开源：`https://github.com/chemmy-11/dsh-vivado`（public，main @ `0fe9ad3`）**，本地工作副本 `D:\dsh-vivado\`
+> 交付形态：**已开源：`https://github.com/chemmy-11/dsh-vivado`（public，main @ `7ea435e`）**，本地工作副本 `D:\dsh-vivado\`
 > 本地已装：**live desktop profile 已从旧手工 bundle 迁到本包并在真实会话中验证通过**（32 MCP / 98 总工具 / 新 persona / 自研技能可见），重启后更彻底
 > 许可：自有内容 **MIT**（© 2026 chemmy-11）；第三方 carve-out 见 `NOTICE` §3.0；GitHub 已识别 `spdx_id=MIT`
 > 徽章：powered-by-dsh 官方徽章 + Vivado 2023.1 tested + 2025.2+ unverified + MCP 32 + platform + MIT（README 顶部，6 个均 HTTP 200 实测）
 > 包名：**`dsh-vivado`**（聚合包 = 会话预设 + MCP 工具 + 技能，不是「preset 包」；后续可继续加工具/技能）
 > 规模：673 文件 / 1.84 MB（其中随包技能 645 文件 / 1.43 MB）；`D:\FPGA\dist\` 已撤除，EIF 仓库工作树干净
 > 纪律：未打包 Vivado 本体/许可证；未改 `D:\vivado-mcp\site`；未在用 desktop profile 上安装（全部验收在隔离 `DSH_HOME`）；`D:\FPGA` 未 commit（提交命令见 §8）；未删任何项目文件。
+> **2026-10-25 追加**：kit 升 **0.1.1** —— 按《实战问题与改进》落地 P0×3/技能×2/CI×1，并**解除对第三方 shell（`win_bash`）的依赖**；详见 §4.9，提交 `7ea435e`。
 
 ---
 
@@ -79,6 +80,8 @@
 ## 3. 验收（每条都真跑过，命令与输出可复现）
 
 ### 3.1 Lead 独立验收：**49/49 断言通过**
+
+> 2026-10-25 追加：矩阵已扩到 **50 条**（静态组新增"启动件在场且纯 ASCII"），最新结果见 §4.9。
 
 脚本 `D:\FPGA\.tmp\kit-recon-2026-10-24\accept_all.py`（不复用队友测试，直接驱动交付件，探针 `DSH_HOME=C:\Users\***\dshprobe-accept`）。
 **两轮都跑**：① 仓库工作副本；② **从 GitHub 全新 clone 出来的副本**（`--kit <clone>`）——两轮均 49/49，证明「推上去的东西」本身可装可用：
@@ -308,6 +311,34 @@ MANIFEST 作为冻结快照保留，检查 12 仍有效」；`docs/agent.md` 重
 
 ---
 
+## 4.9 实战问题清单落地（2026-10-25，kit 0.1.1）
+
+依据：`结论_cross_dsh-vivado实战问题与改进_2026-10-25.md`（16 条实测问题 / 13 条建议）。
+本轮裁决变化：**不再适配第三方 shell 插件**（`@linxin666/dsh-win-bash` 已在本机禁用，别人环境也不一定有），
+改为只用会话里真实存在的官方 `pwsh` / `bash`；`win_bash` 一类只作为可选加速件提及，缺失时不得改变计划。
+
+| 改了什么 | 落到哪 | 验证 |
+|---|---|---|
+| persona 解除第三方 shell 依赖 + 启动矩阵 / 成功判据 / 脱离式长构建 / 操作→工具决策表 / 报告交叉核对 | `templates/persona/{2023.1,2025.2plus}.frag.yml`（两档同步） | 两档渲染 + `validate_patch.py --tier` PASS；新增 `PERSONA_FORBIDDEN` 断言禁止回退 |
+| 三个运行辅助脚本 + 构建标记行 | `tools/vivado-probe.ps1`、`tools/vivado-run.ps1`、`tools/tcl-check.ps1`、`templates/build-markers.tcl` | 真机：probe `PROBE_RESULT=OK`；run(wait) `RUN_EXIT=0`；run(-Detach) 6 s 内 `BUILD_EXIT=0`；tcl-check 7/7 PASS |
+| 包装器三处坑（WinPS 5.1 `ExitCode=$null` / 批处理缺 `call` / `%DATE%` GBK） | `lib/common.ps1` | 见问题清单 §9.3（含最小对照实验） |
+| 32 工具清单与离线/会话依赖表 | 新增 `docs/tools.md` | 32 与 `doctor` 第 7 项一致 |
+| EIF CI 第 5 项从"永久 SKIP"变真门禁 | `D:\FPGA\scripts\ci_check.py` | 本地 `py scripts\ci_check.py` **PASS**（顺带修掉 `git ls-files` 的 GBK 解码回退：2730 → 17969 的假数） |
+| 工具链漂移会让 MCP 行静默消失 | `compatibility.json` 合并 `0.2.1-rc.3`（备份 `.bak-20261025`） | `doctor` 第 12 项 WARN → **PASS** |
+
+新增/加强的断言：`dev/validate_patch.py` 的 `PERSONA_PHRASES` 扩到 9 个必需短语 + `PERSONA_FORBIDDEN`
+（禁止 `is the shell for command work` / `fall back to \`win_bash\`` 回退）；`dev/accept_all.py` 静态组
+8 → 9 条（启动件在场且纯 ASCII），矩阵 **49 → 50**。
+
+验证汇总：`accept_all --only static` **9/9**；`install.ps1 -RenderOnly` 刷新 staging（688 文件，
+patch sha256 `53e6888461d3`）后 `validate_patch` PASS；`doctor.ps1` **11 PASS / 2 WARN / 0 FAIL**
+（WARN = 当前 shell cwd 是中文目录、未设 license 环境变量）。
+
+仍未做：vivado-mcp 侧 4 条 P1（`run_tcl_file`、`background`、`include_paths=false`、`xdc_lint`
+良性族分组）按"PR 优先、不做私有 fork"留待上游；`2025.2+` 档依旧零实测。
+
+---
+
 ## 5. 未做 / 限制（如实登记）
 
 | # | 事项 | 说明 |
@@ -378,6 +409,7 @@ kit 对系统**没有**其它写入：不改环境变量、不写注册表、不
 | 8 | `59f1fe4` | `docs: 补「更新/升级已装版本」流程` |
 | 9 | `0fe9ad3` | `feat(icon): 插件图标 + 中英显示元数据（Vivado 标志按 dsh 配色重上色）` |
 | 10 | `e1d7543` | `feat(dev): 端到端验收脚本搬进仓库 dev/ + 补「热重载后 MCP 子进程不重启」排错` |
+| 11 | `7ea435e` | `feat: 按实战问题清单改进 —— 解除第三方 shell 依赖，补启动/长构建/Tcl 门禁三件套`（21 文件 / +1038 −38，kit 0.1.1；见 §4.9） |
 
 - 仓库：`https://github.com/chemmy-11/dsh-vivado`（**public**，默认分支 `main`，license 被 GitHub 识别为 **MIT**，topics: dsh / dsh-bundle / vivado / fpga / amd / xilinx / mcp / agent-preset / agent-skills）
 - 匿名可达性：`git clone https://github.com/chemmy-11/dsh-vivado.git`（无密钥）实测成功；README 6 个徽章 URL 均 HTTP 200
@@ -385,6 +417,9 @@ kit 对系统**没有**其它写入：不改环境变量、不写注册表、不
 - 校验：`git ls-remote origin main` = `0a378ed…` = 本地 `HEAD`；随后**从远端全新 clone** 到 `C:\Users\***\dsh-vivado-clone`（测试后已删），在其上复跑：
   `make_template.py --check` PASS、`gen_skills_manifest.py --check` PASS、`render_patch.ps1` + `validate_patch.py` PASS、`doctor.ps1` 裸环境 7 PASS/6 WARN/0 FAIL（exit 0）、已装探针 12 PASS/1 WARN/0 FAIL、**完整验收 49/49**。
 - EIF 仓库（`D:\FPGA`）：未提交任何东西；`git status` 干净（`dist/` 已移出），`py scripts\ci_check.py` 仍 **PASS**。
+  > 2026-10-25 更新：本轮在 EIF 提了一条 `fix(ci)`（`scripts/ci_check.py` 第 5 项改真门禁 + `git ls-files` 解码修复、
+  > `AGENTS.md` 同步说明、两篇镜像文档随内容更新），此时 `git status` 干净、`ci_check.py` **PASS**；hash 见
+  > `git -C D:\FPGA log -1`（文档不记录自身提交的 hash，避免改一次写一次的循环）。
 
 > 下一轮拓展（加工具/技能）只需：往 `templates/preset.patch.yml.tmpl` 的插件行里加一条、或往 `skills/` 加目录，
 > 然后 `py tools/gen_skills_manifest.py` 重生成清单 + 跑 `py tools/make_template.py --check` 与 `accept_all.py`。

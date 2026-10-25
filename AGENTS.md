@@ -312,7 +312,8 @@ py scripts\ci_check.py        # 或 §三 记录的全路径解释器；退出�
 ### 远程 workflow 何时触发
 
 - **push 到 master** / **PR 目标 master** / 手动 `workflow_dispatch` 三种触发；运行于 ubuntu-latest + Python 3.12 + tclsh，**job 超时 15 分钟**。
-- 全程只用 **Python 标准库**，不安装任何第三方包；tclsh 仅供第 5 项使用，安装失败该项自动跳过（本地无 tclsh 同理，输出 `[跳过]`）。
+- 全程只用 **Python 标准库**，不安装任何第三方包；第 5 项的 Tcl 解释器探测顺序是 **`tclsh`（PATH）→ Vivado 自带 `bin\unwrapped\win64.o\tclsh*.exe`**（后者自动补 `PATH=<Vivado>\lib\win64.o` 与 `TCL_LIBRARY=<Vivado>\tps\tcl\tcl8.5`，否则报 `0xC0000135` 缺 DLL）；两者都没有才 `[跳过]`。
+  > 2026-10-25 修正：旧实现的探针是 `tclsh "<<exit>>"`，任何**存在**的 tclsh 都会因读不到这个「文件」而非 0 退出 ⇒ 永远 `[跳过]`。现在探针改为 `input="exit 0"`，并优先复用 Vivado 自带的 8.5.14（与工具内解释器同版本）。
 
 ### 失败时怎么定位
 

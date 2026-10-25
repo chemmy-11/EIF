@@ -4,7 +4,7 @@ type: 结论
 摘要: dsh-vivado（Vivado 预设 + vivado-mcp 32 工具 + 技能包）在 prj12 离线 P0 会话中的实测问题清单：进程启动层 6 条、会话/后台作业 3 条、MCP 覆盖度 6 条、技能与预设文本 3 条、仓库 CI 1 条；每条给命令/输出证据、影响与改进建议；另附本会话时间账
 created: 2026-10-25
 updated: 2026-10-25
-状态: 实测记录（2026-10-24 会话取证，2026-10-25 整理）；建议均未落地，供插件维护者取舍
+状态: 实测记录（2026-10-24 会话取证，2026-10-25 整理）；P0 三条 + 技能两条 + CI 一条已于 2026-10-25 落地（§9），vivado-mcp 侧建议仍待上游
 related: "[[结论_cross_dsh-vivado插件包分发_2026-10-24]] · [[操作文档/阶段三_prj12_双板互联开工草案_2026-10-24]] · [[规划_cross_短期推进计划_2026-10-24]]"
 ---
 
@@ -278,6 +278,8 @@ Hold   WHS = +0.004 ns   THS = 0.000 ns
 
 ### 6.1 可直接粘贴进 `Vivado` 预设 persona 的片段（`[建议]`，实测支撑见 §1–§2）
 
+> **已落地（2026-10-25）**：实际文本在 `dsh-vivado/templates/persona/2023.1.frag.yml` 与 `2025.2plus.frag.yml`（两档同步改），并去掉了对第三方 shell（`win_bash`）的依赖；落地与验证证据见 §9。
+
 ```text
 - Vivado 启动矩阵（2026-10-24 本机实测）：win_bash 里 `cmd //c vivado.bat` 会杀掉持久 bash；
   pwsh 里 `& vivado.bat` / `cmd /c "…" | Out-String` 会静默 exit=1 且零输出。
@@ -321,3 +323,54 @@ Hold   WHS = +0.004 ns   THS = 0.000 ns
 | 日期 | 变更 |
 |---|---|
 | 2026-10-25 | 建文：按 5 类（启动层/会话作业/MCP 覆盖度/技能文本/CI）整理 16 条实测问题 + 13 条改进建议 + 时间账 |
+| 2026-10-25 | 落地 §6 里属于本包与仓库 CI 的 6 条（P0×3、技能×2、CI×1），并解除对第三方 shell 插件的依赖；新增 §9 落地记录 |
+
+---
+
+## 9. 落地记录（2026-10-25）
+
+> 原则：只写**已经改进并验证**的项。`vivado-mcp` 侧 4 条（§6 P1）按「PR 优先、不做私有 fork」**未动**，仍等上游。
+> 本轮前提变化：作者环境里 `@linxin666/dsh-win-bash` 已禁用，且他人环境不一定有 —— 所以不再"适配第三方 shell"，改成**只用会话里真实存在的官方 `pwsh`/`bash`**。
+
+### 9.1 与 §6 清单的对应
+
+| §6 条目 | 落到哪 | 怎么验证的 |
+|---|---|---|
+| P0 启动配方（1.1–1.3） | persona 两档 + 新增 `tools/vivado-probe.ps1`、`tools/vivado-run.ps1` | 真机：`PROBE_RESULT=OK`（PROBE_EXIT=0 / TCL 8.5.14）；`RUN_RESULT=OK`（exit 0） |
+| P0 判据（1.2/1.6） | persona 两档 + `vivado-probe.ps1` 的 `PROBE_*` 契约 | 同一轮探针输出里 banner=yes、TCL_OK=yes、EXIT=0 三条同时成立才判 OK |
+| P0 长构建脱离（2.1–2.3） | `vivado-run.ps1 -Detach` + `templates/build-markers.tcl` + persona 纪律 | 真机 detach：`RUN_RESULT=LAUNCHED`，6 s 后状态文件出现 `BUILD_EXIT=0`，Vivado 计数 0 |
+| 1.5 轻量 Tcl 解释器 + 5.1 CI 门禁 | 新增 `tools/tcl-check.ps1`；EIF `scripts/ci_check.py` 第 5 项改探测顺序 | `tcl-check.ps1` 对 prj12 的 7 个 `.tcl`：7/7 `complete=1`、`TCLCHECK_RESULT=PASS`（Tcl 8.5.14） |
+| 2.3 `taskkill /T` 纪律 | persona 两档 + `docs/troubleshooting.md` §2.13 | 文本断言（见下） |
+| 3.4 报告 vs 即时查询交叉核对 | persona 两档 + 技能 §9 | 文本断言 |
+| 4.1 板卡不在场离线流程 | 技能 `vivado-workflow-discipline` §8 | 文本断言 |
+| 4.2 工具清单/离线依赖 | 新增 `docs/tools.md`（32 工具按签名分类） | 与 32 一致；分类依据写在文首 |
+| 4.3 操作→工具决策表 | persona 两档 + `docs/tools.md` §1 | 文本断言 |
+| **（本轮新增）第三方 shell 依赖** | persona 两档 + 4 处文档 | `dev/validate_patch.py` 新增 `PERSONA_FORBIDDEN`（`"is the shell for command work"`、`"fall back to \`win_bash\`"`）；两档 validate PASS |
+
+### 9.2 验证证据（2026-10-25 真机）
+
+| 门禁 | 结果 |
+|---|---|
+| `py tools\gen_skills_manifest.py --check` | PASS（8 技能，sha256 `f6372ec0…`） |
+| `py tools\make_template.py --check` | PASS（22 行、9 占位符、无个人路径） |
+| 两档渲染 + `dev\validate_patch.py --tier` | 2023.1 PASS（persona 25 行/7268 字符）、2025.2plus PASS（25 行/7093 字符） |
+| `dev\accept_all.py --only static` | **9/9 PASS**（新增「launcher assets present and ASCII-only」一条；矩阵 49→50） |
+| `tools\vivado-probe.ps1` | `PROBE_EXIT=0`、`PROBE_RESULT=OK`（Vivado 2023.1 / Tcl 8.5.14） |
+| `tools\vivado-run.ps1`（wait） | `RUN_EXIT=0`、`RUN_RESULT=OK`，状态文件 `BUILD_EXIT=0` |
+| `tools\vivado-run.ps1 -Detach` | `RUN_RESULT=LAUNCHED`，轮询 6 s 见 `BUILD_EXIT=0`，Vivado 计数 0 |
+| `tools\tcl-check.ps1 <prj12 scripts>` | `TCLCHECK_RESULT=PASS`（7/7） |
+
+### 9.3 这一轮**新踩到的坑**（都已写进代码注释/文档，别再踩）
+
+1. **WinPS 5.1 对 `.bat` 的 `Start-Process -PassThru` 拿不到 `ExitCode`**：Vivado 已正常 `Exiting`，`$proc.ExitCode` 仍是 `$null` ⇒ 按它判退出码会全错（第一版脚本就是这么判错的）。改法：生成 `.cmd` 包装器，让 cmd 自己把 `%ERRORLEVEL%` 写进 `build_status.txt` 再读回来。
+2. **批处理里不加 `call` 调用另一个 `.bat`，控制权不返回**：`vivado.bat` 末行是 `exit /b %errorlevel%`，包装器里直接 `"vivado.bat"` 调用导致 `BUILD_EXIT` / `BUILD_FAILED` 两行**永远不执行** ⇒ 退出码仍然丢失（第二版复测 FAIL 的根因，用最小 `.bat` 对照实验定案）。加 `call` 后通过。
+3. **cmd 的 `%DATE%` 在中文 Windows 带「周日」**：cmd 按 OEM/GBK 写入，任何 UTF-8 读取都得到乱码 ⇒ 状态行只用 `%TIME%`。
+4. **`dsh-tool-pwsh` 在本机后端是 Windows PowerShell 5.1**（`$PSVersionTable` 实测 5.1.26100）：persona 因此写明"不要假设 PowerShell 7 语法"。
+5. **EIF `scripts/ci_check.py` 的 `git ls-files` 解码坑**（本轮顺手修掉）：`subprocess.run(..., text=True)` 在中文 Windows 上按 GBK 解码 git 的 UTF-8 文件名 ⇒ `UnicodeDecodeError` 被 `except Exception` 吞掉 ⇒ **退回全盘 `rglob`**。实测：应扫 **2730** 个已跟踪文件，实际扫了 **17969** 个（含未跟踪/`.gitignore` 项），而输出仍写"已跟踪文件"。修法：`encoding="utf-8", errors="replace"`。
+6. **工具链版本漂移会让 MCP 行被静默丢弃**：本轮 `dsh.cmd --version` 已从 `0.2.1-rc.2` 变成 **`0.2.1-rc.3`**，而 `compatibility.json` 只允许 `rc.2` ⇒ `doctor` 第 12 项 WARN，MCP 行可能在重启后**静默消失**（正是 §2.2 那类症状的前置条件）。已把 `rc.3` 合并进豁免（备份 `compatibility.json.bak-20261025`）→ 该项转 PASS。
+
+### 9.4 仍未做的（如实挂账）
+
+- §6 P1 的 4 条 vivado-mcp 改动（`run_tcl_file` / `background` / `include_paths=false` / `xdc_lint` 良性族分组）：属上游仓库，按「不做私有 fork」未动。
+- `2025.2+` 档依旧没有任何实测；本次只保证"两档纪律同步"。
+- 本包新增脚本的**脱离式构建只验证到 6 秒的小 Tcl**（真实 34 min 实现段未在本轮重跑）。
