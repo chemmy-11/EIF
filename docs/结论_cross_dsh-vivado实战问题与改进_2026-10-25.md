@@ -353,12 +353,26 @@ Hold   WHS = +0.004 ns   THS = 0.000 ns
 |---|---|
 | `py tools\gen_skills_manifest.py --check` | PASS（8 技能，sha256 `f6372ec0…`） |
 | `py tools\make_template.py --check` | PASS（22 行、9 占位符、无个人路径） |
-| 两档渲染 + `dev\validate_patch.py --tier` | 2023.1 PASS（persona 25 行/7268 字符）、2025.2plus PASS（25 行/7093 字符） |
+| 两档渲染 + `dev\validate_patch.py --tier` | 2023.1 PASS、2025.2plus PASS（persona 各 25 行；最终 staging 渲染为 7395 / 7093 字符） |
 | `dev\accept_all.py --only static` | **9/9 PASS**（新增「launcher assets present and ASCII-only」一条；矩阵 49→50） |
 | `tools\vivado-probe.ps1` | `PROBE_EXIT=0`、`PROBE_RESULT=OK`（Vivado 2023.1 / Tcl 8.5.14） |
 | `tools\vivado-run.ps1`（wait） | `RUN_EXIT=0`、`RUN_RESULT=OK`，状态文件 `BUILD_EXIT=0` |
 | `tools\vivado-run.ps1 -Detach` | `RUN_RESULT=LAUNCHED`，轮询 6 s 见 `BUILD_EXIT=0`，Vivado 计数 0 |
 | `tools\tcl-check.ps1 <prj12 scripts>` | `TCLCHECK_RESULT=PASS`（7/7） |
+
+**重启前后的真实会话对比**（只读探针卡，`mode=vivado`，重启前/后各一轮）：
+
+| 观测项 | 重启前（旧 preset 还在宿主内存里） | 重启后 |
+|---|---|---|
+| 会话里的 shell 工具 | 只有官方 `pwsh`，**无 `win_bash`** | 同左 |
+| 旧 persona 措辞 "is the shell for command work" | **仍在**（要求用 `win_bash`，而工具不存在） | **已消失** |
+| 新 persona 的 "Launch Vivado through the kit launchers" | 无 | 有 |
+| `-Detach` / `run_in_background` 纪律 | 无 | 有 |
+| `mcp__vivado__*` 工具数 | **0**（宿主启动时运行时已是 `0.2.1-rc.3`，豁免只写 `rc.2` ⇒ MCP 行被静默丢弃） | **32** |
+| kit 的 8 个技能 | 已是新版描述（技能**每次会话读盘**） | 同左 |
+| `tools/vivado-{probe,run}.ps1`、`tools/tcl-check.ps1` 可读 | 是 | 是 |
+
+结论：**profile / bundle patch 在宿主启动时读一次，技能根是每会话读**。所以「改 persona 或 compatibility」必须重启；「改技能内容」不必重启。重启前那个自相矛盾的状态（旧 persona 要求 `win_bash`、会话里却没有它，且 MCP 为 0）就是这两处缓存的叠加。
 
 ### 9.3 这一轮**新踩到的坑**（都已写进代码注释/文档，别再踩）
 
@@ -374,3 +388,4 @@ Hold   WHS = +0.004 ns   THS = 0.000 ns
 - §6 P1 的 4 条 vivado-mcp 改动（`run_tcl_file` / `background` / `include_paths=false` / `xdc_lint` 良性族分组）：属上游仓库，按「不做私有 fork」未动。
 - `2025.2+` 档依旧没有任何实测；本次只保证"两档纪律同步"。
 - 本包新增脚本的**脱离式构建只验证到 6 秒的小 Tcl**（真实 34 min 实现段未在本轮重跑）。
+- persona 只点名 `vivado-probe.ps1` / `vivado-run.ps1` 两个脚本；`tcl-check.ps1` 出现在技能 §4 与 `docs/tools.md` §1，**没有**写进 persona（想让它进 persona 需再改一版并再重启一次，收益不抵成本，故留作可选项）。

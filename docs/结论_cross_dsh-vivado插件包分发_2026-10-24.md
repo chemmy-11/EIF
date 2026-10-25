@@ -334,6 +334,12 @@ MANIFEST 作为冻结快照保留，检查 12 仍有效」；`docs/agent.md` 重
 patch sha256 `53e6888461d3`）后 `validate_patch` PASS；`doctor.ps1` **11 PASS / 2 WARN / 0 FAIL**
 （WARN = 当前 shell cwd 是中文目录、未设 license 环境变量）。
 
+**重启后真会话复核**（只读探针卡，`mode=vivado`）：会话里 shell 只有官方 `pwsh`（无 `win_bash`）；
+persona 含 "Launch Vivado through the kit launchers" 与 `-Detach`、**不再含** "is the shell for command work"；
+`mcp__vivado__*` **32** 个；kit 8 个技能在列；`tools/` 下 probe / run / tcl-check 三个脚本可读。
+对照重启前同一张卡：`MCP_COUNT=0`、旧 persona 仍要求 `win_bash` —— 说明 **profile/bundle patch 是宿主启动时读一次，
+技能是每会话读盘**；改 persona 或 `compatibility.json` 必须重启。
+
 仍未做：vivado-mcp 侧 4 条 P1（`run_tcl_file`、`background`、`include_paths=false`、`xdc_lint`
 良性族分组）按"PR 优先、不做私有 fork"留待上游；`2025.2+` 档依旧零实测。
 
