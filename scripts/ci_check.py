@@ -90,8 +90,11 @@ def tracked_files() -> list[Path]:
 ALLOWED_HEAD = {
     "阶段一", "阶段二", "阶段二前置", "阶段三", "阶段四", "阶段五",
     "前置", "参考", "里程碑", "汇报", "规划", "追踪", "结论", "架构", "导览", "复现",
+    "任务书", "对齐",
 }
 SEG_HEAD = re.compile(r"^阶段[一二三四五](前置)?(之[一二三四五六七八九十]+)?$")
+# M 轴（2026-10-26 终案）：GSnFPipe 时期 M<N>_prj标识_概要_日期，如 M1_prj12_xxx_2026-10-28
+M_HEAD = re.compile(r"^M[1-4]_")
 
 
 def check_doc_names(files: list[Path]) -> None:
@@ -108,7 +111,7 @@ def check_doc_names(files: list[Path]) -> None:
         ok = (
             " " not in name
             and re.search(r"_\d{4}-\d{2}-\d{2}\.md$", name) is not None
-            and (head in ALLOWED_HEAD or SEG_HEAD.match(head) is not None)
+            and (head in ALLOWED_HEAD or SEG_HEAD.match(head) is not None or M_HEAD.match(head) is not None)
         )
         if not ok:
             bad.append(str(f.relative_to(ROOT)).replace("\\", "/"))

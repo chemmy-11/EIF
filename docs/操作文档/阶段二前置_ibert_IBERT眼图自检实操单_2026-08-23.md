@@ -6,7 +6,7 @@ type: 操作文档
 目标: 用 IBERT 验证 FMC 四光口物理链路（GTH + 参考时钟 + 光模块 + 光纤），产出眼图截图
 created: 2026-08-23
 updated: 2026-08-27
-related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] · [[笔记和开发指南/光纤接口眼图]] · [[追踪_cross_短期待办_2026-10-10]]"
+related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] · `笔记和开发指南/光纤接口眼图`（已移出本库） · [[追踪_cross_短期待办_2026-10-10]]"
 ---
 
 # 阶段二前置 · IBERT 光口眼图自检（手把手实操单）
@@ -29,7 +29,7 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 | GT Quad | **X1Y2**（IP 界面显示名 **QUAD_226**，同一事物两种叫法；通道 X1Y8~X1Y11：SFPD=Y8、SFPB=Y9、SFPC=Y10、SFPA=Y11） | 实测定案：选 226 后通道落位 X1Y8~Y11 + 引脚表 `226_TX*/RX*` 双证 |
 | 参考时钟 | **MGTREFCLK1_226（T6/T5），156.25 MHz** | ✅ 实测闭环：IBERT 上板 PLL Locked 验证；手册原文"226_CLK1_P 对应光口外部输入时钟" |
 | 控制信号引脚版本 | **版本 A**：TX_DIS=H26/AH12/J25/AF12，RS0=G27/AH11/M26/AF13，RS1=H27/AG11/M25/AE13（索引 0~3 = SFPD/B/C/A） | ✅ 三方一致：指南 §5.3 XDC = 板卡引脚表工作表1 = 实现落位报告 12/12 |
-| PLL 选择 | **QPLL**（10G 必选 QPLL0：9.8~16.375 GHz） | GTH 架构，见 [[笔记和开发指南/光纤接口眼图]] §2.2 |
+| PLL 选择 | **QPLL**（10G 必选 QPLL0：9.8~16.375 GHz） | GTH 架构，见 `笔记和开发指南/光纤接口眼图`（已移出本库） §2.2 |
 
 ⚠️ **手册 vs 本板的差异只剩两处**（其余配置照手册走）：① 手册正文写"Quad X0Y2"是笔误，实为 Bank 226 = X1Y2；② 手册底板版与本 FMC 子卡版的**参考时钟球对一致**（都走 CLK1/T6T5），控制脚球号见上表版本 A。**手册只当方法论参考，参数一律以上表为准。**
 
@@ -71,7 +71,7 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 1. Flow Navigator → PROJECT MANAGER → **IP Catalog**；
 2. 搜索框输 `IBERT` → 在 *Debug & Verification > Bit Error Testing* 下找到 **UltraScale GTH 的 IBERT**（名称形如 *IBERT UltraScale GTH* / *IBERT UltraScale+ GTH Quad*，以你版本搜索结果为准；生成例程的顶层名应为 `example_ibert_ultrascale_gth_0`，可作对照）→ 双击添加 → 弹出的 IP 定制窗口保持默认名 → Generate/OK。
 
-![[笔记和开发指南/assets/图56.4.1_添加IBERT_IP.png]]
+〔图：笔记和开发指南/assets/图56.4.1_添加IBERT_IP.png（已随「笔记和开发指南」移出本库，见移出包）〕
 > 📷 原书底板版截图，界面布局一致；你的 IP 列表项以搜到的实际名称为准。
 
 ### 2.2 配置 IP（双击刚生成的 IP 重新打开定制窗）
@@ -88,11 +88,11 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 | Quad Count | **1** | 4 个光口共用 Quad X1Y2 |
 | PLL | **QPLL** | 10G ≥ QPLL0 下限 9.8 GHz；CPLL 只到 6.25 GHz 带不动 |
 
-![[笔记和开发指南/assets/图56.4.2_Protocol_Definition选项.png]]
+〔图：笔记和开发指南/assets/图56.4.2_Protocol_Definition选项.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 **Advanced Settings 页**：全部默认（Equalization mode=Auto：插入损耗 >14dB 自动用 DFE，否则 LPM；PPM offset 默认）——首次自检不折腾均衡。
 
-![[笔记和开发指南/assets/图56.4.3_Advanced_Settings选项.png]]
+〔图：笔记和开发指南/assets/图56.4.3_Advanced_Settings选项.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 **Protocol Selection 页**（关键页，选错这里 = PLL 永远不 Lock）：
 
@@ -102,7 +102,7 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 | Protocol Selected | 默认 Custom1 / 10Gbps | 单协议 |
 | Refclk Selection | 展开下拉**认准引脚号**：SFP_CLK 实际接哪对就选哪对（MGTREFCLK0_226=V6/V5，MGTREFCLK1_226=T6/T5；如下拉出现带 P5/P6 的项则直接选它） | 选错唯一症状 = PLL 不 Lock；IBERT 试错零成本，不 Lock 就换另一对 |
 
-![[笔记和开发指南/assets/图56.4.4_Protocol_Selection选项.png]]
+〔图：笔记和开发指南/assets/图56.4.4_Protocol_Selection选项.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 > 🔍 **命名陷阱说明（2026-08-26 定案）**：IP 界面用 **Bank 号**（QUAD_226）称呼 Quad，手册正文却把它写成"Quad X0Y2"——**后者是笔误**。实测证据：① 选 QUAD_226 后 Vivado 生成的 IP 约束把通道落在 `GTHE3_CHANNEL_X1Y8~Y11`（= FMC 四口所在，X1Y2 的通道段）；② 板卡引脚表把四口数据对标为 `226_TX0~3/RX0~3`。**结论：QUAD_226 = X1Y2 = 你的四个光口，放心选。**
 > 🔍 **生成例程后的 30 秒自检**：打开例程 `imports\example_ibert_ultrascale_gth_0.xdc` 看 `gth_refclk` 的 PACKAGE_PIN——落在 **V6/V5 或 T6/T5** 都属正常（这就是 QUAD_226 仅有的两对参考时钟球）；之后 PLL 是否 Lock 会告诉你选没选对**那一对**。
@@ -113,7 +113,7 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 |--------|------|--------|
 | Source | **Quad clock** | IBERT 系统时钟直接取 Quad 的参考时钟分频，省一个外部时钟输入 |
 
-![[笔记和开发指南/assets/图56.4.5_Clock_Setting选项.png]]
+〔图：笔记和开发指南/assets/图56.4.5_Clock_Setting选项.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 点 **OK** 完成定制。
 
@@ -125,15 +125,15 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 
 1. Sources → IP Sources → 右键 `ibert_...` IP → **Open IP Example Design...**；
 
-![[笔记和开发指南/assets/图56.4.6_创建官方例程.png]]
+〔图：笔记和开发指南/assets/图56.4.6_创建官方例程.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 2. 路径选 **工程外** 目录：`D:\FPGA\ibert_exdes`（⚠️ 别放进工程目录内部）→ OK；
 
-![[笔记和开发指南/assets/图56.4.7_选择路径.png]]
+〔图：笔记和开发指南/assets/图56.4.7_选择路径.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 3. 等待自动生成并打开新工程（几十秒）。
 
-![[笔记和开发指南/assets/图56.4.8_官方例程.png]]
+〔图：笔记和开发指南/assets/图56.4.8_官方例程.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 ---
 
@@ -237,7 +237,7 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
 
 ## 8. Hardware Manager：先看链路状态
 
-> **观测顺序铁律：先 PLL 锁没锁 → 再看有没有误码 → 最后才谈眼图**（[[8.3/Aurora/d8e77ba2-c98d-4e48-bda4-6741a163625e]] 的实战经验）。
+> **观测顺序铁律：先 PLL 锁没锁 → 再看有没有误码 → 最后才谈眼图**（`8.3/Aurora/d8e77ba2-c98d-4e48-bda4-6741a163625e`（已移出本库） 的实战经验）。
 
 1. Flow Navigator → **Open Hardware Manager** → 顶部绿条 **Open target → Auto Connect**；
    - ⚠️ FT2232H 同一时刻只能被一个客户端占用：HW Manager 连接着就别让 Vitis 同时 Program FPGA（M1 已知坑）；
@@ -251,7 +251,7 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
 | **Erros** | **`0E0`** | 0×10⁰ = 零误码（列名 Erros 是原书拼写，Vivado 里即 Errors） |
 | TX Pattern / RX Pattern | PRBS-7（默认一致即可） | 收发模式必须同类才能比对 |
 
-![[笔记和开发指南/assets/图56.5.4_Serial_IO_Links界面.png]]
+〔图：笔记和开发指南/assets/图56.5.4_Serial_IO_Links界面.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 5. 上电初期链路不稳属正常：工具栏点 **BERT Reset** 清零重测一次再读数。
 
@@ -285,7 +285,7 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
    - ❌ 不合格：满屏红/花——查光模块速率挡（RS 脚）、光纤脏污（无尘布擦 LC 头）、换线换模块对照；
 5. **截图存档**：右键图像 → 导出/截图，命名 `ibert_eye_SFPA_10G_2026MMDD.png` 存入 `D:\FPGA\ibert_eye_test\docs\`（论文 5.2 节素材，也是给导师看的证据）。
 
-![[笔记和开发指南/assets/图56.5.7_光口眼图.png]]
+〔图：笔记和开发指南/assets/图56.5.7_光口眼图.png（已随「笔记和开发指南」移出本库，见移出包）〕
 
 6. 拓展（原书 56.7，可选）：LineRate 改 15G 重扫一眼，观察眼图收窄——直观感受"速率↑ → 裕量↓"，论文对比素材。
 
@@ -307,7 +307,7 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
 **收尾动作（5 分钟）**：
 - [ ] 结果同步给 VSCode Reasonix 更新 `D:\FPGA\AGENTS.md`（待查项①②正式闭环）+ git 提交例程工程与截图；
 - [ ] [[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] §2.6 与 [[追踪_cross_短期待办_2026-10-10]] 对应项打勾；
-- [ ] 把"实测频率/引脚版本/通道映射"回填 [[笔记和开发指南/光纤接口眼图]] §四参数表（知识沉淀）。
+- [ ] 把"实测频率/引脚版本/通道映射"回填 `笔记和开发指南/光纤接口眼图`（已移出本库） §四参数表（知识沉淀）。
 
 ---
 
@@ -331,4 +331,4 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
 
 物理链路绿灯后，带着这些**实测结论**进 [[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] §3 生成 Aurora 64b/66b：Quad=X1Y2、Refclk=P5/P6@156.25MHz、通道映射（SFPA=X1Y11…）直接照抄，Aurora 配置不再有任何猜的成分。
 
-> 📖 理论配套：[[笔记和开发指南/光纤接口眼图]]（GTH 架构/IBERT 原理/眼图判读，图片已入库）· [[笔记和开发指南/光纤接口8b10b]]（想更深理解编码与对齐再看）
+> 📖 理论配套：`笔记和开发指南/光纤接口眼图`（已移出本库）（GTH 架构/IBERT 原理/眼图判读，图片已入库）· `笔记和开发指南/光纤接口8b10b`（已移出本库）（想更深理解编码与对齐再看）
