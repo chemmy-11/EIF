@@ -55,7 +55,7 @@
 | **最新发布（Release）** | prj11 路线 B 收口（2026-10-19）— <https://github.com/chemmy-11/EIF/releases/tag/prj11-routeB-closed-2026-10-19> |
 | **已完成工作说明（补充材料）** | `汇报/导览_cross_已完成工作说明_2026-10-22.md`（vault）；GitHub 镜像 `docs/导览_cross_已完成工作说明_2026-10-22.md`（路线 A/B 均已收口） |
 | **当前工程状态**（一屏速览） | AGENTS.md **§十** |
-| **CI 与远程仓库规范**（检查项以 `ci_check.py` 输出为准，2026-10-24 起 12 项 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
+| **CI 与远程仓库规范**（检查项以 `ci_check.py` 输出为准 / 本地怎么跑 / 远程触发 / 失败定位 / 提交前自检清单） | AGENTS.md **§十二**（2026-10-17 新增） |
 | **文档索引与命名规范** | `D:\FPGA\docs\README.md`（全量索引，CI 第 6 项强制与磁盘一致） |
 | **仓库入口：关键文档 / 提交文档规则** | `D:\FPGA\README.md` 的「关键文档」「提交文档」两节 |
 
@@ -68,7 +68,7 @@
 - **「字节不一致」多数是脱敏设计的结果，不是缺陷**：当日抽查的差异样本中，vault `C:\Users\***\…` 对应 docs `C:\Users\***\…`，差异全部来自脱敏替换。
 - ⇒ **纪律：绝不「为了对齐」把 vault 原文覆盖进 `docs/`**（会把敏感信息写进 git 历史）。确需同步时先判定差异类型（脱敏 / 内容更新），内容更新以「更晚、有实测证据」的版本为准，**同步后必须重新脱敏**。
 - **vault 增删文档后，镜像入 `docs/` 时必须同步 `docs/README.md` 全量索引**（口径 = docs/ 下除任意 `README.md` 外的全部 .md），否则远程 CI 第 6 项会红。
-- **CI 门禁（2026-10-24 起，`ci_check.py` 第 11 项 `check_mirror_gate`；第 7 项是 `check_skills_manifest`，勿混）**：存在 vault 时逐文件比对 `docs/**/*.md` ↔ vault 对应文件，**先归一（两侧 `***`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节**；归一后仍不等、或 docs 独有而 vault 没有 → 必须在 `D:\FPGA\scripts\mirror_allowlist.json` 登记（每项带可复核理由），否则 **CI FAIL**。现状：83 篇 = 归一相等 **75** + 白名单 **8**（drift 2 / docs-only 6），未登记不一致 **0**（2026-10-24 二次收口：7 条纯目录改名漂移按最小编辑 resync 进 docs 并删除登记，白名单 15→8；剩余 drift 2 = `README.md` 定位差异 + `追踪_cross_短期待办_2026-10-10.md` 有意去链接）。
+- **CI 门禁（2026-10-24 起，`ci_check.py` 第 11 项 `check_mirror_gate`；第 7 项是 `check_skills_manifest`，勿混）**：存在 vault 时逐文件比对 `docs/**/*.md` ↔ vault 对应文件，**先归一（两侧 `***`→`***`、去 UTF-8 BOM、CRLF→LF）再比字节**；归一后仍不等、或 docs 独有而 vault 没有 → 必须在 `D:\FPGA\scripts\mirror_allowlist.json` 登记（每项带可复核理由），否则 **CI FAIL**。现状：篇数/相等数以 CI 输出为准（白名单 drift/docs-only 分类见 2026-10-24 二次收口：7 条纯目录改名漂移按最小编辑 resync 进 docs 并删除登记，白名单 15→8；剩余 drift 2 = `README.md` 定位差异 + `追踪_cross_短期待办_2026-10-10.md` 有意去链接）。
 - 白名单不是垃圾桶：新增条目要写清**为什么**不等（脱敏未覆盖 / vault 目录改名 / 内容新旧 / docs 独有），写「历史遗留」视为无效理由（门禁自身会校验 reason 非空）。
 
 ## 文档地图（本目录；2026-10-26 归位后）
@@ -174,6 +174,9 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 
 > **状态唯一化**：现行状态与计划 = `规划_cross_短期推进计划_2026-10-24.md`（唯一权威，随周期滚动）；里程碑全表 = 本目录 `README.md`「里程碑索引表」（只追加不改旧行）；EIF 仓工程状态 = `AGENTS.md` §十。历史状态（≤2026-10-19 路线 A/B 收口记录）见下节。
 
+> 状态明细已并入下方历史状态节；"现在"只看顶部指针。
+
+### 历史状态（≤2026-10-26，仅供追溯；含路线 A/B 收口明细）
 - ✅ **路线 B（prj11）已全量收口（2026-10-19）**：round3d 位流 `F6012BA0`（WNS +0.002）+ 固件 `BA3C0220`；S0–S11 **13/13 PASS**；四档 / 10MB 100%+SHA / J3 四链 / 双桥对账全过；R3 速率：1466B 可持续 2000fps 零丢、上限≈2560fps；R4 文档收口完成（复现指南 / 探针清单 / 归档索引 0 缺失）。
 - 🧪 **演示固件（2026-10-22，非验收件）**：`B6D3F7B1` 在 `BA3C0220` 同源上仅增串口 `Q`（一行汇总：mode/wr/rd/drop/s2sr 解码/fault/末帧槽长）与 `?`（速查），位流 `F6012BA0` 不变；归档 `prj/project_11/out/archive/fw_q_2026-10-22/`（J3 M/A/B 逐轮 + 四档 UDP 日志）。正式证据仍以 `BA3C0220` 为准。
 - 📦 **发布页**：<https://github.com/chemmy-11/EIF/releases/tag/prj11-routeB-closed-2026-10-19>（tag `prj11-routeB-closed-2026-10-19`）；**已完工作说明**：vault `汇报/导览_cross_已完成工作说明_2026-10-22.md`（GitHub 镜像 `docs/导览_cross_已完成工作说明_2026-10-22.md`）。
@@ -181,8 +184,6 @@ vivado -mode batch -source D:\FPGA\prj\project_11\out\evidence_2026-10-19\tools\
 - **入口**：`调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md` §十九–§二十二（收口/速率/重审）；`复现/复现_prj11_指南_2026-10-19.md`（一键复现）；`操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md` §七/§八（重审与收尾）。
 - **下一步（非强制）**：双板双链路按 2026-09-30 Q4 暂缓；SG 描述符环 / 调度与 FL 负载验证属新范围。
 
-
-### 历史状态（≤2026-10-19，仅供追溯）
 
 路线 A（W0–W6）与路线 B（B0–B5 / R1–R4）的完整过程、位流哈希、缺陷链与证据均在：
 `调试记录/`（尤其 `阶段三_prj10_*`、`阶段三_prj11_*` 系列）与 `D:\FPGA\prj\project_11\out\archive\ARCHIVE_INDEX_prj11.md`。

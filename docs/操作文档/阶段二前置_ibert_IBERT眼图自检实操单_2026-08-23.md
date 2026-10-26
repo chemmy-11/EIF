@@ -24,7 +24,7 @@ related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04
 
 | 参数 | 值 | 来源 |
 |------|-----|------|
-| part | `xcku060-ffva1156-2-i`（**非 CIV！**） | M1 血泪教训，见 [[Agent 协作/M1进度总结_2026-08-11]] |
+| part | `xcku060-ffva1156-2-i`（**非 CIV！**） | M1 血泪教训，见 `归档/Agent 协作/M1进度总结_2026-08-11` |
 | 光口 | FMC_4SFP 子卡 ×4（SFPA~SFPD） | `D:\FPGA\FMC_4SFP_GTH引脚表.md` |
 | GT Quad | **X1Y2**（IP 界面显示名 **QUAD_226**，同一事物两种叫法；通道 X1Y8~X1Y11：SFPD=Y8、SFPB=Y9、SFPC=Y10、SFPA=Y11） | 实测定案：选 226 后通道落位 X1Y8~Y11 + 引脚表 `226_TX*/RX*` 双证 |
 | 参考时钟 | **MGTREFCLK1_226（T6/T5），156.25 MHz** | ✅ 实测闭环：IBERT 上板 PLL Locked 验证；手册原文"226_CLK1_P 对应光口外部输入时钟" |
@@ -331,4 +331,4 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
 
 物理链路绿灯后，带着这些**实测结论**进 [[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] §3 生成 Aurora 64b/66b：Quad=X1Y2、Refclk=P5/P6@156.25MHz、通道映射（SFPA=X1Y11…）直接照抄，Aurora 配置不再有任何猜的成分。
 
-> 📖 理论配套：`笔记和开发指南/光纤接口眼图`（已移出本库）（GTH 架构/IBERT 原理/眼图判读，图片已入库）· `笔记和开发指南/光纤接口8b10b`（已移出本库）（想更深理解编码与对齐再看）
+> 📖 理论配套：`笔记和开发指南/光纤接口眼图`（已移出本库）（GTH 架构/IBERT 原理/眼图判读；配图原在「笔记和开发指南」，2026-10-26 已随该目录移出，桌面 zip 取用）· `笔记和开发指南/光纤接口8b10b`（已移出本库）（想更深理解编码与对齐再看）

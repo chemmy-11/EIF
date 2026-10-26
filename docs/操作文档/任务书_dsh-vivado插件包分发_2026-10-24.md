@@ -44,7 +44,7 @@
 | 预设现役形态 | `preset-vivado` 一行（`@deepseek-ai/dsh-agent-preset`，`config.id: vivado`）+ 23 个 plugin 行（22 拷自 standard + `mcp-vivado`） | `<vault>\.dsh\bundles\vivado-preset\cordis.patch.yml` |
 | 工具面实测 | 普通预设会话 **91**（59 内置 + 32 MCP）；Team 会话 97 | subagent / teammate 实测（2026-10-24） |
 | 继承 | `spawn_teammate` 与 `subagent` **都继承**预设作用域（32 工具 + persona 原文一致） | 本轮实测 |
-| AMD 6 技能 | 源 `vivado-ai-extension-2026.9.1.vsix` 内 `resources/plugin-bundled/skills/`，**MIT**（与 GitHub `Xilinx/ross-ai-assistant` 同源）；已装 `<vault>\.dsh\skills\`；安装脚本 `.ross-recon\install_skills.py`（幂等，DST 指向项目级） | `.ross-recon\安装记录.md` |
+| AMD 6 技能 | 源 `vivado-ai-extension-2026.9.1.vsix` 内 `resources/plugin-bundled/skills/`，**MIT**（与 GitHub `Xilinx/ross-ai-assistant` 同源）；已装 `<vault>\.dsh\skills\`；安装脚本 `归档\.ross-recon\install_skills.py`（幂等，DST 指向项目级） | `归档\.ross-recon\安装记录.md` |
 | AMD 技能基线 | 官方声明 **2026.1**；本机 2023.1；MANIFEST 里 6/7 为 `unverified`，仅 `vivado-rtl-elaboration-analysis` 有 2023.1 实证 | `<vault>\.dsh\skills\MANIFEST.json` |
 | 现役 MCP | 第三方 vivado-mcp（32 工具），安装 `D:\vivado-mcp`（**不是我们的资产**）；本轮打了 3 个补丁（`max_lines`/`save_full_to`、`xdc_lint` 聚合+默认全量、`safe_tcl` 提示），**均未入版本库** | `D:\vivado-mcp\site\...\*.bak-mcp-20261024b` |
 | asar 可自证 | 脚本 `D:\FPGA\.tmp\asar_get*.py` 可解析 `D:\dsh\resources\app.asar`（18309 文件，含全部第一方包 README/源码）⇒ 任何 DSH 契约疑问自行取证，不必猜 | 本轮实测（注意 `offset` 是字符串，需 `int()`） |
@@ -119,8 +119,8 @@
 | 资产 | 位置 |
 |---|---|
 | 现役预设 bundle（可直接改造成分发版） | `<vault>\.dsh\bundles\vivado-preset\` |
-| AMD 技能安装器（幂等） | `<vault>\.ross-recon\install_skills.py` |
-| asar 解析探针 | `<vault>\.ross-recon\asar_probe.py`（解析 `D:\dsh\resources\app.asar`，可抽任意第一方包 README/源码） |
+| AMD 技能安装器（幂等） | `<vault>\归档\.ross-recon\install_skills.py` |
+| asar 解析探针 | `<vault>\归档\.ross-recon\asar_probe.py`（解析 `D:\dsh\resources\app.asar`，可抽任意第一方包 README/源码） |
 | MCP 健康检查 | `D:\vivado-mcp\tmp\verify_all.py`、`mcp_probe_launch.py` |
 | 技能清单/镜像门禁 | `D:\FPGA\scripts\ci_check.py`、`gen_skills_manifest.py` |
 | DSH 第一方 bundle 开发指南 | asar 内 `@deepseek-ai/dsh-agent-preset/skills/cordis-plugin-development/`（`SKILL.md` + `references/mcp-bundle.md` + `templates/`） |

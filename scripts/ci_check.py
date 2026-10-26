@@ -93,8 +93,9 @@ ALLOWED_HEAD = {
     "任务书", "对齐",
 }
 SEG_HEAD = re.compile(r"^阶段[一二三四五](前置)?(之[一二三四五六七八九十]+)?$")
-# M 轴（2026-10-26 终案）：GSnFPipe 时期 M<N>_prj标识_概要_日期，如 M1_prj12_xxx_2026-10-28
-M_HEAD = re.compile(r"^M[1-4]_")
+# M 轴（2026-10-26 终案）：GSnFPipe 时期 M<N>_prj标识_概要_日期，如 M1_prj12_xxx_2026-10-28。
+# 按全名匹配（head 只取到 "M1"，head 级检查永不过命——2026-10-26 DSH 复查 P0-1）
+M_FULL = re.compile(r"^M[1-4]_(prj12|GSnFPipe)_.+_\d{4}-\d{2}-\d{2}\.md$")
 
 
 def check_doc_names(files: list[Path]) -> None:
@@ -106,12 +107,14 @@ def check_doc_names(files: list[Path]) -> None:
             continue
         if f.name in ("README.md", "agent.md"):
             continue  # 目录级索引与会话入口豁免
+        if "对齐" in f.parent.name and re.match(r"^0[0-6]_", f.name):
+            continue  # 对齐包子件（00~06 编号式，2026-10-26 终案目录级约定）
         name = f.name
         head = name.split("_")[0]
         ok = (
             " " not in name
             and re.search(r"_\d{4}-\d{2}-\d{2}\.md$", name) is not None
-            and (head in ALLOWED_HEAD or SEG_HEAD.match(head) is not None or M_HEAD.match(head) is not None)
+            and (head in ALLOWED_HEAD or SEG_HEAD.match(head) is not None or M_FULL.match(name) is not None)
         )
         if not ok:
             bad.append(str(f.relative_to(ROOT)).replace("\\", "/"))

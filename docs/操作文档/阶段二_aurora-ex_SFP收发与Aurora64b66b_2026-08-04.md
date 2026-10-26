@@ -13,7 +13,7 @@ related: "[[追踪_cross_短期待办_2026-10-10]]"
 
 > **一句话目标**：让 KU060 的 GTH 高速收发器通过 SFP+ 光口，用 Aurora 协议收发数据，并亲眼看到链路建立信号拉高。
 > **对应任务**：[[追踪_cross_短期待办_2026-10-10]] 阶段 2（2~3 周）· `8.3/任务分工-2026-05-07`（已移出本库） 阶段五
-> **前置状态**：✅ M1 已达成（2026-08-11，见 [[Agent 协作/M1进度总结_2026-08-11]]）。正式动手前，先以 design_1 的 AXI Interconnect + UART Lite（0x40600000）地址映射补 **AXI 总线族**基础（M1 总结的下一步，对应任务分工阶段二），再进入本阶段。
+> **前置状态**：✅ M1 已达成（2026-08-11，见 `归档/Agent 协作/M1进度总结_2026-08-11`）。正式动手前，先以 design_1 的 AXI Interconnect + UART Lite（0x40600000）地址映射补 **AXI 总线族**基础（M1 总结的下一步，对应任务分工阶段二），再进入本阶段。
 > **成功标准（M2）**：SFP+ 环回下 `channel_up`/`lane_up` 拉高，ILA 抓到 AXI-Stream 数据收发正常 ✅
 
 ---
@@ -128,7 +128,7 @@ related: "[[追踪_cross_短期待办_2026-10-10]]"
 
 建议**新建独立工程**（如 `D:\FPGA\aurora_test`，与 M1 工程同目录；`D:\FPGA` 目前不是 git 仓库，建议先 `git init` 再动工），先不加 MicroBlaze，专心搞链路——这就是"第二组独立验证"的思路，排除软核干扰。
 
-⚠️ **器件 part 必须精确选择 `xcku060-ffva1156-2-i`（非 CIV 变体）**——M1 曾因选了 CIV 变体导致位流烧不进（`DONE PIN is not HIGH`），对照实验后才发现 part 选错（详见 [[Agent 协作/M1进度总结_2026-08-11]] 第五节复盘）。这是 M1 最大的坑，阶段二不要再踩。
+⚠️ **器件 part 必须精确选择 `xcku060-ffva1156-2-i`（非 CIV 变体）**——M1 曾因选了 CIV 变体导致位流烧不进（`DONE PIN is not HIGH`），对照实验后才发现 part 选错（详见 `归档/Agent 协作/M1进度总结_2026-08-11` 第五节复盘）。这是 M1 最大的坑，阶段二不要再踩。
 
 ### 3.2 添加 Aurora IP 并配置
 
@@ -210,7 +210,7 @@ related: "[[追踪_cross_短期待办_2026-10-10]]"
 
 ### 5.2 下载并观察状态
 
-1. Vivado → `Open Hardware Manager` → `Open Target` → 连接板卡（📖 手册 → JTAG）。⚠️ **实测**：下载线为正点原子 FT2232H（Vivado 识别为 Digilent JTAG-HS1），**同一时刻只允许一个客户端占线**——HW Manager 连着时 Vitis 的 Program FPGA 会抢不到线，务必先断开一边（M1 工作流中 Vitis 侧已取消 Program FPGA 勾选，见 [[Agent 协作/M1进度总结_2026-08-11]] 第四节）。
+1. Vivado → `Open Hardware Manager` → `Open Target` → 连接板卡（📖 手册 → JTAG）。⚠️ **实测**：下载线为正点原子 FT2232H（Vivado 识别为 Digilent JTAG-HS1），**同一时刻只允许一个客户端占线**——HW Manager 连着时 Vitis 的 Program FPGA 会抢不到线，务必先断开一边（M1 工作流中 Vitis 侧已取消 Program FPGA 勾选，见 `归档/Agent 协作/M1进度总结_2026-08-11` 第四节）。
 2. `Program Device` 选择你的 bitstream → Program。
 3. 观察链路状态信号：
    - **`gt_pll_lock`** 先亮（时钟锁定，几毫秒内）
@@ -267,7 +267,7 @@ related: "[[追踪_cross_短期待办_2026-10-10]]"
 | 拔插光纤后链路不回 | 重新触发复位（`reset_pb`）或重新 program |
 | 光模块不发光 / LOS 报警 | **控制三件套没配好**：① TX_DISABLE 没拉低（低有效，给 0 才发光）② **RS0/RS1 没拉高**——线速率 >4.25G 必须给 1，10G 下两脚都拉高，否则模块按低速工作；本板控制信号引脚版本待确认（待查项②） |
 | 报 GT 资源冲突 | 两个 IP 用了同一个 Quad 的同一通道，改约束到不同通道 |
-| 下载后 `DONE PIN is not HIGH` / startup LOW | **part 选错**（CIV vs 非 CIV）——M1 实锤根因：必须 `xcku060-ffva1156-2-i`（非 CIV），见 [[Agent 协作/M1进度总结_2026-08-11]] |
+| 下载后 `DONE PIN is not HIGH` / startup LOW | **part 选错**（CIV vs 非 CIV）——M1 实锤根因：必须 `xcku060-ffva1156-2-i`（非 CIV），见 `归档/Agent 协作/M1进度总结_2026-08-11` |
 | IBERT 界面 Erros ≠ `0E0` | 链路有误码：先 **BERT Reset** 重测（上电初期链路不稳常见）；仍错则查光模块/线缆/参考时钟——**PLL Status 必须 Locked** 测试才有意义 |
 | 参考时钟没起振 | 先确认时钟来源（FMC 子卡晶振 or 底板晶振，以原理图为准）。开发指南底板版板卡的 156.25 MHz 晶振在**底板**、经**板间连接器**才到核心板 GTH BANK——连接器接触不良也会表现为"没时钟" |
 
