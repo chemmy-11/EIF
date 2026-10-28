@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-make_test_pcap.py — prj12 P1: 造一份"假 pcap"来离线验证 PC2 判据脚本
+make_test_pcap.py — prj12 P1: 造"假 pcap"离线压测 twin_recv.py 的判据
 
-为什么需要: 板卡不在场时，twin_recv.py 的解析/判据逻辑必须能被证明"不是橡皮图章"。
-本脚本按 P1 的真实帧形状造帧（src=板卡 MAC、dst=PC1 网卡 MAC、UDP、payload=twin_send 格式）：
-  --mode good  : 全部帧合法 -> twin_recv 应 PASS
-  --mode bad   : 第 2 帧 fill 破坏 -> twin_recv 应 FAIL（负向对照）
-  --mode none  : 只有无关帧      -> twin_recv 应 FAIL（空集对照）
+为什么需要：板卡不在场时，抓包判据脚本必须被证明"不是橡皮图章"。本脚本按 P1 真实帧形状造帧
+（src=板卡 MAC、dst=PC1 网卡 MAC、UDP、payload=twin_send 结构），并覆盖现场可能出现的坏形状。
 
-用法:
-  py pc\\make_test_pcap.py --out out/mock_pc2_good.pcap --mode good --count 5
-  py pc\\twin_recv.py --from-pcap out/mock_pc2_good.pcap --expect-count 5      # 期望 PASS
-  py pc\\make_test_pcap.py --out out/mock_pc2_bad.pcap --mode bad --count 5
-  py pc\\twin_recv.py --from-pcap out/mock_pc2_bad.pcap                        # 期望 FAIL
+--shape 取值：
+  good    全部合法（期望 twin_recv PASS）
+  badfill 第 2 帧 fill 破坏（期望 FAIL：fill BAD）
+  none    只有无关帧（期望 FAIL：matched=0）
+  vlan    全部带 802.1Q 标签（期望 PASS + WARN vlan）
+  fcs     全部尾部多 4B FCS（期望 PASS + INFO auto-trim）
+  ooo     乱序（期望 PASS：seq 集合完整）
+  dup     重复一帧（期望 FAIL，除非 --allow-dup）
+  trunc   最后一帧被截断（期望 --expect-len 时 FAIL）
+  lens    长度矩阵 26/40/63/100/200/1200/1496（配 --expect-len 判）
+  mixed   5 好 + 1 坏 fill + 1 外来 MAC（期望 FAIL）
+
+用法：
+  py pc\\make_test_pcap.py --out out/mock_good.pcap --shape good --count 5
+  py pc\\twin_recv.py --from-pcap out/mock_good.pcap --expect-count 5 --expect-len 100
 """
 import argparse
 import struct
@@ -37,15 +44,22 @@ def _ip_checksum(hdr):
 
 
 def build_eth_ip_udp(payload, dst_mac=PC1_MAC, src_mac=BOARD_MAC,
-                     src_ip=BOARD_IP, dst_ip=PC1_IP, sport=1234, dport=1234):
+                     src_ip=BOARD_IP, dst_ip=PC1_IP, sport=1234, dport=1234,
+                     vlan=False, fcs=False):
     udp_len = 8 + len(payload)
     udp = struct.pack(">HHHH", sport, dport, udp_len, 0) + payload
     ip_len = 20 + udp_len
     ip = struct.pack(">BBHHHBBH4s4s", 0x45, 0, ip_len, 0x1234, 0, 64, 17, 0,
                      src_ip, dst_ip)
     ip = ip[:10] + struct.pack(">H", _ip_checksum(ip)) + ip[12:]
-    eth = dst_mac + src_mac + struct.pack(">H", 0x0800)
-    return eth + ip + udp
+    if vlan:
+        eth = dst_mac + src_mac + struct.pack(">HHH", 0x8100, 0x0064, 0x0800)
+    else:
+        eth = dst_mac + src_mac + struct.pack(">H", 0x0800)
+    frame = eth + ip + udp
+    if fcs:
+        frame += b"\xde\xad\xbe\xef"
+    return frame
 
 
 def write_pcap(path, frames):
@@ -57,25 +71,56 @@ def write_pcap(path, frames):
             f.write(fr)
 
 
+def payload_for(seq, total, length):
+    return bytes(build_payload(seq, total, 0x00000001, length))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
-    ap.add_argument("--mode", choices=["good", "bad", "none"], default="good")
+    ap.add_argument("--shape", choices=["good", "badfill", "none", "vlan", "fcs",
+                                       "ooo", "dup", "trunc", "lens", "mixed"],
+                    default="good")
+    ap.add_argument("--mode", choices=["good", "bad", "none"], default=None,
+                    help="(旧参数名，等价于 --shape good/badfill/none)")
     ap.add_argument("--count", type=int, default=5)
     ap.add_argument("--len", type=int, default=100)
     args = ap.parse_args()
 
+    shape = args.shape
+    if args.mode:
+        shape = {"good": "good", "bad": "badfill", "none": "none"}[args.mode]
+
     frames = []
-    for seq in range(args.count):
-        p = bytearray(build_payload(seq, args.count, 0x00000001, args.len))
-        if args.mode == "bad" and seq == 1 and len(p) > 20:
-            p[20] ^= 0xFF           # 破坏第 2 帧的 fill 区，twin_recv 必须发现
-        frames.append(build_eth_ip_udp(bytes(p)))
-    if args.mode == "none":
-        frames = [build_eth_ip_udp(b"OTHERDATA" * 5, src_mac=bytes.fromhex("001122334466"))]
+    if shape == "lens":
+        lens = [26, 40, 63, 100, 200, 1200, 1496]
+        for i, L in enumerate(lens):
+            frames.append(build_eth_ip_udp(payload_for(i, len(lens), L)))
+        print("LENS:", lens)
+    else:
+        for seq in range(args.count):
+            p = bytearray(payload_for(seq, args.count, args.len))
+            if shape in ("badfill", "mixed") and seq == 1 and len(p) > 20:
+                p[20] ^= 0xFF
+            frames.append(build_eth_ip_udp(bytes(p),
+                                           vlan=(shape == "vlan"),
+                                           fcs=(shape == "fcs")))
+        if shape == "none":
+            frames = [build_eth_ip_udp(b"OTHERDATA" * 5, src_mac=bytes.fromhex("001122334466"))]
+        elif shape == "ooo":
+            order = list(range(len(frames)))
+            order[0], order[1], order[2] = order[2], order[0], order[1]
+            frames = [frames[i] for i in order]
+        elif shape == "dup":
+            frames.append(frames[1])
+        elif shape == "trunc" and frames:
+            frames[-1] = frames[-1][:-10]          # 截掉尾部 10B（udp_len 仍声明完整）
+        elif shape == "mixed":
+            frames.append(build_eth_ip_udp(payload_for(99, 100, args.len),
+                                           src_mac=bytes.fromhex("001122334466")))
 
     write_pcap(args.out, frames)
-    print(f"MOCK_PCAP: {args.out} mode={args.mode} frames={len(frames)}")
+    print(f"MOCK_PCAP: {args.out} shape={shape} frames={len(frames)}")
     return 0
 
 

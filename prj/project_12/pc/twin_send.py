@@ -82,6 +82,9 @@ def main():
                 time.sleep(args.interval_ms / 1000.0)
     except OSError as e:
         print(f"FAIL: send error after {sent} frames: {e}", file=sys.stderr)
+        print("HINT: P1 下板卡的 ARP 应答会跨光到对端板，PC 收不到 -> 必须先绑静态 ARP：", file=sys.stderr)
+        print(f"      powershell -File pc\\static_arp.ps1 -Apply -InterfaceAlias \"<网卡名>\" -BoardIp {args.dst_ip}", file=sys.stderr)
+        print("      校验：Get-NetNeighbor -IPAddress " + args.dst_ip + " 应显示 00-11-22-33-44-55 / Permanent", file=sys.stderr)
         return 1
     finally:
         sock.close()

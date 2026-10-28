@@ -19,6 +19,7 @@ param(
     [ValidateSet('Bit','BitElf')][string]$Mode = 'Bit',
     [string]$HwServer = '',
     [string]$Cable = '',
+    [switch]$ListTargets,
     [switch]$Run,
     [switch]$Force,
     [string]$Root = 'D:\FPGA\prj\project_12'
@@ -41,6 +42,29 @@ $bit = Join-Path $Root $cfg.artifacts.bit
 $elf = Join-Path $Root $cfg.artifacts.elf
 $expectBit = [string]$cfg.artifacts.expect_bit_sha256
 $expectElf = [string]$cfg.artifacts.expect_elf_sha256
+
+# -ListTargets：只读列出 hw_server 下的 target/device（不编程），用于上板第一分钟认板
+if ($ListTargets) {
+    $url = if ($HwServer -ne '') { $HwServer } else { [string]$cfg.boards.A.hw_server }
+    $tcl = Join-Path $Root 'scripts\list_targets.tcl'
+    Say "=== twin_burn [LIST-TARGETS] hw_server=$url （只读，不编程）==="
+    if (-not (Test-Path $tcl)) { throw "list_targets.tcl not found: $tcl" }
+    $env:TEMP = 'D:\FPGA\.tmp'; $env:TMP = 'D:\FPGA\.tmp'
+    Set-Location 'D:\FPGA'
+    $console = Join-Path $Root 'out\list_targets.console.log'
+    $p = Start-Process -FilePath 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' `
+            -ArgumentList @('-mode','batch','-source',$tcl,'-tclargs',$url) `
+            -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $console -RedirectStandardError "$console.err"
+    Say "exit=$($p.ExitCode)"
+    Say "log=$console"
+    Get-Content $console -ErrorAction SilentlyContinue |
+        Select-String -Pattern 'LIST_|TARGET|DEVICE' | ForEach-Object { Say $_.Line }
+    if ($p.ExitCode -ne 0) { Say "TWIN_BURN_RESULT: FAIL（见 $console）"; exit 1 }
+    Say "TWIN_BURN_RESULT: LIST_OK（确认两条线缆都在，再回填 cable_serial）"
+    exit 0
+}
+
 
 Say "=== twin_burn $(if ($dry) { '[DRY-RUN]' } else { '[RUN]' }) mode=$Mode board=$Board ==="
 Say "config : $Config"

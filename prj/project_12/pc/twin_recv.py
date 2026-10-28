@@ -92,24 +92,46 @@ def read_capture(path):
 
 # ---------------------------------------------------------------- dissection
 def parse_eth_ip_udp(frame):
-    """返回 dict 或 None（非 IPv4/UDP 直接跳过）"""
+    """返回 dict 或 None（非 IPv4/UDP 直接跳过）
+
+    2026-10-29 加固（上板前）：
+      * 支持 802.1Q VLAN 单标签（个位数 TCI），返回 vlan=1 —— 板卡不发光 VLAN，
+        若抓到 VLAN 帧说明上游/网卡加了标签，要能识别而不是当噪声丢掉；
+      * FCS 自动剥离：若帧长 == 14(+4) + IP total_len + 4，多出来的 4 字节按 FCS 处理
+        （dumpcap 一般不给 FCS，但个别网卡/驱动会给）；
+    """
     if len(frame) < 14:
         return None
     dst_mac = ":".join(f"{b:02x}" for b in frame[0:6])
     src_mac = ":".join(f"{b:02x}" for b in frame[6:12])
     etype = struct.unpack(">H", frame[12:14])[0]
+    l3_off = 14
+    vlan = 0
+    if etype == 0x8100 and len(frame) >= 18:      # 802.1Q
+        etype = struct.unpack(">H", frame[16:18])[0]
+        l3_off = 18
+        vlan = 1
     if etype != 0x0800:
-        return {"etype": etype, "dst_mac": dst_mac, "src_mac": src_mac, "l3": None}
-    ip = frame[14:]
+        return {"etype": etype, "dst_mac": dst_mac, "src_mac": src_mac,
+                "l3": None, "vlan": vlan}
+    ip = frame[l3_off:]
     if len(ip) < 20:
         return None
     ihl = (ip[0] & 0x0F) * 4
     proto = ip[9]
     tot = struct.unpack(">H", ip[2:4])[0]
+    # FCS 自动剥离（只在长度严格吻合 14+l3_off-14+tot+4 时）
+    exp_no_fcs = l3_off + tot
+    fcs_trimmed = 0
+    if len(frame) == exp_no_fcs + 4:
+        frame = frame[:-4]
+        ip = frame[l3_off:]
+        fcs_trimmed = 4
     src_ip = ".".join(str(b) for b in ip[12:16])
     dst_ip = ".".join(str(b) for b in ip[16:20])
     d = {"etype": etype, "dst_mac": dst_mac, "src_mac": src_mac,
-         "src_ip": src_ip, "dst_ip": dst_ip, "proto": proto, "l3": None}
+         "src_ip": src_ip, "dst_ip": dst_ip, "proto": proto, "l3": None,
+         "vlan": vlan, "fcs": fcs_trimmed}
     if proto != 17 or len(ip) < ihl + 8:
         return d
     udp = ip[ihl:]
@@ -151,6 +173,8 @@ def main():
     ap.add_argument("--board-mac", default="00:11:22:33:44:55", help="板卡 MAC（src 判据）")
     ap.add_argument("--port", type=int, default=1234, help="期望 UDP 端口")
     ap.add_argument("--expect-count", type=int, default=0, help="期望帧数（0=不判）")
+    ap.add_argument("--expect-len", default="", help="期望 payload 长度白名单，逗号分隔（如 100 或 26,63,200）")
+    ap.add_argument("--allow-dup", action="store_true", help="允许重复 seq（默认重复即 FAIL）")
     ap.add_argument("--dry-run", action="store_true", help="只校验参数/文件")
     args = ap.parse_args()
 
@@ -193,12 +217,14 @@ def main():
     print(f"capture: {path} ({kind}), frames={len(frames)}")
 
     target = args.board_mac.lower().replace("-", ":")
-    hits, other, bad = [], 0, 0
+    hits, other, bad, vlan_n, fcs_n = [], 0, 0, 0, 0
     for ts, fr in frames:
         d = parse_eth_ip_udp(fr)
         if not d:
             other += 1
             continue
+        vlan_n += d.get("vlan", 0)
+        fcs_n += 1 if d.get("fcs") else 0
         if d["src_mac"].lower() != target:
             other += 1
             continue
@@ -206,7 +232,8 @@ def main():
             info = looks_like_twin(d["l3"]["payload"])
             rec = {"ts": ts, "dst_mac": d["dst_mac"], "src_ip": d["src_ip"],
                    "dst_ip": d["dst_ip"], "sport": d["l3"]["sport"],
-                   "dport": d["l3"]["dport"], "plen": len(d["l3"]["payload"]), "twin": info}
+                   "dport": d["l3"]["dport"], "plen": len(d["l3"]["payload"]), "twin": info,
+                   "vlan": d.get("vlan", 0)}
             hits.append(rec)
             if info and not info["fill_ok"]:
                 bad += 1
@@ -241,6 +268,24 @@ def main():
             ok = False
     if bad:
         print(f"FAIL: {bad} frame(s) with corrupted fill pattern")
+    # 重复帧：0 丢包的判据里，重复也是缺陷（除非显式允许）
+    dup = len(seqs) - len(set(seqs)) if seqs else 0
+    if dup and not args.allow_dup:
+        print(f"FAIL: {dup} duplicate seq(s)（0 丢包场景不允许；确属预期请加 --allow-dup）")
+        ok = False
+    # 载荷长度白名单（抓到的帧长度必须与发送侧一致）
+    if args.expect_len:
+        want = {int(x) for x in args.expect_len.split(",") if x.strip()}
+        got = {r["plen"] for r in hits}
+        if not got.issubset(want):
+            print(f"FAIL: payload len(s) {sorted(got - want)} not in expected {sorted(want)}")
+            ok = False
+        else:
+            print(f"payload len(s) {sorted(got)} ⊆ expected {sorted(want)}: OK")
+    if vlan_n:
+        print(f"WARN: {vlan_n} frame(s) carry 802.1Q VLAN tag（板卡不发光 VLAN；已按 VLAN 解析）")
+    if fcs_n:
+        print(f"INFO: {fcs_n} frame(s) had trailing FCS, auto-trimmed")
     print(f"twin_recv: {'PASS' if ok else 'FAIL'}")
     print("NOTE: P1 判据只要求「PC2 网口能看到目的=PC1 的帧」；eth.dst 不是 PC2 = 预期，不是失败。")
     return 0 if ok else 1

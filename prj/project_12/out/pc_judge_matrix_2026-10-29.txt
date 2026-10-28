@@ -1,0 +1,15 @@
+# twin_recv 判据矩阵（离线 mock pcap，2026-10-29 上板前压测）
+# 生成：py pc\make_test_pcap.py --shape <s>；判定：py pc\twin_recv.py --from-pcap ...
+
+good       shape=good     expect=True  got=True  OK         
+badfill    shape=badfill  expect=False got=False OK         FAIL: 1 frame(s) with corrupted fill pattern
+none       shape=none     expect=False got=False OK         
+vlan       shape=vlan     expect=True  got=True  OK         WARN: 5 frame(s) carry 802.1Q VLAN tag（板卡不发光 VLAN；已按 VLAN 解析）
+fcs        shape=fcs      expect=True  got=True  OK         INFO: 5 frame(s) had trailing FCS, auto-trimmed
+ooo        shape=ooo      expect=True  got=True  OK         
+dup        shape=dup      expect=False got=False OK         FAIL: 1 duplicate seq(s)（0 丢包场景不允许；确属预期请加 --allow-dup）
+trunc      shape=trunc    expect=False got=False OK         FAIL: payload len(s) [90] not in expected [100]
+lens       shape=lens     expect=True  got=True  OK         
+mixed      shape=mixed    expect=False got=False OK         FAIL: 1 frame(s) with corrupted fill pattern
+
+结论：10/10 形状判定与预期一致（正例 PASS、负例 FAIL）

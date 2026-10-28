@@ -13,13 +13,19 @@
 P1 的预期现象（**不是故障**）：PC1 发的 UDP 被板 A 回显，回显帧经光纤到板 B、从板 B 的 GE1 出去；
 所以 **PC2 的网口能看到目的 = PC1 的帧**，而 PC1 收不到回包。`eth.dst != PC2 的 MAC` 是预期。
 
-## 1. 静态 ARP（可选但推荐）
+## 1. 静态 ARP（**必须**，不是可选）
+
+**为什么必须**：板卡的 ARP/ICMP/UDP 应答全部汇成 `stack_txd` 后进泵A → Aurora（`rtl/eth_ctrl.v:163-177`、
+`rtl/aurora_mem_bridge.v:657`/`:808`），**ARP 应答也跨光去了对端板**，所以 PC1 的 ARP 请求永远收不到应答，
+`sendto()` 会在 OS 层就失败。同理 `ping 192.168.1.10` 在 P1 一定不通——链路判据请看 ILA / LED T23。
 
 ```powershell
 # 只演练：
 powershell -NoProfile -ExecutionPolicy Bypass -File static_arp.ps1 -DryRun
-# 真绑（管理员）：
+# 真绑（管理员；两台 PC 各绑自己那块板）：
 powershell -NoProfile -ExecutionPolicy Bypass -File static_arp.ps1 -Apply -InterfaceAlias "Ethernet"
+# 校验：邻居表里应出现 192.168.1.10 -> 00-11-22-33-44-55（State=Permanent）
+Get-NetNeighbor -IPAddress 192.168.1.10 | Format-Table InterfaceAlias,IPAddress,LinkLayerAddress,State
 # 解除：
 powershell -NoProfile -ExecutionPolicy Bypass -File static_arp.ps1 -Apply -Remove -InterfaceAlias "Ethernet"
 ```

@@ -1,5 +1,5 @@
 {
-  "created": "2026-10-24T23:11:00+08:00",
+  "created": "2026-10-28T16:43:33+08:00",
   "purpose": "prj12 fork of prj11 (双板 P1 离线就绪); prj11 只读",
   "source_root": "D:/FPGA/prj/project_11",
   "dest_root": "D:/FPGA/prj/project_12",
@@ -17,10 +17,10 @@
     "*.jou"
   ],
   "summary": {
-    "files": 98,
+    "files": 100,
     "identical": 82,
     "modified": 4,
-    "prj12_only": 12
+    "prj12_only": 14
   },
   "files": [
     {
@@ -572,6 +572,12 @@
       "status": "prj12_only"
     },
     {
+      "dst": "scripts/list_targets.tcl",
+      "src": "D:/FPGA/prj/project_11/scripts/list_targets.tcl",
+      "sha256": "7de00569fe3cd4512bd71c517d6298d2c0903a2f50ed8e5d05037655ac9e02ab",
+      "status": "prj12_only"
+    },
+    {
       "dst": "scripts/make_fork_manifest.py",
       "src": "D:/FPGA/prj/project_11/scripts/make_fork_manifest.py",
       "sha256": "133e56544f51cd834d6e25625f2deaf8b6e08f6c3594cf63dbe8deecfac36bed",
@@ -682,13 +688,19 @@
     {
       "dst": "docs/P1_双板上板执行单_2026-10-24.md",
       "src": "D:/FPGA/prj/project_11/docs/P1_双板上板执行单_2026-10-24.md",
-      "sha256": "35ad2039a7fc02d58779c4a264f2afee1ba7b49665d1b81b1e6905a4d24eedc1",
+      "sha256": "a4895901d0915e4b9fbbb205073330c13af6e2317e155fdf95698b8b2d6e210f",
       "status": "prj12_only"
     },
     {
       "dst": "docs/P2_候选设计_透明转发_2026-10-24.md",
       "src": "D:/FPGA/prj/project_11/docs/P2_候选设计_透明转发_2026-10-24.md",
       "sha256": "67d3e9d416d8946fadded971890249ad2d4247ea9aaa2a1b64d39128f56b7da4",
+      "status": "prj12_only"
+    },
+    {
+      "dst": "docs/两板硬件清点_hardware_inventory_模板_2026-10-29.md",
+      "src": "D:/FPGA/prj/project_11/docs/两板硬件清点_hardware_inventory_模板_2026-10-29.md",
+      "sha256": "033df736afb768078c3707b3e5f21f644effef27bb2ff6bf31778686345c0b74",
       "status": "prj12_only"
     },
     {

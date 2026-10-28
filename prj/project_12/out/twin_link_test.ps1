@@ -54,6 +54,14 @@ function Step-Preflight {
         elseif ($sha -ne $exp.ToLower()) { Log-Fail "bit sha mismatch (expect=$exp)" }
         else { Say "bit sha256: MATCH" }
     }
+    # 位流与 ILA 定义必须成对（ltx 错了 ILA 认不出探针名）
+    $ltx = Join-Path $Root 'scripts\probes.ltx'
+    if (Test-Path $ltx) { Say "probes.ltx: present ($((Get-Item $ltx).Length) B)" }
+    else { Log-Warn "probes.ltx missing：ILA 抓取会认不出探针（位流与 ltx 必须成对）" }
+    # 抓包工具（PC2 判据靠 dumpcap；没有它 STEP 4 跑不了）
+    $dumpcap = Get-Command dumpcap -ErrorAction SilentlyContinue
+    if ($dumpcap) { Say "dumpcap: $($dumpcap.Source)" }
+    else { Log-Warn "dumpcap 不在 PATH（装 Wireshark 或把其目录加入 PATH；PC2 判据需要）" }
     foreach ($b in $boards) {
         $bd = $cfg.boards.$b
         Say "board $b : jtag=$($bd.jtag_serial) cable=$($bd.cable_serial) com=$($bd.com) server=$($bd.hw_server)"
@@ -74,6 +82,32 @@ function Step-Preflight {
             $ok = Test-NetConnection -ComputerName $host_ -Port $port -InformationLevel Quiet -WarningAction SilentlyContinue
             if ($ok) { Say "board $b : hw_server $($bd.hw_server) reachable" }
             else { Log-Warn "board $b : hw_server $($bd.hw_server) NOT reachable（hw_server 起了吗？）" }
+        }
+        # 静态 ARP + 网口 IP（P1 必须：板卡 ARP 应答跨光，PC 收不到，见执行单 §4.1）
+        $nicName = [string]$bd.pc_nic
+        if ($nicName -match '^<.*>$' -or $nicName -eq '') {
+            Log-Warn "board $b : pc_nic 未配置（跳过静态 ARP / 网口 IP 检查）"
+        } else {
+            $nic = Get-NetAdapter -Name $nicName -ErrorAction SilentlyContinue
+            if (-not $nic) {
+                Log-Warn "board $b : 网卡 '$nicName' 不存在（Get-NetAdapter 查真实名字；候选如下）"
+                Get-NetAdapter -ErrorAction SilentlyContinue | Select-Object -First 4 |
+                    ForEach-Object { Say "    - '$($_.Name)'  mac=$($_.MacAddress)  status=$($_.Status)" }
+            } else {
+                $want = ($bd.board_mac -replace '[:\-.]', '') -replace '(..)(?=.)', '$1-'
+                $neigh = Get-NetNeighbor -InterfaceAlias $nicName -IPAddress $bd.board_ip -ErrorAction SilentlyContinue
+                if ($neigh -and (($neigh.LinkLayerAddress -replace '[:\-.]', '') -eq ($want -replace '[:\-.]', ''))) {
+                    Say "board $b : static ARP OK ($($bd.board_ip) -> $($neigh.LinkLayerAddress), state=$($neigh.State))"
+                } elseif ($dry) {
+                    Log-Warn "board $b : 静态 ARP 未绑（dry-run 允许；实跑前必须 pc\static_arp.ps1 -Apply）"
+                } else {
+                    Log-Fail "board $b : 静态 ARP 未绑 -> PC 根本发不出包（先跑 pc\static_arp.ps1 -Apply）"
+                }
+                $ip = Get-NetIPAddress -InterfaceAlias $nicName -AddressFamily IPv4 -ErrorAction SilentlyContinue | Select-Object -First 1
+                if (-not $ip) { Log-Warn "board $b : 网卡 $nicName 没有 IPv4 地址（期望 $($bd.pc_ip)/24）" }
+                elseif ($ip.IPAddress -ne $bd.pc_ip) { Log-Warn "board $b : 网卡 $nicName ip=$($ip.IPAddress) != 期望 $($bd.pc_ip)" }
+                else { Say "board $b : NIC $nicName ip=$($bd.pc_ip) OK" }
+            }
         }
     }
     foreach ($b in $boards) {

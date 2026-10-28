@@ -41,5 +41,6 @@
     "unused_port": "SFPB=X1Y9 (B core idle in P1)",
     "module": "10G SFP+",
     "refclk_mhz": 156.25
-  }
+  },
+  "_pc_nic_note": "pc_nic must equal Get-NetAdapter Name column exactly (localized names possible; run -Step 1 -DryRun to list candidates)."
 }
