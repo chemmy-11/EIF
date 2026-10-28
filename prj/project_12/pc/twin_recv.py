@@ -174,6 +174,7 @@ def main():
     ap.add_argument("--port", type=int, default=1234, help="期望 UDP 端口")
     ap.add_argument("--expect-count", type=int, default=0, help="期望帧数（0=不判）")
     ap.add_argument("--expect-len", default="", help="期望 payload 长度白名单，逗号分隔（如 100 或 26,63,200）")
+    ap.add_argument("--expect-run-id", default="", help="期望 run_id（可写 0x2；用于区分方向）")
     ap.add_argument("--allow-dup", action="store_true", help="允许重复 seq（默认重复即 FAIL）")
     ap.add_argument("--dry-run", action="store_true", help="只校验参数/文件")
     args = ap.parse_args()
@@ -286,6 +287,15 @@ def main():
         print(f"WARN: {vlan_n} frame(s) carry 802.1Q VLAN tag（板卡不发光 VLAN；已按 VLAN 解析）")
     if fcs_n:
         print(f"INFO: {fcs_n} frame(s) had trailing FCS, auto-trimmed")
+    # 方向判别：run_id 必须与发送侧一致（PC1 发用 0x1、PC2 发用 0x2 的约定见执行单）
+    if args.expect_run_id:
+        want_rid = int(args.expect_run_id, 0)
+        got_rids = sorted({r["twin"]["run_id"] for r in hits if r["twin"]})
+        if got_rids != [want_rid]:
+            print(f"FAIL: run_id(s) {[hex(x) for x in got_rids]} != expected {hex(want_rid)}")
+            ok = False
+        else:
+            print(f"run_id: {hex(want_rid)} OK（方向判别通过）")
     print(f"twin_recv: {'PASS' if ok else 'FAIL'}")
     print("NOTE: P1 判据只要求「PC2 网口能看到目的=PC1 的帧」；eth.dst 不是 PC2 = 预期，不是失败。")
     return 0 if ok else 1

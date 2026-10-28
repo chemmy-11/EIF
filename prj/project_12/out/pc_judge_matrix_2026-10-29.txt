@@ -1,4 +1,4 @@
-# twin_recv 判据矩阵（离线 mock pcap，2026-10-29 上板前压测）
+# twin_recv 判据矩阵（离线 mock pcap，2026-10-29 上板前压测；含 --expect-run-id 方向判别）
 # 生成：py pc\make_test_pcap.py --shape <s>；判定：py pc\twin_recv.py --from-pcap ...
 
 good       shape=good     expect=True  got=True  OK         
@@ -11,5 +11,6 @@ dup        shape=dup      expect=False got=False OK         FAIL: 1 duplicate se
 trunc      shape=trunc    expect=False got=False OK         FAIL: payload len(s) [90] not in expected [100]
 lens       shape=lens     expect=True  got=True  OK         
 mixed      shape=mixed    expect=False got=False OK         FAIL: 1 frame(s) with corrupted fill pattern
+runid      shape=good     expect=False got=False OK         FAIL: run_id(s) ['0x1'] != expected 0x2
 
-结论：10/10 形状判定与预期一致（正例 PASS、负例 FAIL）
+结论：11/11 与预期一致（正例 PASS、负例 FAIL；runid 用错方向必 FAIL）
