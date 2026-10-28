@@ -2,7 +2,7 @@
 # p12_build_report.py — prj12: 从构建产物生成 P1 位流报告（markdown）
 # 输入（构建完才有）: out/impl*.console.log, out/rpt_impl_util.rpt,
 #                     scripts/probes.ltx, out/aurora_mem_bridge.bit
-# 输出: docs/构建报告_P1位流_<tag>.md
+# 输出: docs/M1_prj12_构建报告_P1位流_<tag>.md
 # 基线: prj11 round3d F6012BA0（常量写在 BASELINE 里，来源见 docs 引用）
 # 用法: py scripts\p12_build_report.py [tag]
 # =============================================================================
@@ -252,7 +252,7 @@ def main():
     A("| impl（第一次） | 被外部 Ctrl+C 中断 | 日志 `out/impl1.log`（DRC 阶段收到 ^C，与设计无关） |")
     A("| impl（重跑） | **OK** | 日志 `out/impl1b.*`；WNS/WHS/资源见 §1–§2 |")
     A("")
-    path = os.path.join(DOCS, f"构建报告_P1位流_{tag}.md")
+    path = os.path.join(DOCS, f"M1_prj12_构建报告_P1位流_{tag}.md")
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines))
     print(f"REPORT: {path}")
