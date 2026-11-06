@@ -19,6 +19,10 @@ puts "BURN_BIT: $bitfile"
 puts "BURN_ELF: $elffile"
 puts "BURN_CABLE: $cable"
 if {$url eq ""} { error "BURN_FAIL: missing hw_server url (arg0)" }
+# xsct 的 connect 要求传输前缀（tcp:<host>:<port>）；twin_burn.ps1 默认传 localhost:3121，
+# 不带 tcp: 时 xsct 直接报 "Invalid transport name"（2026-11-06 实测）。这里统一补齐。
+if {![string match "tcp:*" $url]} { set url "tcp:$url" }
+puts "BURN_URL_NORMALIZED: $url"
 if {![file exists $bitfile]} { error "BURN_FAIL: bit not found: $bitfile" }
 if {$elffile ne "-" && ![file exists $elffile]} { error "BURN_FAIL: elf not found: $elffile" }
 
