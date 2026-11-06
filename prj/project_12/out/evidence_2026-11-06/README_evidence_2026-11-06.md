@@ -71,3 +71,10 @@
 - [ ] P1-05 断电恢复：两板断电 10 s → 重烧 BitElf + `d` → 30 s 内 `channel_up=1`、计数清零不增长
 - [ ] 硬件清点表回填（`docs/M1_prj12_两板硬件清点_2026-11-06.md`）
 - [ ] PC2 侧用修好的 `twin_recv.py` 重跑 `pc2_round4.pcap` 出官方 PASS 文本
+
+## 6. 本轮收尾时的现场状态（2026-11-06 20:08:37）
+
+- 板 A：ILA6 `ch_up=0 / link_ok=0 / lane_up=0 / gt_pll_lock=1 / aurora_rst=1`，计数全 0（`ila/ila6_A_wrapcheck.csv`）
+  ⇒ 板 B 在 20:04:52 恢复之后又掉了（或未进 P1），A 侧链路随之 down；**这是预期状态，不是 A 侧故障**。
+- 板 A 最后一次健康验证：20:03:10 重烧 + `d` → 3 帧探针 `pk_frames=3 / pfwd_wr=3`（`ila/ila6_A_final_healthy.csv`）。
+- 下轮开测第一步：先让 PC2 恢复 B（`ilas=4`）→ 再整板重烧 A + `d` → 3 帧探针 `pk+3` → 才开窗口。
