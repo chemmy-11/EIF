@@ -1,4 +1,4 @@
-# prj12 · P1 上板证据包（2026-11-06）
+﻿# prj12 · P1 上板证据包（2026-11-06）
 
 > 本目录是 **2026-11-06 P1 双板上板联调**的 PC1 侧证据。PC2 侧证据在 `out/evidence_2026-11-06_pc2/`（PC2 本机）。
 > 判据口径：`docs/M1_prj12_P1双板上板执行单_2026-10-24.md` §3–§4（已按本日实测修订）；协作记录 EIF issue #1。
@@ -56,13 +56,17 @@
 - `pcap/pc1_captest.log`：Npcap 抓包工具自检（14 帧/10 s）
 - `judge/judge_*.txt`：`judge_ila6.py` 对关键 CSV 的判据输出
 - `pcap/selftest_bcast_1730.pcap`：`twin_recv.py` 新判据自测（广播 dst + `sport=1234/dport=49355`）
+- `B_RESET_evidence_2026-11-06.md`：**板 B 无规律复位**的完整证据（10 次时刻、两套方法交叉、排除项、下轮建议）
+- `ila/ila6_A_slot_pre.csv` / `ila6_A_slot_a2b.csv`：固定时钟槽回归时 A 侧前后计数（`pk` 卡死证据）
+- `ila/ila6_A_final_healthy.csv`：收尾前重烧 A 的 3 帧探针（`pk_frames=3/pfwd_wr=3`，管道健康）
 
 > 大件（ILA CSV、pcap）留在本目录不提交 git；判据文本与说明随文档提交。
 > PC2 侧证据（`pc2_round4.pcap`、`ila6_B_1709.csv`、`burn_B_1708.console.log`、`npcap_capture.py`）由 PC2 归档到其 `out/evidence_2026-11-06_pc2/`。
 
-## 5. 待办（P1 收口前必须闭环）
+## 5. 待办 / 下轮前置（2026-11-06 收尾时点）
 
-- [ ] B→A 数据面 20 帧 PASS（PC1 抓包 + PC2 发 `run_id=0x2`）
+- [x] B→A 数据面 20 帧 PASS（18:28，`pcap/pc1_b2a_final.pcap`）
+- [ ] **接线重插后的回归**：未完成（两轮都被 A 的 pack/DMA 卡死挡住，根因=先烧 A 后等 B 恢复；详见 REPORT §7）。下轮前置：对端 `ilas=4`+`ch_up=1` → 重烧本板+`d` → **3 帧探针 `pk+3`** → 再开窗口
 - [ ] 板 B 供电/USB 稳定性（无规律复位 = 每轮都要重烧两块板；这是当前唯一系统性风险）
 - [ ] P1-05 断电恢复：两板断电 10 s → 重烧 BitElf + `d` → 30 s 内 `channel_up=1`、计数清零不增长
 - [ ] 硬件清点表回填（`docs/M1_prj12_两板硬件清点_2026-11-06.md`）
