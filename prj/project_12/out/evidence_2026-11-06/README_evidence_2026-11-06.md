@@ -1,4 +1,4 @@
-﻿# prj12 · P1 上板证据包（2026-11-06）
+# prj12 · P1 上板证据包（2026-11-06）
 
 > 本目录是 **2026-11-06 P1 双板上板联调**的 PC1 侧证据。PC2 侧证据在 `out/evidence_2026-11-06_pc2/`（PC2 本机）。
 > 判据口径：`docs/M1_prj12_P1双板上板执行单_2026-10-24.md` §3–§4（已按本日实测修订）；协作记录 EIF issue #1。
@@ -32,6 +32,8 @@
 6. **回声帧 `eth.dst = ff:ff:ff:ff:ff:ff`（广播）**：板 B 的 ARP 表无 PC2 IP，跨板回声退化成广播；判据只看 `src=板卡 MAC` + TWIN payload，不看 `dst_mac`。
 7. **板卡身份**：两台机器的 JTAG 都报 `210512180081`（克隆 EEPROM 或同批烧写）⇒ 单机禁 `-Board Both`，以物理标签 A/PC1、B/PC2 区分。
 8. **抓包时段纪律**：分块抓包（每块 15 s + 判据耗时）块间有空档，20 帧 0.4 s 的突发落在空档就会漏抓（18:05:45 的 B→A 首轮就是这么漏的：A 侧计数 `up_frames/prew_wr` 都 +20，PC1 pcap 却是空）。**收尾判据必须用单次连续抓包**（`pc/npcap_capture.py --seconds 300`）。
+9. **稳定性判据的方法学漏洞**：`ch_up_evt/hard_err_cnt/soft_err_cnt` 与 `aurora_rst` 同域复位——链路掉一次再恢复时计数自己先清零，于是「两次抓取都不增长」会把「掉过一次又恢复」误判成稳定。改用 `scripts/ila_poll_stable.tcl`（单会话每 5 s 抓一次）：实测 A 侧 **60 样本 / 304 s，drops=0 resets=0**（`judge/ila_poll_stable_A_300s.txt`）。`scripts/ila_wait_drop.tcl` 的「ch_up 落下」触发不可用（Vivado 2023.1 对 1-bit 探针 `TRIGGER_COMPARE_VALUE eq0/ne1` 报 `[Designutils 20-614]`）。
+10. **串口 `d` 的假阳性**：`d` 是翻转命令、串口缓冲会堆积历次 banner；`serial_dma_mode.ps1` 原先匹配到任意 `now=DMA` 就 PASS（实测踩到：报 PASS 实际停在 bridge）。已改为**只看最后一条 banner**。
 
 ## 3. 环境与工具
 

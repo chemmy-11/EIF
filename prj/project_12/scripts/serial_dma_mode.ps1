@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # serial_dma_mode.ps1 -- prj12: put the MicroBlaze firmware into DMA write mode ('d').
 #
 # Why this is REQUIRED for prj12 P1 (2026-11-06 finding):
@@ -62,7 +62,9 @@ for ($try = 1; $try -le 3; $try++) {
     $rx = Read-For $port ($Seconds * 1000)
     $last = $rx
     Say "try ${try}: sent 'd' -> $(($rx -replace "`r?`n", ' ').Trim())"
-    if ($rx -match 'DMAMODE\s+now=DMA') { $ok = $true; break }
+    # 2026-11-06 修：串口缓冲区可能堆积之前几次的输出，必须看**最后一条** banner 才是当前状态
+    $m = [regex]::Matches($rx, 'DMAMODE\s+now=(DMA|bridge)')
+    if ($m.Count -gt 0 -and $m[$m.Count - 1].Groups[1].Value -eq 'DMA') { $ok = $true; break }
 }
 $port.Close()
 
