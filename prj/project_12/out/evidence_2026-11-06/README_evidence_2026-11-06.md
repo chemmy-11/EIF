@@ -1,4 +1,4 @@
-# prj12 · P1 上板证据包（2026-11-06）
+﻿# prj12 · P1 上板证据包（2026-11-06）
 
 > 本目录是 **2026-11-06 P1 双板上板联调**的 PC1 侧证据。PC2 侧证据在 `out/evidence_2026-11-06_pc2/`（PC2 本机）。
 > 判据口径：`docs/M1_prj12_P1双板上板执行单_2026-10-24.md` §3–§4（已按本日实测修订）；协作记录 EIF issue #1。
@@ -15,7 +15,8 @@
 | **P1-03 数据面 A→B（端到端）** | ✅ **PASS（官方判据）**：PC2 抓到 **20/20 帧**，`run_id=0x1`、`unique=20`、`dup=0`、`fill` 全 ok；仓库版 `twin_recv.py` @ `003284d` 判 `twin_recv: PASS` | PC2 `out/pc2_round4.pcap`（sha256 `a5aaf1f3…d563e3`，56 帧）；判据全文 `pc2_issue/comment_6682320881_20261106_180558.txt` |
 | **P1-04 数据面 B→A** | ✅ **逻辑闭环**：B 侧 ILA `pk_frames=20`（20 帧打包进 Aurora TX）；A 侧 ILA6 `up_frames=20`、`prev_wr=20`，ILA3 `mem2_wm/wr_frm/rd_frm=20/20/20`（PC1 pcap 判据见下条） | B：`comment_6682341507_20261106_180708.txt`；A：`ila/ila6_A_after_b2a1.csv`、`ila/ila3_A_after_b2a1.csv` |
 | **P1-04 数据面 B→A（PC1 pcap 判据）** | ✅ **PASS**：PC1 抓到 **20/20 帧**，`run_id=0x2`、`unique=20`、`dup=0`、`len=100`、`fill` 全 ok、跨度 0.39 s | `pcap/pc1_b2a_final.pcap`（sha256 `FCA2E71F…4B3A`，26,872 B，108 帧）+ `pcap/pc1_b2a_final.log` |
-| P1-05 断电恢复 | ⏳ 未做（板 B 存在无规律复位风险，先稳定供电） | — |
+| P1-05 断电恢复（板 A） | ✅ PASS：18:56:57 断电上电后重烧 BitElf+`d`，18:58:00 首次 ILA6 即 `ch_up=1`、计数清零；`scripts/p1_05_recover.ps1` 一键复现 | `ila/ila6_A_p105_185658.csv`、`judge/judge_ila6_A_p105.txt` |
+| P1-05 断电恢复（板 B） | ⏳ 待执行（需板 B 断电 + PC2 重烧；我同步重烧 A） | — |
 | P1-06 证据归档 | ⏳ 本目录（A 侧已收，B 侧待 PC2 汇总） | — |
 
 ## 2. 关键发现（本日实测，已写进执行单）

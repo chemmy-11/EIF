@@ -1,0 +1,6 @@
+﻿FILE: out\ila6_A_p105_185658.csv
+BOARD: A   ROWS: 1024
+STATE: link_ok=1 ch_up=1 lane_up=1 gt_pll_lock=1 aurora_rst=0
+COUNTERS(last): ch_up_evt=0 hard_err_cnt=0 soft_err_cnt=0 pk_frames=0 up_frames=0 pfwd_wr=1 prev_wr=0
+COUNTERS(delta in capture): ch_up_evt=0 hard_err_cnt=0 soft_err_cnt=0
+VERDICT: PASS - link up, link_ok in phase, no errors, counters stable
