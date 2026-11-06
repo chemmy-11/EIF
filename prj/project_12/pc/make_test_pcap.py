@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 make_test_pcap.py — prj12 P1: 造"假 pcap"离线压测 twin_recv.py 的判据
