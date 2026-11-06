@@ -1,4 +1,4 @@
-# prj12 · PC 侧脚本（P1 双板链路/数据面可见性）
+﻿# prj12 · PC 侧脚本（P1 双板链路/数据面可见性）
 
 > 板卡不在场时，三个脚本都可以 **dry-run**：`twin_send.py --dry-run`、`twin_recv.py --from-pcap <现成 pcap>`、`static_arp.ps1 -DryRun`。
 > 现场判据见 `../out/twin_link_test.ps1` 的 STEP 3/4（以及草案 §4.2 P1-02/P1-03）。
@@ -11,7 +11,7 @@
 | PC IP | `192.168.1.102/24` | `192.168.1.102/24`（两 PC 直连各自板卡，不共交换域） |
 
 P1 的预期现象（**不是故障**）：PC1 发的 UDP 被板 A 回显，回显帧经光纤到板 B、从板 B 的 GE1 出去；
-所以 **PC2 的网口能看到目的 = PC1 的帧**，而 PC1 收不到回包。`eth.dst != PC2 的 MAC` 是预期。
+所以 **PC2 的网口能看到板卡发出的回声帧**，而 PC1 收不到回包。2026-11-06 实测：回声帧的 `eth.dst` 是**以太网广播 `ff:ff:ff:ff:ff:ff`**（板卡 ARP 表里没有对端 PC 的 IP，跨板回声退化成广播），`eth.src` 才是板卡 MAC；判据不看 `dst_mac`。端口方向：板卡回声 `sport=1234 / dport=PC 临时端口`，`twin_recv.py` 默认 `--port-direction any`（旧版只认 dport 会假阴性）。
 
 ## 1. 静态 ARP（**必须**，不是可选）
 

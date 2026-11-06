@@ -171,7 +171,10 @@ def main():
     ap.add_argument("--seconds", type=int, default=20, help="--live 抓包时长")
     ap.add_argument("--out", default=None, help="--live 的 pcap 输出路径")
     ap.add_argument("--board-mac", default="00:11:22:33:44:55", help="板卡 MAC（src 判据）")
-    ap.add_argument("--port", type=int, default=1234, help="期望 UDP 端口")
+    ap.add_argument("--port", type=int, default=1234, help="期望 UDP 端口（板卡回声的 1234）")
+    ap.add_argument("--port-direction", choices=["any", "sport", "dport"], default="any",
+                    help="port 匹配方向：any=sport 或 dport 命中都算（默认；2026-11-06 实测板卡回声是 "
+                         "sport=1234 / dport=PC 临时端口，只认 dport 会假阴性）")
     ap.add_argument("--expect-count", type=int, default=0, help="期望帧数（0=不判）")
     ap.add_argument("--expect-len", default="", help="期望 payload 长度白名单，逗号分隔（如 100 或 26,63,200）")
     ap.add_argument("--expect-run-id", default="", help="期望 run_id（可写 0x2；用于区分方向）")
@@ -180,7 +183,7 @@ def main():
     args = ap.parse_args()
 
     print("=== twin_recv ===")
-    print(f"board-mac: {args.board_mac}  port={args.port}  expect-count={args.expect_count}")
+    print(f"board-mac: {args.board_mac}  port={args.port} ({args.port_direction})  expect-count={args.expect_count}")
 
     if args.live:
         dumpcap = shutil.which("dumpcap")
@@ -229,7 +232,16 @@ def main():
         if d["src_mac"].lower() != target:
             other += 1
             continue
-        if d.get("l3") and d["l3"]["dport"] == args.port:
+        port_hit = False
+        if d.get("l3"):
+            sport, dport = d["l3"]["sport"], d["l3"]["dport"]
+            if args.port_direction == "sport":
+                port_hit = sport == args.port
+            elif args.port_direction == "dport":
+                port_hit = dport == args.port
+            else:  # any
+                port_hit = (sport == args.port) or (dport == args.port)
+        if port_hit:
             info = looks_like_twin(d["l3"]["payload"])
             rec = {"ts": ts, "dst_mac": d["dst_mac"], "src_ip": d["src_ip"],
                    "dst_ip": d["dst_ip"], "sport": d["l3"]["sport"],
@@ -244,7 +256,7 @@ def main():
     hits.sort(key=lambda r: (r["twin"]["seq"] if r["twin"] else 1 << 16))
     seqs = [r["twin"]["seq"] for r in hits if r["twin"]]
     lens = sorted({r["plen"] for r in hits})
-    print(f"matched: {len(hits)} frame(s) src={target} dport={args.port}; other={other}")
+    print(f"matched: {len(hits)} frame(s) src={target} port={args.port}({args.port_direction}); other={other}")
     if lens:
         print(f"payload lens: {lens}")
     if seqs:
@@ -296,8 +308,11 @@ def main():
             ok = False
         else:
             print(f"run_id: {hex(want_rid)} OK（方向判别通过）")
-    print(f"twin_recv: {'PASS' if ok else 'FAIL'}")
-    print("NOTE: P1 判据只要求「PC2 网口能看到目的=PC1 的帧」；eth.dst 不是 PC2 = 预期，不是失败。")
+    print("twin_recv: PASS" if ok else "twin_recv: FAIL")
+    print("NOTE: P1 判据只要求「PC2 网口能看到板卡发出的帧」：src=板卡 MAC、payload 是 TWIN 结构即可。")
+    print("      2026-11-06 实测：板 B 的 ARP 表里没有 PC2 的 IP，回声帧退化成 **以太网广播**")
+    print("      （eth.dst=ff:ff:ff:ff:ff:ff，src=00:11:22:33:44:55）；eth.dst 不是 PC1 也不是 PC2 都属预期，")
+    print("      判据不看 dst_mac。端口方向同理：板卡回声是 sport=1234 / dport=PC 临时端口（默认 --port-direction any）。")
     return 0 if ok else 1
 
 

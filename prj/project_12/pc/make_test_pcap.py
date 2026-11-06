@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 make_test_pcap.py — prj12 P1: 造"假 pcap"离线压测 twin_recv.py 的判据
@@ -44,7 +44,7 @@ def _ip_checksum(hdr):
 
 
 def build_eth_ip_udp(payload, dst_mac=PC1_MAC, src_mac=BOARD_MAC,
-                     src_ip=BOARD_IP, dst_ip=PC1_IP, sport=1234, dport=1234,
+                     src_ip=BOARD_IP, dst_ip=PC1_IP, sport=1234, dport=49355,
                      vlan=False, fcs=False):
     udp_len = 8 + len(payload)
     udp = struct.pack(">HHHH", sport, dport, udp_len, 0) + payload
@@ -79,7 +79,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--shape", choices=["good", "badfill", "none", "vlan", "fcs",
-                                       "ooo", "dup", "trunc", "lens", "mixed"],
+                                       "ooo", "dup", "trunc", "lens", "mixed", "bcast"],
                     default="good")
     ap.add_argument("--mode", choices=["good", "bad", "none"], default=None,
                     help="(旧参数名，等价于 --shape good/badfill/none)")
@@ -103,6 +103,7 @@ def main():
             if shape in ("badfill", "mixed") and seq == 1 and len(p) > 20:
                 p[20] ^= 0xFF
             frames.append(build_eth_ip_udp(bytes(p),
+                                           dst_mac=(bytes.fromhex("ffffffffffff") if shape == "bcast" else PC1_MAC),
                                            vlan=(shape == "vlan"),
                                            fcs=(shape == "fcs")))
         if shape == "none":
