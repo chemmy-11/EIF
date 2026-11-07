@@ -95,6 +95,13 @@ module frame_mem_if #(
     // ================= DDR side (ui_clk domain) =================
     input  wire         ui_clk,
     input  wire         ui_rst_n,
+    // ★B1 (2026-11-07 dma-stall): ui 域 **FIFO 侧**复位, 必须与 user_rst_n 成对。
+    //   缺陷: 二者原本分接 ~aurora_rst / ui_rst_n, Aurora 闪断时只有一侧指针归零,
+    //         另一侧留在 Q -> 水位读成 8192-Q -> wr_hold 永久粘滞 -> 写通路自锁,
+    //         且只有 ui_rst_n(=MIG ui_clk_sync_rst, 仅 POR/按键/重配置)能清。
+    //   范围: 只驱动下面 5 个 async_fifo 的 ui 侧指针；桥/槽表仍用 ui_rst_n
+    //         (避免 AXI 读 burst 中途被断)。见 out/evidence_2026-11-07_dma_stall/。
+    input  wire         ui_link_rst_n,
     input  wire         calib_ok,         // init_calib_complete (ui_clk)
     // status / counters -- MUST be probed by a ui_clk ILA (AGENTS.md S5.2)
     output wire [15:0]  ro_wm,
@@ -188,29 +195,29 @@ module frame_mem_if #(
     async_fifo #(.DW(8), .AW(BF_AW)) u_wr_bytes (
         .wr_clk(user_clk), .wr_rst_n(user_rst_n), .wr_data(wr_data), .wr_en(ub_wr_en),
         .wr_full(ub_full), .wr_level(ub_wl),
-        .rd_clk(ui_clk), .rd_rst_n(ui_rst_n), .rd_data(ub_dout), .rd_en(ub_rd_en),
+        .rd_clk(ui_clk), .rd_rst_n(ui_link_rst_n), .rd_data(ub_dout), .rd_en(ub_rd_en),
         .rd_empty(ub_empty), .rd_level(ub_rl));
 
     async_fifo #(.DW(16), .AW(DF_AW)) u_wr_desc (
         .wr_clk(user_clk), .wr_rst_n(user_rst_n), .wr_data(ud_din), .wr_en(ud_wr_en),
         .wr_full(ud_full), .wr_level(),
-        .rd_clk(ui_clk), .rd_rst_n(ui_rst_n), .rd_data(ud_dout), .rd_en(ud_rd_en),
+        .rd_clk(ui_clk), .rd_rst_n(ui_link_rst_n), .rd_data(ud_dout), .rd_en(ud_rd_en),
         .rd_empty(ud_empty), .rd_level());
 
     async_fifo #(.DW(9), .AW(2)) u_rd_cmd (
         .wr_clk(user_clk), .wr_rst_n(user_rst_n), .wr_data(uc_din), .wr_en(uc_wr_en),
         .wr_full(uc_full), .wr_level(),
-        .rd_clk(ui_clk), .rd_rst_n(ui_rst_n), .rd_data(uc_dout), .rd_en(uc_rd_en),
+        .rd_clk(ui_clk), .rd_rst_n(ui_link_rst_n), .rd_data(uc_dout), .rd_en(uc_rd_en),
         .rd_empty(uc_empty), .rd_level());
 
     async_fifo #(.DW(8), .AW(BF_AW)) u_rd_bytes (
-        .wr_clk(ui_clk), .wr_rst_n(ui_rst_n), .wr_data(rb_din), .wr_en(rb_wr_en),
+        .wr_clk(ui_clk), .wr_rst_n(ui_link_rst_n), .wr_data(rb_din), .wr_en(rb_wr_en),
         .wr_full(rb_full), .wr_level(rb_level),
         .rd_clk(user_clk), .rd_rst_n(user_rst_n), .rd_data(rb_dout), .rd_en(rb_rd_en),
         .rd_empty(rb_empty), .rd_level());
 
     async_fifo #(.DW(25), .AW(2)) u_rd_desc (
-        .wr_clk(ui_clk), .wr_rst_n(ui_rst_n), .wr_data(rdesc_din), .wr_en(rdesc_wr_en),
+        .wr_clk(ui_clk), .wr_rst_n(ui_link_rst_n), .wr_data(rdesc_din), .wr_en(rdesc_wr_en),
         .wr_full(rd_full), .wr_level(),
         .rd_clk(user_clk), .rd_rst_n(user_rst_n), .rd_data(rd_dout), .rd_en(rd_pop),
         .rd_empty(rd_empty), .rd_level());

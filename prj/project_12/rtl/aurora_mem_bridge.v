@@ -244,6 +244,26 @@ wire [511:0] dbg_bus;
 wire        mig_sys_rst = ~sys_rst_n;  // ★ 取反! prj4 教训(见文件头注释 4)
 wire        ui_rst_n = ~ui_sync_rst;
 
+//--------------------------------------------------------------------------
+// ★B1 (2026-11-07 dma-stall): Aurora 事件在 ui 域的镜像复位(与 ~aurora_rst 成对)
+//   缺陷: frame_mem_if 内 5 个跨时钟 async_fifo 的 wr_rst_n/rd_rst_n 原本分接
+//         ~aurora_rst 与 ui_rst_n。channel_up 一掉, 写指针归零而 ui 读指针不动,
+//         字节 FIFO 水位读成 8192-Q -> wr_hold 永久粘滞 -> 写通路自锁, 且只有
+//         ui_rst_n(=MIG ui_clk_sync_rst, 仅 POR/按键/整板重配置)能清 => 现场
+//         症状"发 d 无效, 只有整板 BitElf 重烧能恢复"。
+//   形状: 异步置位 / 同步延时释放(展宽约 4 个 ui_clk)。ui 侧先复位、后释放,
+//         释放时 rd_bin=0 与"空 FIFO"一致, 不与 user 侧合法写入冲突。
+//   范围: 只给 FIFO 的 ui 侧指针; 桥/槽表仍吃 ui_rst_n(避免 AXI 读 burst 中途被断)。
+//   依据: out/evidence_2026-11-07_dma_stall/{AUDIT_mechanism.md,FIX_PLAN.md}
+//--------------------------------------------------------------------------
+reg [3:0] arst_ui_pipe;
+always @(posedge ui_clk or negedge ui_rst_n) begin
+    if (!ui_rst_n) arst_ui_pipe <= 4'hF;
+    else           arst_ui_pipe <= {arst_ui_pipe[2:0], aurora_rst};
+end
+wire aurora_rst_ui = |arst_ui_pipe;
+wire ui_link_rst_n = ui_rst_n & ~aurora_rst_ui;
+
 // ---- 内存桥 ↔ MIG 的 AXI4（37 信号）----
 wire [31:0] m_awaddr; wire [7:0] m_awlen; wire [2:0] m_awsize; wire [1:0] m_awburst;
 wire        m_awvalid, m_awready;
@@ -836,6 +856,7 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .ro_outstanding_sync(mem_outstanding_sync),
     // DDR 侧 (ui_clk)
     .ui_clk(ui_clk), .ui_rst_n(ui_rst_n), .calib_ok(calib),
+    .ui_link_rst_n(ui_link_rst_n),          // ★B1: FIFO ui 侧复位与 ~aurora_rst 成对
     .ro_wm(mem_wm), .ro_wr_frame(mem_wr_frame), .ro_wr_stall(mem_wr_stall),
     .ro_rd_frame(mem_rd_frame), .ro_ill_rd(mem_ill_rd), .ro_noframe(mem_noframe),
     .ro_bresp_err(mem_bresp_err), .ro_len_err(mem_len_err),
@@ -992,6 +1013,7 @@ frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_mem
     .ro_outstanding_sync(mem2_outstanding_sync),
     // DDR 侧 (ui_clk)  —— 桥② EGRESS
     .ui_clk(ui_clk), .ui_rst_n(ui_rst_n), .calib_ok(calib),
+    .ui_link_rst_n(ui_link_rst_n),          // ★B1: FIFO ui 侧复位与 ~aurora_rst 成对
     .ro_wm(mem2_wm), .ro_wr_frame(mem2_wr_frame), .ro_wr_stall(mem2_wr_stall),
     .ro_rd_frame(mem2_rd_frame), .ro_ill_rd(mem2_ill_rd), .ro_noframe(mem2_noframe),
     .ro_bresp_err(mem2_bresp_err), .ro_len_err(mem2_len_err),
