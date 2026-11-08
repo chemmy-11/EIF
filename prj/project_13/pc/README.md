@@ -1,0 +1,60 @@
+﻿# prj12 · PC 侧脚本（P1 双板链路/数据面可见性）
+
+> 板卡不在场时，三个脚本都可以 **dry-run**：`twin_send.py --dry-run`、`twin_recv.py --from-pcap <现成 pcap>`、`static_arp.ps1 -DryRun`。
+> 现场判据见 `../out/twin_link_test.ps1` 的 STEP 3/4（以及草案 §4.2 P1-02/P1-03）。
+
+## 0. 先钉死两件事
+
+| 项 | 板 A/PC1 | 板 B/PC2 |
+|---|---|---|
+| 板卡 IP / MAC | `192.168.1.10` / `00:11:22:33:44:55` | 同（P1 两板同一位流，各自独立 L2） |
+| PC IP | `192.168.1.102/24` | `192.168.1.102/24`（两 PC 直连各自板卡，不共交换域） |
+
+P1 的预期现象（**不是故障**）：PC1 发的 UDP 被板 A 回显，回显帧经光纤到板 B、从板 B 的 GE1 出去；
+所以 **PC2 的网口能看到板卡发出的回声帧**，而 PC1 收不到回包。2026-11-06 实测：回声帧的 `eth.dst` 是**以太网广播 `ff:ff:ff:ff:ff:ff`**（板卡 ARP 表里没有对端 PC 的 IP，跨板回声退化成广播），`eth.src` 才是板卡 MAC；判据不看 `dst_mac`。端口方向：板卡回声 `sport=1234 / dport=PC 临时端口`，`twin_recv.py` 默认 `--port-direction any`（旧版只认 dport 会假阴性）。
+
+## 1. 静态 ARP（**必须**，不是可选）
+
+**为什么必须**：板卡的 ARP/ICMP/UDP 应答全部汇成 `stack_txd` 后进泵A → Aurora（`rtl/eth_ctrl.v:163-177`、
+`rtl/aurora_mem_bridge.v:657`/`:808`），**ARP 应答也跨光去了对端板**，所以 PC1 的 ARP 请求永远收不到应答，
+`sendto()` 会在 OS 层就失败。同理 `ping 192.168.1.10` 在 P1 一定不通——链路判据请看 ILA / LED T23。
+
+```powershell
+# 只演练：
+powershell -NoProfile -ExecutionPolicy Bypass -File static_arp.ps1 -DryRun
+# 真绑（管理员；两台 PC 各绑自己那块板）：
+powershell -NoProfile -ExecutionPolicy Bypass -File static_arp.ps1 -Apply -InterfaceAlias "Ethernet"
+# 校验：邻居表里应出现 192.168.1.10 -> 00-11-22-33-44-55（State=Permanent）
+Get-NetNeighbor -IPAddress 192.168.1.10 | Format-Table InterfaceAlias,IPAddress,LinkLayerAddress,State
+# 解除：
+powershell -NoProfile -ExecutionPolicy Bypass -File static_arp.ps1 -Apply -Remove -InterfaceAlias "Ethernet"
+```
+
+## 2. PC1 发送
+
+```powershell
+py twin_send.py --dst-ip 192.168.1.10 --dst-port 1234 --count 20 --len 100
+py twin_send.py --dry-run          # 只看计划与前 3 帧 payload
+```
+
+payload 自带结构：`"TWIN"|seq(2)|count(2)|run_id(4)|fill(...)`，PC2 侧逐字节校验。
+
+## 3. PC2 抓包 + 判据
+
+```powershell
+# 现场抓（dumpcap 来自 Wireshark；filter 只收板卡发出的帧）
+dumpcap -D                                   # 查网卡编号
+dumpcap -i 3 -f "ether src 00:11:22:33:44:55" -a duration:30 -w pc2.pcap
+# 解析
+py twin_recv.py --from-pcap pc2.pcap --board-mac 00:11:22:33:44:55 --port 1234 --expect-count 20
+# 或者一条命令（内部调 dumpcap）：
+py twin_recv.py --live --iface "Ethernet" --seconds 30 --out pc2.pcap --expect-count 20
+```
+
+判据（PASS 条件）：`matched > 0`、`fill` 全 ok、`expect-count` 满足；输出会打印每帧 `seq/total/run_id`。
+如果 `matched=0`：先看 `other` 计数——`other` 也不动 ⇒ 网卡/混杂模式/filter 问题；`other>0` 但 matched=0 ⇒ MAC 或端口判据不对。
+
+## 4. 反向（P1-04）
+
+把两端的角色对调：PC2 发（`twin_send.py` 在 PC2 上跑）、PC1 抓（`twin_recv.py` 在 PC1 上跑）。
+payload 的 `--run-id` 换一个值，便于区分方向。

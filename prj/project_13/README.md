@@ -1,0 +1,54 @@
+# project_13 — prj12 P2 透明 IPv4 转发（v0.2 契约）起点
+
+## 这是什么
+
+- **来源**：2026-11-08 从 `prj12`（`D:\FPGA\prj\project_12`）fork 的**源码骨架**（不含任何构建产物）。
+- **目的**：承接交付仓 issue #10 的 **P2 契约 v0.2——IPv4 packet 透明转发**：
+  - 只换 14 B 以太网头（dst=PEER_MAC, src=BOARD_MAC, `0x0800`），**IP 包逐字节不变**（源/目的 IP、端口、TTL、IP/UDP checksum、DSCP、options、分片字段全保留）；
+  - 只转发 `dst=PEER_IP` 的 IPv4；`BOARD_IP` 走本地栈；其它 dst / VLAN / IPv6 / 广播 / 组播 / 超长 / 坏 IP header checksum / 截断帧 → **DROP + 各自计数**；
+  - ARP 只在本地终结、**不跨板**；静态 ARP 为主；
+  - 关闭旧的回显路径（`des_mac=src_mac`），防 A↔B 乒乓环。
+- **包含 B1 修复**：本 fork 的 `rtl/frame_mem_if.v` + `rtl/aurora_mem_bridge.v` 已含 **B1 复位配对补丁**（`ui_link_rst_n = ui_rst_n & ~aurora_rst_ui`，接到 `u_mem`/`u_mem2` 的 FIFO ui 侧复位）。该补丁 **xsim 已 PASS、位流已构建（`E9BE2B14`）、尚未上板验证**——详见 `prj/project_12/out/evidence_2026-11-07_dma_stall/BUILD_B1_2026-11-07.md`。
+
+## 与 prj12 的差异（截至 fork 时点）
+
+- **源码零差异**（rtl/xdc/sim/sw/docs/pc 全量复制；脚本里的 `project_12` 路径已改为 `project_13`，`create_project` 工程名改为 `prj13`）；
+- 未复制：`vivado/`（383 MB 工程目录，按需重建）、`scripts/*.dcp/*.ltx/*.bit`、`out/`（证据与产物）；
+- `p2_candidate/` 只保留历史 `result.txt`（旧 v0.1 候选的 TB 产物已清，源码树里本就没有对应 RTL）。
+
+## 构建流程（与本机 PC1 一致）
+
+```powershell
+cd D:\FPGA\prj\project_13
+# 1) 建工程（IP 从 prj9/prj10 只读 import：aurora×3、async_fifo、ddr4_0）
+$env:TEMP='D:\FPGA\.tmp'; $env:TMP='D:\FPGA\.tmp'
+vivado -mode batch -source scripts\create_project.tcl -notrace
+# 2) 综合（约 5 min）
+vivado -mode batch -source scripts\build_synth_only.tcl -notrace
+# 3) 实现 + 位流（约 30–40 min；自带 WNS>=0 && WHS>=0 守门，否则不写位流）
+vivado -mode batch -source scripts\build_impl.tcl -notrace
+```
+
+产物：`out/aurora_mem_bridge.bit` + `scripts/probes.ltx`（**成对**）+ `out/rpt_impl_timing_summary.rpt`。
+> 注意：产物文件名沿用 `aurora_mem_bridge`（顶层实体名不变）。**prj13 的位流与 prj12 不通用**，烧录时必须与同次构建的 `probes.ltx` 配对；建议出片后立刻改名为 `aurora_mem_bridge_p2_<指纹>.bit` 并在交付仓 `fpga/bitstreams/INDEX.md` 登记。
+
+## 验收判据（P2，交付仓 #10）
+
+1. TB 断言：relay 输出的 IPv4 包与输入**逐字节相同**（除新加的 14 B 头）；
+2. DROP 计数器各自递增：VLAN / IPv6 / 非 IP EtherType / 广播 / 组播 / 未知 dst / 超长 / 坏 IP header checksum / 帧截断；
+3. ARP 不跨板；无 A↔B 乒乓环；本地回显与转发不共存；
+4. 计数器清单落地（`rx_frames`…`aurora_channel_up`/`hard_err`/`soft_err`）；
+5. 上板：PC1→A→B→PC2 单向 `ping`/UDP 与反向，IP 包内容不变，丢包 0（**板 B 稳定性 / B1 验证通过后**）。
+
+## 状态
+
+- [x] 骨架 fork（源码 + 脚本路径改写 + README + fork manifest）
+- [ ] P2 RTL：`ipv4_packet_extract.v` / `eth_rewrap.v` / `local_steer.v`（v0.2）+ 单板环路 TB
+- [ ] 首次构建出 P2 候选位流
+- [ ] 上板验收（需板）
+
+## 纪律
+
+- **prj12 只收 P1/B1 修复**；P2 新功能一律进 prj13；共性 bug 修复用同一 patch 文件两边 apply；
+- 不把 B1 当"已验证"对外引用，直到 `VERIFY_ON_BOARD.md` 的核心判据通过；
+- 位流/ltx 必须成对，版本哈希登记到交付仓 `fpga/bitstreams/INDEX.md`。
