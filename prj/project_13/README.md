@@ -43,12 +43,27 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 ## 状态
 
 - [x] 骨架 fork（源码 + 脚本路径改写 + README + fork manifest）
-- [ ] P2 RTL：`ipv4_packet_extract.v` / `eth_rewrap.v` / `local_steer.v`（v0.2）+ 单板环路 TB
+- [x] P2 RTL：`rtl/p2/{ipv4_packet_extract,eth_rewrap,local_steer}.v`（v0.2）+ 单板环路 TB（`sim/p2/`，**xsim 21/21 PASS**，含 4 组变异测试；2026-11-08）
+- [x] P0/P1 离线工程化（2026-11-08）：地址/ARP 方案、`p1_selfcheck.ps1` + `p1_judge.py`（mock 25/25）、PC 侧发帧基准、B1 回归 `sim/regress.ps1`（12/12）、`stall_watchdog.ps1`、QSPI 方案、吞吐批量方案
+- [ ] P2 顶层集成（接 `aurora_mem_bridge.v` + 关掉 `des_mac=src_mac` 旧回显 + 本地栈应答出本板 GE2）
 - [ ] 首次构建出 P2 候选位流
 - [ ] 上板验收（需板）
+
+### 2026-11-08 离线产出索引（证据在磁盘、不入库；见 `.gitignore`）
+
+| 主题 | 文档 | 一键入口 |
+|---|---|---|
+| P2 RTL 接口契约 | `docs/M1_prj13_P2_RTL接口契约_v0.2_2026-11-08.md` | `sim/p2/run_p2_sim.ps1` |
+| 地址与 ARP | `docs/M1_P2地址与ARP方案_v0.2_2026-11-08.md` | `pc/static_arp.ps1 -DryRun` |
+| M1 判据 | `docs/M1_多尺寸与10MiB判据_2026-11-08.md` | `scripts/p1_selfcheck.ps1 -DryRun` |
+| PC 发帧基准 | `docs/M1_PC侧发帧能力基准_2026-11-08.md` | `pc/twin_send.py --bench` |
+| B1 回归 | `docs/P1_B1回归套件_2026-11-08.md` | `sim/regress.ps1 -Scenario all` |
+| QSPI 固化 | `docs/P1_QSPI固化方案_2026-11-08.md` | `scripts/qspi_program.ps1 -DryRun` |
+| 吞吐批量 | `docs/M1_吞吐批量路径方案_2026-11-08.md` | —（本轮不实现） |
 
 ## 纪律
 
 - **prj12 只收 P1/B1 修复**；P2 新功能一律进 prj13；共性 bug 修复用同一 patch 文件两边 apply；
 - 不把 B1 当"已验证"对外引用，直到 `VERIFY_ON_BOARD.md` 的核心判据通过；
-- 位流/ltx 必须成对，版本哈希登记到交付仓 `fpga/bitstreams/INDEX.md`。
+- 位流/ltx 必须成对，版本哈希登记到交付仓 `fpga/bitstreams/INDEX.md`；
+- **出片后立刻建 `prj13/out/twin_config.json`**（否则 `p1_selfcheck` 会回落到 prj12 的 P1 基线对，M1 复现正确但会误以为烧了 prj13 新位流）。

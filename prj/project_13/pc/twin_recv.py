@@ -12,6 +12,16 @@ twin_recv.py — prj12 P1: PC2 侧抓包判据（pcap 离线解析 / dumpcap 现
   py pc\\twin_recv.py --from-pcap out\\pc2.pcap --board-mac 00:11:22:33:44:55
   py pc\\twin_recv.py --live --iface "Ethernet" --seconds 20 --out out\\pc2.pcap
   py pc\\twin_recv.py --from-pcap out\\pc2.pcap --dry-run     # 只校验参数/文件
+
+P2 多值判据（2026-11-08 增补，P0-2）:
+  py pc\\twin_recv.py --from-pcap p2.pcap --scheme protocol --pair B ^
+     --expect-dst-ip 192.168.50.2 --expect-dst-ip 192.168.50.1 --no-bcast
+  * --board-mac 可重复（板卡 MAC 多值：P1 00:11:22:33:44:55 / P2 02:00:00:00:0A:01、0B:01）；
+    不给时默认匹配「全部已知板卡 MAC」（P1+P2 protocol/handbook），并在 banner 里列出来；
+  * --expect-dst-ip 可重复（本端 PC IP + 对端 PC IP 都算命中）；--expect-dst-mac 可重复；
+  * --no-bcast：命中帧的 eth.dst 若是广播即 FAIL —— P2 新口径要求单播（P1 广播回声已废止）；
+  * --port-direction 默认 any 保持不变。
+  * 注意：MAC 一律按 **src** 判（P1 实测回声帧 dst=广播，src 才是板卡 MAC）。
 """
 import argparse
 import os
@@ -163,15 +173,27 @@ def _first_diff(a, b):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="prj12 P1 capture judge (PC2 side)")
+    ap = argparse.ArgumentParser(description="prj13 P2 capture judge (either PC side)")
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--from-pcap", help="离线解析现成 pcap/pcapng")
     src.add_argument("--live", action="store_true", help="调 dumpcap 现场抓包再解析")
     ap.add_argument("--iface", default=None, help="网卡名（--live 必填，dumpcap -i 的值）")
     ap.add_argument("--seconds", type=int, default=20, help="--live 抓包时长")
     ap.add_argument("--out", default=None, help="--live 的 pcap 输出路径")
-    ap.add_argument("--board-mac", default="00:11:22:33:44:55", help="板卡 MAC（src 判据）")
-    ap.add_argument("--port", type=int, default=1234, help="期望 UDP 端口（板卡回声的 1234）")
+    ap.add_argument("--scheme", choices=["protocol", "handbook", "p1"], default=None,
+                    help="可选：按地址方案自动填 --board-mac（不给 --board-mac 时生效）")
+    ap.add_argument("--pair", choices=["A", "B"], default=None,
+                    help="配合 --scheme：只认该板的 MAC；不给则 scheme 里两块板的 MAC 都认")
+    ap.add_argument("--board-mac", action="append", default=None, metavar="MAC",
+                    help="板卡 MAC（src 判据），可重复给多个。默认=全部已知板卡 MAC"
+                         "（00:11:22:33:44:55 / 02:00:00:00:0A:01 / 02:00:00:00:0B:01）")
+    ap.add_argument("--expect-dst-ip", action="append", default=None, metavar="IP",
+                    help="期望 IP 目的地址，可重复（本端 PC IP / 对端 PC IP 都可给）；不给=不判")
+    ap.add_argument("--expect-dst-mac", action="append", default=None, metavar="MAC",
+                    help="期望以太网目的 MAC，可重复；不给=不判（P1 实测回声帧 dst=广播）")
+    ap.add_argument("--no-bcast", action="store_true",
+                    help="命中帧 eth.dst 若是广播/组播即 FAIL —— P2 新口径要求单播目的 MAC")
+    ap.add_argument("--port", type=int, default=1234, help="期望 UDP 端口（板卡回声的 1234；P2 业务 47001）")
     ap.add_argument("--port-direction", choices=["any", "sport", "dport"], default="any",
                     help="port 匹配方向：any=sport 或 dport 命中都算（默认；2026-11-06 实测板卡回声是 "
                          "sport=1234 / dport=PC 临时端口，只认 dport 会假阴性）")
@@ -182,24 +204,84 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="只校验参数/文件")
     args = ap.parse_args()
 
-    print("=== twin_recv ===")
-    print(f"board-mac: {args.board_mac}  port={args.port} ({args.port_direction})  expect-count={args.expect_count}")
+    # ---- 板卡 MAC 判据集合（多值）
+    KNOWN_BOARD_MACS = {
+        "p1": {"A": ["00:11:22:33:44:55"], "B": ["00:11:22:33:44:55"]},
+        "protocol": {"A": ["02:00:00:00:0a:01"], "B": ["02:00:00:00:0b:01"]},
+        "handbook": {"A": ["02:00:00:00:0a:01"], "B": ["02:00:00:00:0b:01"]},
+    }
+    mac_source = "explicit --board-mac"
+    if args.board_mac:
+        mac_list = [m.lower().replace("-", ":") for m in args.board_mac]
+    elif args.scheme:
+        pairs = [args.pair] if args.pair else ["A", "B"]
+        mac_list = []
+        for p in pairs:
+            mac_list += KNOWN_BOARD_MACS[args.scheme][p]
+        mac_source = f"--scheme {args.scheme}" + (f" --pair {args.pair}" if args.pair else " (both pairs)")
+    else:
+        mac_list = sorted({m for s in KNOWN_BOARD_MACS.values() for v in s.values() for m in v})
+        mac_source = ("default: every known board MAC (P1 + P2 protocol/handbook) -- "
+                      "pass --board-mac (or --scheme) to be strict")
+    mac_set = set(mac_list)
+    dst_ip_set = {ip for ip in (args.expect_dst_ip or [])}
+    dst_mac_set = {m.lower().replace("-", ":") for m in (args.expect_dst_mac or [])}
+
+    print("=== twin_recv (prj13 P2) ===")
+    print(f"board-mac: {', '.join(sorted(mac_set))}   [{mac_source}]")
+    print(f"dst-ip   : {', '.join(sorted(dst_ip_set)) if dst_ip_set else '(not judged)'}")
+    print(f"dst-mac  : {', '.join(sorted(dst_mac_set)) if dst_mac_set else '(not judged)'}"
+          f"  no-bcast={args.no_bcast}")
+    print(f"port     : {args.port} ({args.port_direction})  expect-count={args.expect_count}")
+
+    # ---------------- 参数自检（dry-run 在任何机器上都必须能过：无板、无网卡、无 pcap）
+    if args.port < 0 or args.port > 65535:
+        print(f"FAIL: --port {args.port} 超出 0..65535", file=sys.stderr)
+        return 1
+    if args.expect_count < 0:
+        print(f"FAIL: --expect-count {args.expect_count} < 0", file=sys.stderr)
+        return 1
+    for m in list(mac_set) + list(dst_mac_set):
+        try:
+            if len(m.split(":")) != 6:
+                raise ValueError
+            bytes.fromhex(m.replace(":", ""))
+        except ValueError:
+            print(f"FAIL: bad MAC {m!r}（want AA:BB:CC:DD:EE:FF）", file=sys.stderr)
+            return 1
+    if args.expect_len:
+        try:
+            [int(x) for x in args.expect_len.split(",") if x.strip()]
+        except ValueError:
+            print(f"FAIL: --expect-len {args.expect_len!r} 不是逗号分隔的整数", file=sys.stderr)
+            return 1
+    if args.expect_run_id:
+        try:
+            int(args.expect_run_id, 0)
+        except ValueError:
+            print(f"FAIL: --expect-run-id {args.expect_run_id!r} 不是整数（可写 0x2）", file=sys.stderr)
+            return 1
 
     if args.live:
         dumpcap = shutil.which("dumpcap")
-        if not dumpcap:
-            print("FAIL: dumpcap 不在 PATH（装 Wireshark 或把 dumpcap 目录加入 PATH）", file=sys.stderr)
-            return 1
         if not args.iface:
             print("FAIL: --live 需要 --iface（dumpcap -D 列网卡）", file=sys.stderr)
             return 1
         out = args.out or os.path.join(tempfile.gettempdir(), "twin_live.pcap")
-        cmd = [dumpcap, "-i", args.iface, "-a", f"duration:{args.seconds}",
-               "-f", f"ether src {args.board_mac}", "-w", out, "-q"]
+        flt = " or ".join(f"(ether src {m})" for m in sorted(mac_set))
+        if len(mac_set) > 1:
+            flt = "(" + flt + ")"
+        cmd = [dumpcap or "<dumpcap>", "-i", args.iface, "-a", f"duration:{args.seconds}",
+               "-f", flt, "-w", out, "-q"]
         print("CMD:", " ".join(cmd))
         if args.dry_run:
-            print("DRY_RUN: 未抓包")
+            if not dumpcap:
+                print("WARN: dumpcap 不在 PATH（真抓包前需装 Wireshark / 加 PATH）")
+            print("DRY_RUN: 未抓包（参数校验通过）")
             return 0
+        if not dumpcap:
+            print("FAIL: dumpcap 不在 PATH（装 Wireshark 或把 dumpcap 目录加入 PATH）", file=sys.stderr)
+            return 1
         rc = subprocess.call(cmd)
         if rc != 0 or not os.path.exists(out):
             print(f"FAIL: dumpcap rc={rc}", file=sys.stderr)
@@ -208,29 +290,48 @@ def main():
     else:
         path = args.from_pcap
         if not path:
+            if args.dry_run:
+                print("DRY_RUN: 无抓包源（没给 --from-pcap / --live）-> 仅参数校验通过")
+                return 0
             print("FAIL: 需要 --from-pcap 或 --live", file=sys.stderr)
             return 1
         if not os.path.exists(path):
+            if args.dry_run:
+                print(f"WARN: file not found: {path}")
+                print("DRY_RUN: 仅参数校验通过（文件缺失不影响参数自检）")
+                return 0
             print(f"FAIL: file not found: {path}", file=sys.stderr)
             return 1
         if args.dry_run:
-            print(f"DRY_RUN: 将解析 {path}（{os.path.getsize(path)} B）")
+            print(f"DRY_RUN: 将解析 {path}（{os.path.getsize(path)} B），参数校验通过")
             return 0
 
     frames, kind = read_capture(path)
     print(f"capture: {path} ({kind}), frames={len(frames)}")
 
-    target = args.board_mac.lower().replace("-", ":")
+    target = ", ".join(sorted(mac_set))
     hits, other, bad, vlan_n, fcs_n = [], 0, 0, 0, 0
+    other_mac, other_dst_ip, other_dst_mac, bcast_hits = 0, 0, 0, 0
+    other_nonsense, port_miss = 0, 0
     for ts, fr in frames:
         d = parse_eth_ip_udp(fr)
         if not d:
             other += 1
+            other_nonsense += 1
             continue
         vlan_n += d.get("vlan", 0)
         fcs_n += 1 if d.get("fcs") else 0
-        if d["src_mac"].lower() != target:
+        if d["src_mac"].lower() not in mac_set:
             other += 1
+            other_mac += 1
+            continue
+        if dst_ip_set and (d.get("dst_ip") or "").lower() not in dst_ip_set:
+            other += 1
+            other_dst_ip += 1
+            continue
+        if dst_mac_set and d["dst_mac"].lower() not in dst_mac_set:
+            other += 1
+            other_dst_mac += 1
             continue
         port_hit = False
         if d.get("l3"):
@@ -248,15 +349,22 @@ def main():
                    "dport": d["l3"]["dport"], "plen": len(d["l3"]["payload"]), "twin": info,
                    "vlan": d.get("vlan", 0)}
             hits.append(rec)
+            if d["dst_mac"].lower() == "ff:ff:ff:ff:ff:ff" or (
+                    int(d["dst_mac"][:2], 16) & 1):
+                bcast_hits += 1
             if info and not info["fill_ok"]:
                 bad += 1
         else:
             other += 1
+            port_miss += 1
 
     hits.sort(key=lambda r: (r["twin"]["seq"] if r["twin"] else 1 << 16))
     seqs = [r["twin"]["seq"] for r in hits if r["twin"]]
     lens = sorted({r["plen"] for r in hits})
-    print(f"matched: {len(hits)} frame(s) src={target} port={args.port}({args.port_direction}); other={other}")
+    print(f"matched: {len(hits)} frame(s) src in [{target}] port={args.port}({args.port_direction}); other={other}")
+    if other:
+        print(f"  other breakdown: not-a-frame/non-ipv4={other_nonsense} other-src-mac={other_mac}"
+              f" dst-ip-miss={other_dst_ip} dst-mac-miss={other_dst_mac} port-miss={port_miss}")
     if lens:
         print(f"payload lens: {lens}")
     if seqs:
@@ -308,11 +416,28 @@ def main():
             ok = False
         else:
             print(f"run_id: {hex(want_rid)} OK（方向判别通过）")
+    # 目的 MAC 口径：P2 新口径要求单播（旧「回声 dst=广播」口径已废止）
+    if args.no_bcast:
+        if not hits:
+            print("dst-mac: SKIP (--no-bcast but no matched frame; see the FAIL above)")
+        elif bcast_hits:
+            print(f"FAIL: {bcast_hits}/{len(hits)} matched frame(s) have broadcast/multicast eth.dst -- "
+                  f"P2 requires unicast dst (the P1 broadcast echo shape is RETIRED)")
+            ok = False
+        else:
+            print(f"dst-mac: {len(hits)}/{len(hits)} matched frame(s) unicast: OK (--no-bcast)")
+    if dst_ip_set:
+        if not hits:
+            print(f"dst-ip coverage: SKIP (no matched frame); expected one of {sorted(dst_ip_set)}")
+        else:
+            got_ips = {r["dst_ip"] for r in hits}
+            print(f"dst-ip coverage: {sorted(got_ips)} subset-of {sorted(dst_ip_set)}: "
+                  f"{'OK' if got_ips <= dst_ip_set else 'MISMATCH'}")
     print("twin_recv: PASS" if ok else "twin_recv: FAIL")
-    print("NOTE: P1 判据只要求「PC2 网口能看到板卡发出的帧」：src=板卡 MAC、payload 是 TWIN 结构即可。")
-    print("      2026-11-06 实测：板 B 的 ARP 表里没有 PC2 的 IP，回声帧退化成 **以太网广播**")
-    print("      （eth.dst=ff:ff:ff:ff:ff:ff，src=00:11:22:33:44:55）；eth.dst 不是 PC1 也不是 PC2 都属预期，")
-    print("      判据不看 dst_mac。端口方向同理：板卡回声是 sport=1234 / dport=PC 临时端口（默认 --port-direction any）。")
+    print("NOTE: 判据以 **src=板卡 MAC + payload TWIN 结构** 为准（P1 实测回声帧 dst=广播，src 才是板卡 MAC）。")
+    print("      P1 口径：回声帧 dst 是 ff:ff:ff:ff:ff:ff 属预期，所以默认不判 dst_mac；")
+    print("      P2 口径：必须是单播 dst=本端 PC MAC，请加 --no-bcast（或 --expect-dst-mac <本端 MAC>）作硬判据。")
+    print("      端口方向：板卡回声是 sport=1234 / dport=PC 临时端口（默认 --port-direction any）。")
     return 0 if ok else 1
 
 

@@ -134,3 +134,14 @@ prj/project_12/out/*.done
 prj/project_12/out/build_status.txt
 prj/project_12/out/*.pid
 prj/project_12/out/*.console.log.err
+
+# ===== prj13 证据与仿真运行产物（可再生成，不入库；正文/结论入 docs、摘要入提交信息）=====
+#   out/evidence_<日期>_<主题>/ 含 pcap（10 MiB 级）、日志、判据文本 —— 与 prj12 同口径：
+#   磁盘留档 + SHA256SUMS.txt 校验，git 只收脚本与文档。
+prj/project_13/out/
+#   xsim 控制台重定向产物与运行摘要（*.log/*.jou/*.wdb/*.pb/xsim.dir 已由上面的全局规则覆盖）
+prj/project_13/sim/p2/*_console.txt
+prj/project_13/sim/p2/*_stdout.txt
+prj/project_13/sim/p2/run_p2_sim.log
+prj/project_13/sim/p1_regress/run_*.log
+prj/project_13/sim/p1_regress/*_console.txt
