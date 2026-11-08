@@ -24,16 +24,20 @@ payload layout (big endian):
 min 12 B; --len default 100.
 
 ADDRESS SCHEMES (see docs/M1_P2 address+ARP plan v0.2, section 1-3):
-  protocol : protocol_v1.md 2.2   board A .50.11 / board B .50.12
-  handbook : startup manual 8     board mgmt 10.10.0.11 / 10.10.0.12
-  p1       : CURRENT bitstream    board 192.168.1.10 / 00:11:22:33:44:55
-  protocol vs handbook is PENDING the project-owner decision; both are
-  selectable, neither is silently assumed. Default = protocol, pair A.
+  handbook : ADJUDICATED plan (project owner 2026-11-08 20:40)
+             PC1 10.10.0.1 / PC2 10.10.0.2 / board A .11 / board B .12  [DEFAULT]
+  protocol : historical protocol_v1.md 2.2 (192.168.50.x) -- no longer default,
+             the deliverable repo gets synced at product stage
+  p1       : P1 baseline bitstream only (192.168.1.10 / 00:11:22:33:44:55)
+BITSTREAM GUARD: handbook/protocol need a P2 bitstream (RTL address params are
+  hardcoded); against the current P1 bitstream those addresses silently drop.
 
 usage:
   py pc\\twin_send.py --dry-run
-  py pc\\twin_send.py --dry-run --pair B --scheme protocol
-  py pc\\twin_send.py --dry-run --dst-ip 192.168.50.11 --dst-mac 02:00:00:00:0A:01 --src-mac A8-2B-DD-76-DF-A2
+  py pc\\twin_send.py --dry-run --pair B
+  py pc\\twin_send.py --dry-run --scheme protocol          # historical .50.x
+  py pc\\twin_send.py --dry-run --scheme p1               # P1 baseline bitstream
+  py pc\\twin_send.py --dry-run --dst-ip 10.10.0.11 --dst-mac 02:00:00:00:0A:01 --src-mac A8-2B-DD-76-DF-A2
   py pc\\twin_send.py --dst-port 1234 --count 20 --len 100 --run-id 0x1 --interval-ms 20
   py pc\\twin_send.py --bench --bench-out out\\evidence_x\\bench.txt
 """
@@ -56,27 +60,36 @@ PREAMBLE_SFD_IFG = 8 + 12             # 7 preamble + 1 SFD + 12 IFG
 # MACs are board identity, so protocol/handbook share them; p1 keeps the
 # bitstream-hardcoded 00:11:22:33:44:55 (rtl/aurora_mem_bridge.v:98-101).
 SCHEMES = {
-    "protocol": {
-        "_doc": "protocol_v1.md 2.2 (v0.2 contract) -- PENDING project-owner decision vs 'handbook'",
-        "A": {"board_ip": "192.168.50.11", "board_mac": "02:00:00:00:0A:01",
-              "pc_ip": "192.168.50.1", "peer_ip": "192.168.50.2", "peer_mac": "02:00:00:00:0B:01"},
-        "B": {"board_ip": "192.168.50.12", "board_mac": "02:00:00:00:0B:01",
-              "pc_ip": "192.168.50.2", "peer_ip": "192.168.50.1", "peer_mac": "02:00:00:00:0A:01"},
-    },
     "handbook": {
-        "_doc": "prj13 startup manual 8 suggestion 10.10.0.x -- boards keep protocol_v1 MACs",
+        "_doc": "ADJUDICATED plan (project owner decision 2026-11-08 20:40): 10.10.0.11/.12 + PC 10.10.0.1/.2",
         "A": {"board_ip": "10.10.0.11", "board_mac": "02:00:00:00:0A:01",
               "pc_ip": "10.10.0.1", "peer_ip": "10.10.0.2", "peer_mac": "02:00:00:00:0B:01"},
         "B": {"board_ip": "10.10.0.12", "board_mac": "02:00:00:00:0B:01",
               "pc_ip": "10.10.0.2", "peer_ip": "10.10.0.1", "peer_mac": "02:00:00:00:0A:01"},
     },
+    "protocol": {
+        "_doc": "HISTORICAL protocol_v1.md 2.2 (192.168.50.x) -- no longer the default; deliverable repo syncs at product stage",
+        "A": {"board_ip": "192.168.50.11", "board_mac": "02:00:00:00:0A:01",
+              "pc_ip": "192.168.50.1", "peer_ip": "192.168.50.2", "peer_mac": "02:00:00:00:0B:01"},
+        "B": {"board_ip": "192.168.50.12", "board_mac": "02:00:00:00:0B:01",
+              "pc_ip": "192.168.50.2", "peer_ip": "192.168.50.1", "peer_mac": "02:00:00:00:0A:01"},
+    },
     "p1": {
-        "_doc": "CURRENT bitstream / P1-measured (rtl hardcoded, both boards identical)",
+        "_doc": "P1 BASELINE BITSTREAM only (rtl hardcodes 192.168.1.10 / 00:11:22:33:44:55)",
         "A": {"board_ip": "192.168.1.10", "board_mac": "00:11:22:33:44:55",
               "pc_ip": "192.168.1.102", "peer_ip": "192.168.1.102", "peer_mac": "00:11:22:33:44:55"},
         "B": {"board_ip": "192.168.1.10", "board_mac": "00:11:22:33:44:55",
               "pc_ip": "192.168.1.102", "peer_ip": "192.168.1.102", "peer_mac": "00:11:22:33:44:55"},
     },
+}
+
+BITSTREAM_GUARD = {
+    "handbook": "requires a P2 bitstream -- RTL BOARD_IP must be 10.10.0.11/.12 and PEER_IP 10.10.0.2/.1;\n"
+                "           against a P1 bitstream (192.168.1.10) these addresses silently drop frames",
+    "protocol": "requires a P2 bitstream built with 192.168.50.x -- NOT the adjudicated plan any more;\n"
+                "           against a P1 bitstream (192.168.1.10) these addresses silently drop frames",
+    "p1": "P1 baseline bitstream (192.168.1.10 / 00:11:22:33:44:55) -- use ONLY against the\n"
+          "           currently burned P1 bitstream; a P2 bitstream does NOT answer on these addresses",
 }
 
 # fill pattern cache: fill[i] = (seq + i) & 0xFF  ->  rotated byte ramp.
@@ -232,6 +245,7 @@ def bench(args):
     lines.append("=== twin_send --bench ===")
     lines.append("mode       : %s" % args.bench_target)
     lines.append("scheme/pair: %s / %s" % (args.scheme, args.pair))
+    lines.append("bitstream  : %s" % BITSTREAM_GUARD[args.scheme].replace("\n           ", " "))
     if target:
         lines.append("target     : %s:%d/udp" % target)
     lines.append("frames/len : %d" % n)
@@ -359,10 +373,11 @@ def main():
     ap = argparse.ArgumentParser(
         description="prj13 P2 PC-side UDP sender + send-path benchmark",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="defaults are the board-A shape of --scheme protocol (192.168.50.11 / 02:00:00:00:0A:01).\n"
-               "P1 bitstream present? add --scheme p1 (192.168.1.10 / 00:11:22:33:44:55).")
-    ap.add_argument("--scheme", choices=sorted(SCHEMES), default="protocol",
-                    help="address scheme preset (default protocol; p1 = CURRENT bitstream)")
+        epilog="defaults are the adjudicated handbook shape (10.10.0.11 / 02:00:00:00:0A:01, project owner 2026-11-08 20:40).\n"
+               "P1 baseline bitstream present? add --scheme p1 (192.168.1.10 / 00:11:22:33:44:55).")
+    ap.add_argument("--scheme", choices=sorted(SCHEMES), default="handbook",
+                    help="address scheme preset (default handbook = ADJUDICATED 2026-11-08 20:40; "
+                         "protocol = historical .50.x; p1 = P1 baseline bitstream)")
     ap.add_argument("--pair", choices=["A", "B"], default="A",
                     help="which board/PC side this run belongs to (default A = PC1->board A)")
     ap.add_argument("--dst-ip", default=None, help="destination IP (default = preset board_ip)")
@@ -454,16 +469,23 @@ def main():
     print("=== twin_send (prj13 P2) ===")
     print("scheme   : %s / pair %s" % (args.scheme, args.pair))
     print("  (%s)" % SCHEMES[args.scheme]["_doc"])
+    print("note     : handbook is the ADJUDICATED plan (project owner 2026-11-08 20:40); "
+          "protocol = historical; p1 = P1 baseline bitstream only")
+    print("BITSTREAM: %s" % BITSTREAM_GUARD[args.scheme])
     print("dst      : %s:%d/udp" % (dst_ip, args.dst_port))
     print("src-ip   : %s" % (args.src_ip if args.src_ip else "%s (planned from scheme; NOT bound)" % src_ip_planned))
     print("iface    : %s" % (args.iface if args.iface else "(not given; kernel routing decides)"))
     print("count    : %d  len=%d  run_id=0x%08X  interval=%.1f ms"
           % (args.count, args.len, args.run_id, args.interval_ms))
     if args.scheme == "p1":
-        print("NOTE     : scheme p1 = CURRENT bitstream (192.168.1.10 / 00:11:22:33:44:55)")
+        print("NOTE     : scheme=p1 = P1 BASELINE BITSTREAM (192.168.1.10 / 00:11:22:33:44:55).")
         print("           P1 semantics: the echo frame leaves the PEER board's port, so this PC")
         print("           should NOT receive a reply. Cross-board ping is expected to FAIL in P1")
         print("           and only works in P2 (transparent forward).")
+    else:
+        print("NOTE     : scheme=%s needs a P2 bitstream; against the current P1 bitstream"
+              % args.scheme)
+        print("           the frames aimed at %s are silently dropped." % dst_ip)
     if dst_mac == b"\xff" * 6:
         print("WARN     : dst mac is broadcast -- the P1 broadcast-echo shape is RETIRED for P2;")
         print("           P2 frames must carry dst = the local board MAC.")

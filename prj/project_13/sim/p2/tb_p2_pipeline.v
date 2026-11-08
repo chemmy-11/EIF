@@ -41,7 +41,12 @@
 //   C18 csum_boundary_ffff     checksum 字段 = 0xFFFF 边界（非法，必须丢弃）
 //   C19 local_to_board_ip      dst=BOARD_IP -> LOCAL(1)，本地栈收，零输出
 //   C20 local_bcast_to_board_ip 以太网广播 + ip_dst=BOARD_IP -> LOCAL(1)
+//   C22 old_protocol_addr_now_drop  dst=192.168.50.11（旧 §2.2 地址）-> DROP_UNKNOWN_DST
+//   C23 default_params_handbook_addr  用不带参数覆盖的实例验 RTL 默认值（10.10.0.x + 字节序）
 //   C21 global_counters_clean  全局计数器/输出字节数/len_err 收尾
+//
+// 地址方案：开工手册 §8 的 10.10.0.x（BOARD_IP=10.10.0.11 / PEER_IP=10.10.0.2 /
+//           PC_IP=10.10.0.1）。protocol_v1 §2.2 的 192.168.50.x 仅作 C22 的"旧地址"向量。
 //
 // 输出：每例 [PASS]/[FAIL] 行，末尾 "P2_TB: PASS=<n> FAIL=<m>"
 // 编码：纯 Verilog-2001（无 logic/always_ff/interface/包），单时钟域。
@@ -60,10 +65,13 @@ module tb_p2_pipeline;
     localparam [47:0] BCAST_MAC   = 48'hFFFF_FFFF_FFFF;
     localparam [47:0] MCAST_MAC   = 48'h01_00_5E_00_00_01;
 
-    localparam [31:0] BOARD_IP    = {8'd192, 8'd168, 8'd50, 8'd11};
-    localparam [31:0] PEER_IP     = {8'd192, 8'd168, 8'd50, 8'd2};
-    localparam [31:0] PC1_IP      = {8'd192, 8'd168, 8'd50, 8'd1};
+    // 地址方案：开工手册 §8 裁决的 10.10.0.x（2026-11-08）。
+    // protocol_v1.md §2.2 的 192.168.50.x 只作"旧方案"向量，见 C22。
+    localparam [31:0] BOARD_IP    = {8'd10, 8'd10, 8'd0, 8'd11};
+    localparam [31:0] PEER_IP     = {8'd10, 8'd10, 8'd0, 8'd2};
+    localparam [31:0] PC1_IP      = {8'd10, 8'd10, 8'd0, 8'd1};
     localparam [31:0] UNKNOWN_IP  = {8'd8, 8'd8, 8'd8, 8'd8};
+    localparam [31:0] OLD_BOARD_IP= {8'd192, 8'd168, 8'd50, 8'd11};   // 旧 protocol_v1 §2.2 地址
 
     localparam [15:0] MIN_FRAME   = 16'd60;
 
@@ -243,6 +251,53 @@ module tb_p2_pipeline;
         .o_cnt_drop_bad_csum   (cnt_dcsum),
         .o_cnt_drop_truncated  (cnt_dtrunc),
         .o_cnt_drop_mac        (cnt_dmac)
+    );
+
+    //=========================================================================
+    // DUT 2b: local_steer —— **故意不做参数覆盖**
+    //   u_steer 用 TB 的 localparam 覆盖了参数，所以 RTL 里的**默认值**在仿真里
+    //   根本没被用到。这一份实例直接吃 RTL 默认值，交给 C23 验：
+    //   默认 BOARD_IP/PEER_IP 必须是 handbook §8 的 10.10.0.x（含大端字节序），
+    //   且旧 protocol_v1 的 192.168.50.x 必须落进 DROP_UNKNOWN_DST。
+    //   （变异 MA「把默认 BOARD_IP 字节序写反」就是专门打这条的）
+    //=========================================================================
+    reg  [47:0] def_eth_dst;
+    reg  [15:0] def_eth_type;
+    reg  [31:0] def_ip_dst;
+    wire [2:0]  def_dec;
+    wire [3:0]  def_reason;
+
+    local_steer u_steer_def (
+        .clk              (clk),
+        .rst_n            (rst_n),
+        .i_eth_dst        (def_eth_dst),
+        .i_eth_type       (def_eth_type),
+        .i_ip_dst         (def_ip_dst),
+        .i_ip_total_len   (16'd60),
+        .i_ip_hdr_ok      (1'b1),
+        .i_frame_len      (16'd74),
+        .o_decision       (def_dec),
+        .o_drop_reason    (def_reason),
+        .i_frame_pulse    (1'b0),
+        .i_relay_pulse    (1'b0),
+        .i_local_pulse    (1'b0),
+        .i_arp_pulse      (1'b0),
+        .i_drop_pulse     (1'b0),
+        .i_drop_reason    (4'd0),
+        .o_cnt_rx_frames       (),
+        .o_cnt_relay           (),
+        .o_cnt_local           (),
+        .o_cnt_arp             (),
+        .o_cnt_drop_vlan       (),
+        .o_cnt_drop_ipv6       (),
+        .o_cnt_drop_ethertype  (),
+        .o_cnt_drop_broadcast  (),
+        .o_cnt_drop_multicast  (),
+        .o_cnt_drop_unknown_dst(),
+        .o_cnt_drop_oversize   (),
+        .o_cnt_drop_bad_csum   (),
+        .o_cnt_drop_truncated  (),
+        .o_cnt_drop_mac        ()
     );
 
     //=========================================================================
@@ -987,7 +1042,7 @@ module tb_p2_pipeline;
         //=====================================================================
         set_eth(BCAST_MAC, PC1_MAC, 16'h0800);
         ip_hdr(4'd5, 16'd60, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
-               PC1_IP, {8'd192, 8'd168, 8'd50, 8'd99}, 16'h0006);
+               PC1_IP, {8'd10, 8'd10, 8'd0, 8'd99}, 16'h0006);
         for (i = 34; i < 14 + 60; i = i + 1) frm[i] = 8'h44;
         frm_len = 14 + 60;
         m_rx = m_rx + 1; m_dbcast = m_dbcast + 1;
@@ -1249,6 +1304,68 @@ module tb_p2_pipeline;
         drain;
         chk_all("C20_local_bcast_to_board_ip", 3'd1, 4'd0, 1'b1, 1'b0);
         req(meta_reason == 4'd0, "C20 LOCAL(bcast+BOARD_IP) reason NONE");
+
+        //=====================================================================
+        // C22 旧地址不再生效：dst = 192.168.50.11（protocol_v1 §2.2 的旧闸 A IP）
+        //   地址方案已按开工手册 §8 切到 10.10.0.x，所以旧 BOARD_IP 现在只是
+        //   "陌生 dst"，必须 DROP_UNKNOWN_DST —— 防"两套地址混用"时被静默转发
+        //   （那会变成跨板乒乓的一个隐蔽入口）。
+        //=====================================================================
+        set_eth(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr(4'd5, 16'd60, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+               PC1_IP, OLD_BOARD_IP, 16'h001B);
+        for (i = 34; i < 14 + 60; i = i + 1) frm[i] = 8'hDF;
+        frm_len = 14 + 60;
+        m_rx = m_rx + 1; m_dunk = m_dunk + 1;
+        run_frame;
+        drain;
+        chk_all("C22_old_protocol_addr_now_drop", 3'd0, 4'd6, 1'b1, 1'b0);
+        req(meta_reason == 4'd6, "C22 old 192.168.50.11 reason DROP_UNKNOWN_DST");
+        req(meta_dec != 3'd1, "C22 old addr must NOT be treated as LOCAL");
+
+        //=====================================================================
+        // C23 RTL 默认参数自检（用**不带参数覆盖**的 u_steer_def 实例）
+        //   为什么需要：u_steer 是带 #() 覆盖例化的，RTL 里的默认值在仿真里
+        //   根本不生效 —— 若只测 u_steer，"默认值写错/字节序写反"永远查不出来。
+        //   这里直接吃默认值，逐条核对 handbook §8 的 10.10.0.x。
+        //=====================================================================
+        def_eth_type = 16'h0800;
+        def_eth_dst  = BOARD_MAC;
+
+        // 1) 默认 BOARD_IP 必须 = 10.10.0.11 -> LOCAL
+        def_ip_dst = {8'd10, 8'd10, 8'd0, 8'd11};
+        @(negedge clk);
+        req(def_dec == 3'd1, "C23 default BOARD_IP == 10.10.0.11 (LOCAL)");
+
+        // 2) 旧 protocol_v1 的 192.168.50.11 不再是本板 IP -> DROP_UNKNOWN_DST
+        def_ip_dst = OLD_BOARD_IP;
+        @(negedge clk);
+        req((def_dec == 3'd0) && (def_reason == 4'd6),
+            "C23 default BOARD_IP is NOT 192.168.50.11");
+
+        // 3) 默认 PEER_IP 必须 = 10.10.0.2 -> RELAY
+        def_ip_dst = {8'd10, 8'd10, 8'd0, 8'd2};
+        @(negedge clk);
+        req(def_dec == 3'd2, "C23 default PEER_IP == 10.10.0.2 (RELAY)");
+
+        // 4) 旧 192.168.50.2 不再是 PEER_IP -> DROP_UNKNOWN_DST（不是 RELAY！）
+        def_ip_dst = {8'd192, 8'd168, 8'd50, 8'd2};
+        @(negedge clk);
+        req((def_dec == 3'd0) && (def_reason == 4'd6),
+            "C23 default PEER_IP is NOT 192.168.50.2");
+
+        // 5) 本板 PC(10.10.0.1) 不是转发目标 -> DROP_UNKNOWN_DST
+        def_ip_dst = {8'd10, 8'd10, 8'd0, 8'd1};
+        @(negedge clk);
+        req((def_dec == 3'd0) && (def_reason == 4'd6),
+            "C23 PC_IP is not a relay target");
+
+        // 6) 字节序反了必须不认（10.0.10.11 只能当陌生地址）
+        def_ip_dst = {8'd10, 8'd0, 8'd10, 8'd11};
+        @(negedge clk);
+        req(def_dec == 3'd0, "C23 byte-swapped 10.0.10.11 not LOCAL");
+
+        end_case("C23_default_params_handbook_addr");
 
         //=====================================================================
         // 收尾

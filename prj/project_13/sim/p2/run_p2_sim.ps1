@@ -1,34 +1,39 @@
 # =============================================================================
-# run_p2_sim.ps1 -- prj13 P2 (v0.2 contract) one-click xsim runner
+# run_p2_sim.ps1 -- prj13 P2 one-click xsim runner (3 testbenches)
 # -----------------------------------------------------------------------------
-# What it does:
-#   1. checks that no other Vivado/xsim process is running (Vivado is globally
-#      serial on this machine -> refuse instead of fighting for it)
-#   2. deletes sim\p2\xsim.dir  (PITFALL #48: an interrupted xvlog corrupts the
-#      shared work library)
-#   3. xvlog -> xelab -> xsim, all output redirected to log files (never pipe
-#      straight from the tool)
-#   4. greps the "P2_TB: PASS=<n> FAIL=<m>" line and prints a summary
-#   5. exit code 0 only when FAIL=0 and the line was found
+# Testbenches driven (each gets its own xvlog -> xelab -> xsim pass):
+#   unit     tb_p2_pipeline   : 3 unit modules (extract/rewrap/steer), 23 cases
+#   framebuf tb_p2_frame_buf  : p2_frame_buf whole-frame drop + per-frame sideband
+#   relay    tb_p2_relay_top  : p2_relay_top integration (dual clock), I01..I09
+#
+# Behaviour:
+#   1. refuses to run when any vivado/xsim/xvlog/xelab is already running
+#      (Vivado is globally serial on this machine -> do not fight for it)
+#   2. ASCII guard on every path handed to the tools (Vivado Tcl is GBK sensitive)
+#   3. TEMP/TMP pinned to an ASCII scratch dir
+#   4. per TB: delete xsim.dir (PITFALL #48), xvlog, xelab, xsim; all output
+#      redirected to log files, never piped straight from the tool
+#   5. parses each TB's verdict line, requires FAIL=0 and a minimum case count
+#   6. prints one summary line:  P2_SIM: PASS (unit=<n> relay=<m> framebuf=<k>)
+#      exit code 0 only when every TB passed
 #
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File run_p2_sim.ps1
-#   powershell -NoProfile -ExecutionPolicy Bypass -File run_p2_sim.ps1 -Clean
-#   powershell -NoProfile -ExecutionPolicy Bypass -File run_p2_sim.ps1 -VivadoBin D:\Xilinx\Vivado\2023.1\bin
+#   ... -Clean                  also remove historical logs / webtalk leftovers
+#   ... -VivadoBin D:\Xilinx\Vivado\2023.1\bin
+#   ... -Only unit|framebuf|relay    run a single testbench
+#   ... -AllowConcurrent        skip the serial check (NOT recommended)
 #
-# Notes:
-#   - pure ASCII on purpose (Vivado/Tcl is GBK-sensitive; keep paths ASCII)
-#   - PowerShell 5.1 compatible (no ??, no -Encoding utf8BOM, no ternary)
-#   - NO synthesis / NO implementation / NO project is created: this only drives
-#     the standalone simulator (xvlog/xelab/xsim), which is what the P2 unit
-#     acceptance needs.
+# Pure ASCII on purpose. PowerShell 5.1 compatible (no ??, no -Encoding utf8BOM).
+# NO synthesis / NO implementation / NO project: simulator tools only.
 # =============================================================================
 [CmdletBinding()]
 param(
     [string] $VivadoBin = 'D:\Xilinx\Vivado\2023.1\bin',
     [switch] $Clean,
     [switch] $AllowConcurrent,
-    [string] $TempDir  = 'D:\FPGA\.tmp'
+    [string] $TempDir  = 'D:\FPGA\.tmp',
+    [string] $Only     = ''
 )
 
 $ErrorActionPreference = 'Continue'
@@ -36,13 +41,8 @@ $ErrorActionPreference = 'Continue'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $scriptDir
 
-$rtlDir  = Join-Path (Split-Path -Parent (Split-Path -Parent $scriptDir)) 'rtl\p2'
-$tbFile  = Join-Path $scriptDir 'tb_p2_pipeline.v'
-$logFile = Join-Path $scriptDir 'run_p2_sim.log'
-$xvlogLog= Join-Path $scriptDir 'xvlog_console.txt'
-$xelabLog= Join-Path $scriptDir 'xelab_console.txt'
-$xsimLog = Join-Path $scriptDir 'xsim_console.txt'
-$snap    = 'p2_sim'
+$p2Root = Split-Path -Parent (Split-Path -Parent $scriptDir)
+$rtlDir = Join-Path $p2Root 'rtl\p2'
 
 function Write-Head([string] $msg) {
     Write-Host ''
@@ -54,10 +54,33 @@ function Fail([string] $msg, [int] $code) {
     exit $code
 }
 
-Write-Head 'prj13 P2 xsim runner'
+# ---- testbench table ----------------------------------------------------
+$rtl_unit = @('ipv4_packet_extract.v', 'eth_rewrap.v', 'local_steer.v')
+$tb_unit  = @() ; foreach ($f in $rtl_unit) { $tb_unit += (Join-Path $rtlDir $f) }
+$tb_unit += (Join-Path $scriptDir 'tb_p2_pipeline.v')
+
+$tb_fbuf  = @((Join-Path $rtlDir 'p2_frame_buf.v'), (Join-Path $scriptDir 'tb_p2_frame_buf.v'))
+
+$tb_relay = @()
+foreach ($f in $rtl_unit) { $tb_relay += (Join-Path $rtlDir $f) }
+$tb_relay += (Join-Path $rtlDir 'p2_frame_buf.v')
+$tb_relay += (Join-Path $rtlDir 'p2_relay_top.v')
+$tb_relay += (Join-Path $scriptDir 'tb_p2_relay_top.v')
+
+$tbs = @(
+    @{ key='unit';     top='tb_p2_pipeline';  snap='p2_sim_unit';
+       srcs=$tb_unit;  verdict='P2_TB: PASS=';          min=23; label='unit' },
+    @{ key='framebuf'; top='tb_p2_frame_buf'; snap='p2_sim_fbuf';
+       srcs=$tb_fbuf;  verdict='P2_FRAMEBUF_TB: PASS='; min=5;  label='framebuf' },
+    @{ key='relay';    top='tb_p2_relay_top'; snap='p2_sim_relay';
+       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=9;  label='relay' }
+)
+
+Write-Head 'prj13 P2 xsim runner (unit + framebuf + relay)'
 Write-Host ('script dir : ' + $scriptDir)
 Write-Host ('vivado bin : ' + $VivadoBin)
 Write-Host ('rtl dir    : ' + $rtlDir)
+if ($Only -ne '') { Write-Host ('only       : ' + $Only) }
 
 # ---- 0. tools -----------------------------------------------------------
 foreach ($tool in @('xvlog.bat', 'xelab.bat', 'xsim.bat')) {
@@ -65,7 +88,7 @@ foreach ($tool in @('xvlog.bat', 'xelab.bat', 'xsim.bat')) {
     if (-not (Test-Path $p)) { Fail ('missing simulator tool: ' + $p) 2 }
 }
 
-# ---- 0b. ASCII guard on every path we hand to Vivado --------------------
+# ---- 0b. ASCII guard ----------------------------------------------------
 foreach ($p in @($scriptDir, $rtlDir, $VivadoBin, $TempDir)) {
     if ($p -match '[^\x00-\x7F]') {
         Fail ('non-ASCII path would break Vivado Tcl/GBK decoding: ' + $p) 3
@@ -92,109 +115,124 @@ $env:TEMP = $TempDir
 $env:TMP  = $TempDir
 Write-Host ('TEMP/TMP   : ' + $env:TEMP)
 
-# ---- 2. clean -----------------------------------------------------------
-# always drop xsim.dir (PITFALL #48); -Clean also removes every log/leftover
+# ---- 2. global clean ----------------------------------------------------
 if (Test-Path 'xsim.dir') { Remove-Item -Recurse -Force 'xsim.dir' }
-foreach ($f in @('xvlog_console.txt', 'xelab_console.txt', 'xsim_console.txt')) {
-    if (Test-Path $f) { Remove-Item -Force $f }
-}
 if ($Clean) {
-    foreach ($f in @('run_p2_sim.log', 'webtalk.log', 'xsim_webtalk.log', '.Xil')) {
-        if (Test-Path $f) { Remove-Item -Force -Recurse $f }
+    Get-ChildItem $scriptDir -File | Where-Object {
+        $_.Name -like '*.log' -or $_.Name -like '*console.txt' -or
+        $_.Name -like 'webtalk*' -or $_.Name -like '*.jou' -or $_.Name -like '*.pb'
+    } | ForEach-Object { Remove-Item -Force $_.FullName }
+    if (Test-Path '.Xil') { Remove-Item -Recurse -Force '.Xil' }
+}
+
+# ---- 3. run each testbench ---------------------------------------------
+$res = @{}
+foreach ($tb in $tbs) {
+    if (($Only -ne '') -and ($Only -ne $tb.key)) { continue }
+
+    $key       = $tb.key
+    $xvlogLog  = Join-Path $scriptDir ($key + '_xvlog_console.txt')
+    $xelabLog  = Join-Path $scriptDir ($key + '_xelab_console.txt')
+    $xsimLog   = Join-Path $scriptDir ($key + '_xsim_console.txt')
+
+    Write-Head ($key + ' : ' + $tb.top)
+
+    foreach ($s in $tb.srcs) {
+        if (-not (Test-Path $s)) { Fail ('missing source: ' + $s) 5 }
     }
-}
 
-# ---- 3. sources ---------------------------------------------------------
-$sources = @()
-$sources += (Join-Path $rtlDir 'ipv4_packet_extract.v')
-$sources += (Join-Path $rtlDir 'eth_rewrap.v')
-$sources += (Join-Path $rtlDir 'local_steer.v')
-$sources += $tbFile
-foreach ($s in $sources) {
-    if (-not (Test-Path $s)) { Fail ('missing source: ' + $s) 5 }
-    Write-Host ('  src: ' + $s)
-}
+    if (Test-Path 'xsim.dir') { Remove-Item -Recurse -Force 'xsim.dir' }
 
-'' | Out-File -FilePath $logFile -Encoding ascii
-('run_p2_sim.ps1  ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) | Out-File -FilePath $logFile -Append -Encoding ascii
-('vivado bin: ' + $VivadoBin) | Out-File -FilePath $logFile -Append -Encoding ascii
+    # -- xvlog --
+    & (Join-Path $VivadoBin 'xvlog.bat') $tb.srcs *> $xvlogLog
+    $rc = $LASTEXITCODE
+    Write-Host ('  xvlog exit = ' + $rc)
+    if ($rc -ne 0) {
+        Select-String -Path $xvlogLog -Pattern 'ERROR' | ForEach-Object { Write-Host $_.Line }
+        Fail ($key + ' xvlog failed') 10
+    }
 
-# ---- 4. xvlog -----------------------------------------------------------
-Write-Head 'xvlog'
-& (Join-Path $VivadoBin 'xvlog.bat') $sources *> $xvlogLog
-$rc = $LASTEXITCODE
-Write-Host ('xvlog exit = ' + $rc)
-Get-Content $xvlogLog | Out-File -FilePath $logFile -Append -Encoding ascii
-if ($rc -ne 0) {
-    Write-Host '--- xvlog errors ---'
-    Select-String -Path $xvlogLog -Pattern 'ERROR' | ForEach-Object { Write-Host $_.Line }
-    Fail 'xvlog failed' 10
-}
+    # -- xelab --
+    & (Join-Path $VivadoBin 'xelab.bat') '-debug' 'typical' $tb.top '-s' $tb.snap *> $xelabLog
+    $rc = $LASTEXITCODE
+    Write-Host ('  xelab exit = ' + $rc)
+    if ($rc -ne 0) {
+        Select-String -Path $xelabLog -Pattern 'ERROR' | ForEach-Object { Write-Host $_.Line }
+        Fail ($key + ' xelab failed') 11
+    }
+    $w = Select-String -Path $xelabLog -Pattern 'not connected|remains unconnected'
+    if ($w) {
+        $w | ForEach-Object { Write-Host ('  ' + $_.Line) }
+        Fail ($key + ': elaboration reports unconnected ports') 12
+    }
 
-# ---- 5. xelab -----------------------------------------------------------
-Write-Head 'xelab'
-& (Join-Path $VivadoBin 'xelab.bat') '-debug' 'typical' 'tb_p2_pipeline' '-s' $snap *> $xelabLog
-$rc = $LASTEXITCODE
-Write-Host ('xelab exit = ' + $rc)
-Get-Content $xelabLog | Out-File -FilePath $logFile -Append -Encoding ascii
-if ($rc -ne 0) {
-    Write-Host '--- xelab errors ---'
-    Select-String -Path $xelabLog -Pattern 'ERROR' | ForEach-Object { Write-Host $_.Line }
-    Fail 'xelab failed' 11
-}
-$w = Select-String -Path $xelabLog -Pattern 'not connected|remains unconnected'
-if ($w) {
-    Write-Host '--- WARNING: unconnected ports (must be empty) ---'
-    $w | ForEach-Object { Write-Host $_.Line }
-    Fail 'elaboration reports unconnected ports' 12
-}
+    # -- xsim --
+    & (Join-Path $VivadoBin 'xsim.bat') $tb.snap '-runall' *> $xsimLog
+    $rc = $LASTEXITCODE
+    Write-Host ('  xsim  exit = ' + $rc)
+    if ($rc -ne 0) {
+        Select-String -Path $xsimLog -Pattern 'ERROR' | Select-Object -First 10 |
+            ForEach-Object { Write-Host ('  ' + $_.Line) }
+        Fail ($key + ' xsim exited with code ' + $rc) 22
+    }
 
-# ---- 6. xsim ------------------------------------------------------------
-Write-Head 'xsim'
-& (Join-Path $VivadoBin 'xsim.bat') $snap '-runall' *> $xsimLog
-$rc = $LASTEXITCODE
-Write-Host ('xsim exit = ' + $rc)
-Get-Content $xsimLog | Out-File -FilePath $logFile -Append -Encoding ascii
+    # -- verdict --
+    $passLines = Select-String -Path $xsimLog -Pattern '^\[PASS\]'
+    $failLines = Select-String -Path $xsimLog -Pattern '^\[FAIL\]'
+    $detLines  = Select-String -Path $xsimLog -Pattern '^\s+\[DET\]'
+    $infoLines = Select-String -Path $xsimLog -Pattern '^\s+\[INFO\]'
+    if ($passLines) { $passLines | ForEach-Object { Write-Host $_.Line } }
+    if ($failLines) { $failLines | ForEach-Object { Write-Host $_.Line } }
+    if ($detLines)  { $detLines  | ForEach-Object { Write-Host $_.Line } }
+    if ($infoLines) { $infoLines | ForEach-Object { Write-Host $_.Line } }
 
-# ---- 7. verdict ---------------------------------------------------------
-Write-Head 'results'
-$passLines = Select-String -Path $xsimLog -Pattern '^\[PASS\]' 
-$failLines = Select-String -Path $xsimLog -Pattern '^\[FAIL\]'
-$detLines  = Select-String -Path $xsimLog -Pattern '^\s+\[DET\]'
-if ($passLines) { $passLines | ForEach-Object { Write-Host $_.Line } }
-if ($failLines) { $failLines | ForEach-Object { Write-Host $_.Line } }
-if ($detLines)  { $detLines  | ForEach-Object { Write-Host $_.Line } }
-
-$verdict = Select-String -Path $xsimLog -Pattern 'P2_TB: PASS='
-if (-not $verdict) {
-    Fail 'no "P2_TB: PASS=" line in xsim log -> simulation did not complete' 20
-}
-$vline = ($verdict | Select-Object -Last 1).Line.Trim()
-Write-Host ''
-Write-Host $vline
-
-# parse PASS=<n> FAIL=<m>
-$nPass = -1
-$nFail = -1
-$m = [regex]::Match($vline, 'PASS=(\d+)\s+FAIL=(\d+)')
-if ($m.Success) {
+    $verdict = Select-String -Path $xsimLog -Pattern $tb.verdict
+    if (-not $verdict) {
+        Fail ($key + ': no "' + $tb.verdict + '" line in xsim log') 20
+    }
+    $vline = ($verdict | Select-Object -Last 1).Line.Trim()
+    $m = [regex]::Match($vline, 'PASS=(\d+)\s+FAIL=(\d+)')
+    if (-not $m.Success) { Fail ($key + ': cannot parse verdict line: ' + $vline) 21 }
     $nPass = [int] $m.Groups[1].Value
     $nFail = [int] $m.Groups[2].Value
-} else {
-    Fail ('cannot parse verdict line: ' + $vline) 21
+    Write-Host ('  ' + $vline)
+    if ($nFail -ne 0) { Fail ($key + ' reported FAIL=' + $nFail) 1 }
+    if ($nPass -lt $tb.min) { Fail ($key + ': expected at least ' + $tb.min + ' cases, got ' + $nPass) 23 }
+    $res[$tb.label] = $nPass
 }
 
-Write-Host ''
-Write-Host ('cases run : ' + ($nPass + $nFail))
-Write-Host ('pass      : ' + $nPass)
-Write-Host ('fail      : ' + $nFail)
-Write-Host ('logs      : ' + $logFile)
-Write-Host ('            ' + $xsimLog)
+# ---- 4. RTL under test: self-certifying SHA256 --------------------------
+# Pin "which RTL revision was actually simulated" into every run log, so a
+# bitstream-candidate registration can copy the hashes straight from here.
+# Trust content hashes only -- never mtime, never a path.
+Write-Head 'RTL under test (SHA256)'
+$rtlNames = @('ipv4_packet_extract.v', 'eth_rewrap.v', 'local_steer.v',
+              'p2_frame_buf.v', 'p2_relay_top.v')
+$sumLines = @()
+foreach ($n in $rtlNames) {
+    $p = Join-Path $rtlDir $n
+    if (Test-Path $p) {
+        $h = (Get-FileHash $p -Algorithm SHA256).Hash
+        $sz = (Get-Item $p).Length
+        Write-Host ('  ' + $n.PadRight(24) + $h + '  (' + $sz + ' B)')
+        $sumLines += ($h + '  ' + $p)
+    } else {
+        Write-Host ('  ' + $n.PadRight(24) + 'MISSING')
+    }
+}
+$sumLines | Out-File -FilePath (Join-Path $scriptDir 'RTL_SHA256.txt') -Encoding ascii
+Write-Host ('  (written to ' + (Join-Path $scriptDir 'RTL_SHA256.txt') + ')')
 
-if ($rc -ne 0) { Fail ('xsim exited with code ' + $rc) 22 }
-if ($nFail -ne 0) { Fail 'P2_TB reported FAIL' 1 }
-if ($nPass -lt 21) { Fail ('expected at least 21 cases, got ' + $nPass) 23 }
+# ---- 5. summary ---------------------------------------------------------
+Write-Head 'summary'
+$u = 0; if ($res.ContainsKey('unit'))     { $u = $res['unit'] }
+$r = 0; if ($res.ContainsKey('relay'))    { $r = $res['relay'] }
+$f = 0; if ($res.ContainsKey('framebuf')) { $f = $res['framebuf'] }
 
+Write-Host ('unit     = ' + $u + ' cases  (tb_p2_pipeline: 3 unit modules + TB glue)')
+Write-Host ('relay    = ' + $r + ' cases  (tb_p2_relay_top: p2_relay_top integration)')
+Write-Host ('framebuf = ' + $f + ' cases  (tb_p2_frame_buf: whole-frame drop + sideband)')
+Write-Host ('logs     : ' + $scriptDir)
 Write-Host ''
-Write-Host ('P2_SIM: PASS (PASS=' + $nPass + ' FAIL=' + $nFail + ')')
+Write-Host ('P2_SIM: PASS (unit=' + $u + ' relay=' + $r + ' framebuf=' + $f + ')')
 exit 0

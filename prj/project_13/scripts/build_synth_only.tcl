@@ -13,7 +13,7 @@
 set proj  D:/FPGA/prj/project_13
 file mkdir $proj/out
 
-open_project $proj/vivado/prj12.xpr
+open_project $proj/vivado/prj13.xpr
 # ---- B3-1: 新增 RTL 幂等纳入工程（create_project 只在首建加文件）----
 if {[llength [get_files -quiet axi_arb_3to1.v]] == 0} {
     add_files -fileset sources_1 $proj/rtl/axi_arb_3to1.v
@@ -30,6 +30,13 @@ if {[llength [get_files -quiet dma_rd_shim_v2.v]] == 0} {
     add_files -fileset sources_1 $proj/rtl/dma_rd_shim_v2.v
     puts "ADD_FILES: dma_rd_shim_v2.v"
 }
+# ---- prj13 P2: integration-layer files (created after create_project; idempotent) ----
+foreach p2f {p2_frame_buf.v p2_relay_top.v} {
+    if {[llength [get_files -quiet $p2f]] == 0} {
+        add_files -fileset sources_1 $proj/rtl/p2/$p2f
+        puts "ADD_FILES: rtl/p2/$p2f"
+    }
+}
 if {[llength [get_files -quiet dma_rd_shim.v]] > 0} {
     remove_files -fileset sources_1 [get_files -quiet dma_rd_shim.v]
     puts "REMOVE_FILES: dma_rd_shim.v (v1 退役)"
@@ -39,7 +46,7 @@ update_compile_order -fileset sources_1
 #   仅当 synth 产物缺失时才重建（实测 2026-10-24: 重建路径偶发
 #   [Common 17-233] slave interpreter 初始化失败 / [IP_Flow 19-1747] 交付文件失败，
 #   与 PITFALLS #61「安装盘偶发读失败」同族 => 重建必须带重试，且能不重建就不重建）。
-set ddr4_syn [glob -nocomplain $proj/vivado/prj12.gen/sources_1/ip/ddr4_0/synth/ddr4_0.v]
+set ddr4_syn [glob -nocomplain $proj/vivado/prj13.gen/sources_1/ip/ddr4_0/synth/ddr4_0.v]
 if {[llength $ddr4_syn] == 0} {
     puts "DDR4_TARGET_REGEN: synth products missing -> regenerate (retry x3)"
     set ddr4_ok 0
@@ -130,7 +137,13 @@ puts "SYNTH_JOBS: $synth_jobs"
 launch_runs synth_1 -jobs $synth_jobs
 wait_on_run synth_1
 puts "SYNTH_STATUS: [get_property STATUS [get_runs synth_1]]"
-if {[get_property PROGRESS [get_runs synth_1]] != "100%"} { error "synth failed" }
+if {[get_property PROGRESS [get_runs synth_1]] != "100%"} {
+    # 2026-11-08 实测: batch 模式下未捕获的 error 不改变进程退出码(wrapper 记到 BUILD_EXIT=0),
+    # 判据必须靠标记行 + 显式 exit 1, 否则"综合失败"会被当成"构建成功"。
+    puts "SYNTH_FAILED: progress=[get_property PROGRESS [get_runs synth_1]]"
+    exit 1
+}
+puts "SYNTH_OK: progress=100% status=[get_property STATUS [get_runs synth_1]]"
 open_run synth_1 -name synth_1
 
 proc one_net {name} {
@@ -458,5 +471,6 @@ write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design
 
 # synth + ILA definition only; implementation via scripts/build_impl.tcl
+puts "SYNTH_DCP_OK: $proj/scripts/pre_impl_debug.dcp"
 puts "SYNTH_ONLY_DONE"
-exit
+exit 0

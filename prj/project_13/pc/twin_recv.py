@@ -180,13 +180,13 @@ def main():
     ap.add_argument("--iface", default=None, help="网卡名（--live 必填，dumpcap -i 的值）")
     ap.add_argument("--seconds", type=int, default=20, help="--live 抓包时长")
     ap.add_argument("--out", default=None, help="--live 的 pcap 输出路径")
-    ap.add_argument("--scheme", choices=["protocol", "handbook", "p1"], default=None,
-                    help="可选：按地址方案自动填 --board-mac（不给 --board-mac 时生效）")
+    ap.add_argument("--scheme", choices=["handbook", "protocol", "p1"], default="handbook",
+                    help="地址方案（默认 handbook = 2026-11-08 20:40 已裁决 10.10.0.x；"
+                         "protocol = 历史 192.168.50.x；p1 = P1 基线位流，判 P1 抓包必须显式给）")
     ap.add_argument("--pair", choices=["A", "B"], default=None,
                     help="配合 --scheme：只认该板的 MAC；不给则 scheme 里两块板的 MAC 都认")
     ap.add_argument("--board-mac", action="append", default=None, metavar="MAC",
-                    help="板卡 MAC（src 判据），可重复给多个。默认=全部已知板卡 MAC"
-                         "（00:11:22:33:44:55 / 02:00:00:00:0A:01 / 02:00:00:00:0B:01）")
+                    help="板卡 MAC（src 判据），可重复给多个，覆盖 --scheme 的默认集合")
     ap.add_argument("--expect-dst-ip", action="append", default=None, metavar="IP",
                     help="期望 IP 目的地址，可重复（本端 PC IP / 对端 PC IP 都可给）；不给=不判")
     ap.add_argument("--expect-dst-mac", action="append", default=None, metavar="MAC",
@@ -213,21 +213,29 @@ def main():
     mac_source = "explicit --board-mac"
     if args.board_mac:
         mac_list = [m.lower().replace("-", ":") for m in args.board_mac]
-    elif args.scheme:
+    else:
         pairs = [args.pair] if args.pair else ["A", "B"]
         mac_list = []
         for p in pairs:
             mac_list += KNOWN_BOARD_MACS[args.scheme][p]
         mac_source = f"--scheme {args.scheme}" + (f" --pair {args.pair}" if args.pair else " (both pairs)")
-    else:
-        mac_list = sorted({m for s in KNOWN_BOARD_MACS.values() for v in s.values() for m in v})
-        mac_source = ("default: every known board MAC (P1 + P2 protocol/handbook) -- "
-                      "pass --board-mac (or --scheme) to be strict")
     mac_set = set(mac_list)
     dst_ip_set = {ip for ip in (args.expect_dst_ip or [])}
     dst_mac_set = {m.lower().replace("-", ":") for m in (args.expect_dst_mac or [])}
 
+    BITSTREAM_GUARD = {
+        "handbook": "requires a P2 bitstream (RTL BOARD_IP 10.10.0.11/.12); a P1 bitstream only\n"
+                    "           ever emits 00:11:22:33:44:55 -> use --scheme p1 for P1 captures",
+        "protocol": "requires a P2 bitstream built with 192.168.50.x -- NOT the adjudicated plan\n"
+                    "           any more; a P1 bitstream only ever emits 00:11:22:33:44:55",
+        "p1": "P1 baseline bitstream (board mac 00:11:22:33:44:55, 192.168.1.0/24)",
+    }
+
     print("=== twin_recv (prj13 P2) ===")
+    print(f"scheme   : {args.scheme}" + (f" / pair {args.pair}" if args.pair else ""))
+    print("note     : handbook is the ADJUDICATED plan (project owner 2026-11-08 20:40); "
+          "protocol = historical; p1 = P1 baseline bitstream only")
+    print(f"BITSTREAM: {BITSTREAM_GUARD[args.scheme]}")
     print(f"board-mac: {', '.join(sorted(mac_set))}   [{mac_source}]")
     print(f"dst-ip   : {', '.join(sorted(dst_ip_set)) if dst_ip_set else '(not judged)'}")
     print(f"dst-mac  : {', '.join(sorted(dst_mac_set)) if dst_mac_set else '(not judged)'}"

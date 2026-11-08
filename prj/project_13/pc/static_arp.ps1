@@ -13,25 +13,29 @@
 #
 # ADDRESS SCHEMES (see docs/M1_P2_<addr+arp>_v0.2 doc; ASCII-safe name below):
 #   doc      : prj13/docs/M1_P2 address+ARP plan v0.2 (2026-11-08), section 1-3
-#   protocol : protocol_v1.md 2.2   PC1 .50.1 / PC2 .50.2 / board A .50.11 /
-#                                   board B .50.12, boards 02:00:00:00:0A:01 /
-#                                   02:00:00:00:0B:01              [DEFAULT]
-#   handbook : prj13 startup manual section 8 suggestion 10.10.0.1 / 10.10.0.2
-#              + board mgmt .11 / .12 (MACs reused from protocol_v1)
-#   p1       : CURRENT bitstream / P1-measured 192.168.1.102 + 192.168.1.10,
-#                                   MAC 00:11:22:33:44:55 (rtl hardcoded)
-#   The protocol vs handbook choice is PENDING the project-owner decision; both
-#   are selectable here on purpose, neither is silently assumed.
+#   handbook : ADJUDICATED plan (project owner decision 2026-11-08 20:40)
+#              PC1 10.10.0.1 / PC2 10.10.0.2 / board A 10.10.0.11 / board B 10.10.0.12
+#              boards 02:00:00:00:0A:01 / 02:00:00:00:0B:01        [DEFAULT]
+#   protocol : historical protocol_v1.md 2.2  192.168.50.1/.2 + board .50.11/.50.12
+#              (no longer the default; deliverable repo to sync at product stage)
+#   p1       : P1 BASELINE BITSTREAM only -- 192.168.1.102 + 192.168.1.10,
+#              MAC 00:11:22:33:44:55 (rtl hardcoded, aurora_mem_bridge.v:98-101)
+#
+# BITSTREAM GUARD (added after the 2026-11-08 20:40 decision):
+#   handbook/protocol need a P2 bitstream -- the RTL address params are hardcoded.
+#   Against the current P1 bitstream (=192.168.1.10) those addresses silently drop
+#   frames, so the script always prints which bitstream the chosen scheme needs.
 #
 # USAGE (no board / no adapter needed -- -DryRun validates parameters only):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -DryRun
-#   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair B -DryRun -Scheme handbook
-#   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -DryRun -IfAlias "Ethernet"
+#   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair B -DryRun
+#   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -DryRun -Scheme protocol
+#   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -DryRun -Scheme p1 -IfAlias "Ethernet"
 #   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -Apply -IfAlias "Ethernet"
 #   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -Apply -Remove -IfAlias "Ethernet"
 #   powershell -NoProfile -ExecutionPolicy Bypass -File pc\static_arp.ps1 -BoardPcPair A -List
 #   # full manual form (no preset):
-#   ... -LocalIp 192.168.50.1 -PeerIp 192.168.50.2 -BoardIp 192.168.50.11 `
+#   ... -LocalIp 10.10.0.1 -PeerIp 10.10.0.2 -BoardIp 10.10.0.11 `
 #       -BoardMac 02:00:00:00:0A:01 -IfAlias "Ethernet" -DryRun
 #
 # EXIT CODES: 0 = dry-run self-consistent / apply verified
@@ -43,8 +47,8 @@ param(
     [ValidateSet('A', 'B', '')]
     [string]$BoardPcPair = '',
 
-    [ValidateSet('protocol', 'handbook', 'p1')]
-    [string]$Scheme = 'protocol',
+    [ValidateSet('handbook', 'protocol', 'p1')]
+    [string]$Scheme = 'handbook',
 
     # Explicit overrides (win over the -BoardPcPair preset)
     [string]$LocalIp = '',
@@ -164,6 +168,26 @@ if ($bindPeer -and $BoardIp -eq $PeerIp) {
 
 Say "=== static_arp (prj13 P2 / v0.2) ==="
 Say "scheme   : $Scheme"
+Say "note     : scheme=handbook is the ADJUDICATED plan (project owner decision 2026-11-08 20:40);"
+Say "           scheme=protocol is the historical protocol_v1.md 2.2 set;"
+Say "           scheme=p1 is the P1 baseline bitstream set only."
+switch ($Scheme) {
+    'p1' {
+        Say "BITSTREAM: p1 = P1 baseline bitstream (192.168.1.10 / 00:11:22:33:44:55)."
+        Say "           Use it ONLY against the currently burned P1 bitstream -- the RTL hardcodes"
+        Say "           those values (rtl/aurora_mem_bridge.v:98-101)."
+    }
+    'handbook' {
+        Say "BITSTREAM: handbook requires a P2 bitstream -- the RTL address params must be the"
+        Say "           adjudicated 10.10.0.x (BOARD_IP 10.10.0.11/.12, PEER_IP 10.10.0.2/.1)."
+        Say "           Against a P1 bitstream (192.168.1.10) these entries silently drop frames."
+    }
+    'protocol' {
+        Say "BITSTREAM: protocol requires a P2 bitstream built with the 192.168.50.x addresses."
+        Say "           NOT the default any more (adjudicated plan = handbook 10.10.0.x);"
+        Say "           against a P1 bitstream (192.168.1.10) these entries silently drop frames."
+    }
+}
 Say "preset   : $(if ($usedPreset) { "BoardPcPair=$BoardPcPair" } else { 'manual (no -BoardPcPair)' })"
 Say "iface    : $effectiveAlias"
 Say "local ip : $(if ([string]::IsNullOrWhiteSpace($LocalIp)) { '(not given)' } else { "$LocalIp  [informational only; this script does NOT set the adapter IP]" })"
@@ -178,10 +202,9 @@ if ($errors.Count -gt 0) {
     Say "STATIC_ARP_RESULT: FAIL"
     exit 1
 }
-if ($Scheme -eq 'protocol' -and $usedPreset) {
-    Say "NOTE     : scheme=protocol MAC 02:00:00:00:0A:01/0B:01 is the v0.2 CONTRACT value;"
-    Say "           the CURRENT bitstream still hardcodes 192.168.1.10 / 00:11:22:33:44:55"
-    Say "           (rtl/aurora_mem_bridge.v:98-101) -> use -Scheme p1 against a P1 bitstream."
+if ($Scheme -ne 'p1' -and $usedPreset) {
+    Say "NOTE     : board MACs 02:00:00:00:0A:01 / 02:00:00:00:0B:01 are board identity and are"
+    Say "           UNCHANGED by the 2026-11-08 20:40 address decision (only the IP plan changed)."
 }
 
 # ------------------------------------------------------------------ adapter probe (optional in dry-run)

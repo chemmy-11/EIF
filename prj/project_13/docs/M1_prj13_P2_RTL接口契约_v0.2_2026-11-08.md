@@ -246,3 +246,73 @@ output [3:0]  o_drop_reason;
 | 日期 | 变更 |
 |---|---|
 | 2026-11-08 | v0.2 首版：按 issue #10 + protocol_v1 §2.2/§2.5/§3.1 定义三模块接口、drop 编码、判决优先级、计数器清单、验收映射、集成点与 4 项待确认 |
+| 2026-11-08 20:40 | **地址裁决**：项目负责人定 `10.10.0.x`（开工手册 §8），RTL 参数与 PC 脚本默认全部切换；`protocol_v1.md` §2.2 留成品阶段同步 |
+| 2026-11-08 21:10 | v0.3：新增 §12 顶层集成（已落地）与 §13 已知限制（含集成级 TB 实测数） |
+
+---
+
+# 12. 顶层集成（2026-11-08 落地，v0.3）
+
+> 本节把 §7 的"集成点"从计划变成事实。改动集中在 `rtl/aurora_mem_bridge.v` 的 4 处 +
+> 两个新文件；Aurora / DDR / 内存桥 / 软核控制面主体一字未动。
+
+## 12.1 新增文件（集成层，不属于三个单元件）
+
+| 文件 | 作用 |
+|---|---|
+| `rtl/p2/p2_frame_buf.v` | 单时钟、2 bank（各 2 KB）、**整帧粒度**弹性缓冲 + 侧带（每帧 eth_dst/eth_type 跟帧走）。银行满/超容量时**整帧丢弃**并计数，绝不留半帧 |
+| `rtl/p2/p2_relay_top.v` | 集成封装：以太侧 `rx→buf→extract→steer→relay 门控`；Aurora 侧 `unpack→buf→rewrap→mem2 写` |
+
+## 12.2 为什么必须有 `p2_frame_buf`（这是集成里最容易被漏掉的一环）
+
+链路两侧的**生产者都不支持反压**：
+
+- 以太网 MAC 侧 `gmii_rxd/gmii_rx_dv` 按线速到达，不能暂停；
+- Aurora 解包侧 `axis_word_unpack.out_valid` **没有 ready 口**（`rtl/axis_word_unpack.v:163-193`：帧内零空拍、帧间恰好 1 拍 gap）。
+
+而三个单元件是 valid/ready 字节流（extract 整帧收完再发、rewrap 先吐 14 B 头）。直连必在**帧中间**丢字节 → 残帧上电路，比丢整帧恶劣得多。`p2_frame_buf` 就是那道"要么整帧、要么整帧丢"的闸门。
+
+**侧带随帧走**（`o_rd_eth_dst/o_rd_eth_type`）：判决要 eth_dst/eth_type，而这两个字段只在帧首 14 B。若在缓冲外面旁路嗅探，第二帧的帧首会在第一帧还在读侧时覆盖嗅探寄存器 —— 背靠背帧就误判（集成 TB 的 `I09` 专门钉这条）。
+
+## 12.3 `aurora_mem_bridge.v` 的四处改动
+
+| # | 位置 | 改动 |
+|---|---|---|
+| 1 | 参数区 | `BOARD_MAC=02:00:00:00:0A:01`、`BOARD_IP=10.10.0.11`、新增 `PEER_MAC/PEER_IP/PC_IP`（板 B 只换参数） |
+| 2 | `u_pump_fwd.wr_data/wr_en` | `stack_txd/stack_tx_en` → `p2_relay_txd/p2_relay_tx_en`（**转发流**） |
+| 3 | `u_mem2.wr_data/wr_en` | `unpack_data/unpack_en` → `p2_lan_txd/p2_lan_tx_en`（**已重加 14 B 头的完整以太帧**） |
+| 4 | RGMII TX 末级 mux | 新增 `stack_takeover`（本地栈应答局域网直出），优先级 `cmd > stack > relay` |
+
+**关键语义变化（★必读）**：栈 TX 不再进 Aurora。P1 的"跨板回声"结构上消失（不再有 `des_mac=src_mac` 的回声帧跨板），本地应答（ARP/ICMP/管理 UDP）因此真的能回到本板 PC —— 这就是 §7.3 记的缺口被补上的方式。`des_mac = src_mac` 保留，因为对**本地**应答它恰好是正确的以太网目的地址。
+
+## 12.4 回程为什么把 `eth_rewrap` 放在**内存桥②之前**
+
+`eth_rewrap` 吐 14 B 头时 `s_ready=0`；帧泵B 读侧没有反压口。放在泵B **之后**每帧必丢 14 字节。放在桥② **之前**，泵B 拿到的已经是完整以太帧，与 P1 回程路径逐位同构（P1 泵B 也是原样吐桥② 内容）。
+
+`i_pkt_len` 在本集成里**钉 0**：它只用于算 `tot_len`，而 `tot_len` 只影响"是否补零到 60 B"与结尾判据。钉 0 ⇒ `tot_len=60` ⇒ IP 包 <46 B 补零到 60（正确）、≥46 B 到真实 eop 就结束（正确）。线上字节完全正确，只有它自己报的 `m_frame_len/o_len_err` 无意义（不接、不判）。
+
+---
+
+# 13. 验证矩阵与已知限制（截至 2026-11-08 21:10）
+
+## 13.1 已验证（离线，判据分级按 AGENTS §6a）
+
+| 层 | 判据 | 结果 | 证据 |
+|---|---|---|---|
+| 单元 | 三件套 23 例 | **PASS 23/0** | `sim/p2/` runner；`out/evidence_2026-11-08_p2_sim/handbook_3tb/` |
+| 单元 | 帧缓冲 5 例（含超容量整帧丢弃） | **PASS 5/0** | 同上 `framebuf_*` |
+| 集成 | relay_top 9 例（含 ARP/背靠背/满帧/侧带） | **PASS 9/0** | 同上 `relay_*`、`relay_verdict.log` |
+| 集成 | **I04** 3×142 B 背靠背 | `relayed=3 dropped=0` | 同上 |
+| 集成 | **I10** 3×1472 B 满帧背靠背 | `relayed=3 dropped=0` | 同上 |
+| 综合 | `synth_design` 2023.1 | **0 Error / 0 Critical Warning**，2:48 墙钟，Checksum `a31ff1a4`，5 个 ILA 核插入 | `out/synth13_p2b.log`（`SYNTH_OK`/`SYNTH_DCP_OK`） |
+
+## 13.2 已知限制（写进候选位流说明，V4 上板前必须知道）
+
+1. **吞吐上限未触到（未被证伪，也未证明够用）**：`2-bank 整帧缓冲 + 暂存转发`，实测 **3 帧 × 1472 B 满帧背靠背 3/3 无丢**（I10）。**不外推**成"任意连发安全" —— >3 连发、或帧长刚好卡 bank 边界的情形未测；需要时加 `5–8 帧` 用例钉。丢帧语义是**整帧丢并计数**（`st_rx_drop`），不会残帧。
+2. **`stack_takeover` 抢帧风险**：本地栈应答与回程帧同一拍起帧时，被抢占那一帧会坏（与 W5 命令注入同类，已在 `aurora_mem_bridge.v` 的该段注释登记）。表现是 PC 侧该帧丢失/校验错，**不会静默通过**。
+3. **非法 IPv4 帧仍会透传**：Aurora 侧收到的帧若首字节 `version!=4`，`st_aur_bad_v4` 计数但仍会加头送出，由 PC 侧 IP 层丢弃。Aurora 是点对点带 CRC 链路，正常不会出现；作为已知边界登记。
+4. **P2 计数器本候选未挂 ILA**：11 个 drop 计数器 + relay/local/arp 在 RTL 里已实现，但**没有 mark_debug 探针**（为保 B1 那点时序余量）。V4 上板前必须补一路探针（预计 32–48 bit），会需要重掷 place directive。
+5. **没有板级验证**：本候选位流**未经任何上板判据**；V4 的全部验收项（逐字节不变、DROP 计数、ARP 不跨板、无乒乓）都待板。
+6. **地址双方案共存**：`protocol`（192.168.50.x）仅作历史保留；`protocol_v1.md` §2.2 仍是旧值，留成品阶段同步。
+
+

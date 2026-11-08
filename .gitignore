@@ -139,6 +139,8 @@ prj/project_12/out/*.console.log.err
 #   out/evidence_<日期>_<主题>/ 含 pcap（10 MiB 级）、日志、判据文本 —— 与 prj12 同口径：
 #   磁盘留档 + SHA256SUMS.txt 校验，git 只收脚本与文档。
 prj/project_13/out/
+#   Vivado 工程目录（create_project 幂等重建；2026-11-08 首次建工程后补）
+prj/project_13/vivado/
 #   xsim 控制台重定向产物与运行摘要（*.log/*.jou/*.wdb/*.pb/xsim.dir 已由上面的全局规则覆盖）
 prj/project_13/sim/p2/*_console.txt
 prj/project_13/sim/p2/*_stdout.txt

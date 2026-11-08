@@ -57,12 +57,14 @@ param(
     [ValidateSet('A', 'B', 'Both')][string]$Board = 'A',
     [string]$Com = 'COM6',
     [string]$Cable = '210512180081',
+    [ValidateSet('p1', 'handbook', 'protocol')][string]$IpScheme = 'p1',
     [switch]$DryRun,
     [string]$PrjRoot = '',
     [switch]$SkipBurn,
     [switch]$SkipProbe,
+    [switch]$SkipArp,
     [string]$Iface = '',
-    [string]$BoardMac = '00:11:22:33:44:55',
+    [string]$BoardMac = '',   # empty = derived from -IpScheme
     [int]$Port = 1234,
     [int]$CaptureSeconds = 180,
     [int]$SendDelaySeconds = 30,
@@ -99,7 +101,7 @@ function Add-Cmd([string]$s) {
     Say ("CMD: " + $s)
     $script:CmdLog += $s
 }
-function Step([int]$n, [string]$name, [string]$verdict, [string]$detail) {
+function Step([string]$n, [string]$name, [string]$verdict, [string]$detail) {
     Say ("STEP {0} {1}: {2} {3}" -f $n, $name, $verdict, $detail)
     switch ($verdict) {
         'PASS' { $script:Pass++ }
@@ -293,11 +295,51 @@ if ($FrameLen -lt 12) {
 }
 if ($Board -eq 'B' -and $Com -eq 'COM6') { Say "PARAM_WARN: board B normally uses COM4, not COM6 (see the manual section 1)." }
 
+# ------------------------------------------------------------- address scheme
+# 2026-11-08 decision (project lead): the DEFAULT address plan for P2 is handbook
+# (10.10.0.x). THIS TOOL, however, reproduces the P1 BASELINE bitstream, whose RTL
+# hardcodes 192.168.1.10 / 00:11:22:33:44:55 -> its default is 'p1' on purpose.
+# Burning the wrong scheme does not break the link: every frame is simply sent to an
+# address no board answers, so all data-plane criteria FAIL while link criteria PASS.
+# That signature must be read as "wrong scheme / wrong bitstream", not "broken link".
+$SchemeTable = @{
+    'p1'       = @{
+        Doc  = 'P1 baseline bitstream (rtl hardcoded 192.168.1.10)'
+        Note = 'P1 baseline bitstream 192.168.1.10'
+        A    = @{ Ip = '192.168.1.10'; Mac = '00:11:22:33:44:55' }
+        B    = @{ Ip = '192.168.1.10'; Mac = '00:11:22:33:44:55' }
+    }
+    'handbook' = @{
+        Doc  = 'prj13 startup manual section 8 (10.10.0.x)'
+        Note = 'P2 candidate, board A 10.10.0.11 / board B 10.10.0.12'
+        A    = @{ Ip = '10.10.0.11'; Mac = '02:00:00:00:0a:01' }
+        B    = @{ Ip = '10.10.0.12'; Mac = '02:00:00:00:0b:01' }
+    }
+    'protocol' = @{
+        Doc  = 'v0.2 contract 192.168.50.x (HISTORICAL reference only)'
+        Note = 'v0.2 contract addresses, historical only'
+        A    = @{ Ip = '192.168.50.11'; Mac = '02:00:00:00:0a:01' }
+        B    = @{ Ip = '192.168.50.12'; Mac = '02:00:00:00:0b:01' }
+    }
+}
+$Scheme = $SchemeTable[$IpScheme]
+$SchemeSide = $Scheme[$Board]
+$SchemeMac = if ($BoardMac -ne '') { $BoardMac } else { $SchemeSide.Mac }
+$SchemeMacSrc = if ($BoardMac -ne '') { '-BoardMac override' } else { '-IpScheme' }
+if ($IpScheme -eq 'p1') {
+    Say "ADDR_SCHEME p1 (P1 baseline bitstream 192.168.1.10); use -IpScheme handbook after a P2 bitstream is burned"
+} else {
+    Say ("ADDR_SCHEME {0} ({1}); a P1 baseline bitstream does NOT answer on these addresses" -f $IpScheme, $Scheme.Doc)
+    Say ("EXPECT P2 BITSTREAM (scheme {0} = {1})" -f $IpScheme, $Scheme.Note)
+}
+Say ("ADDR_TARGET board {0} -> {1}:{2}/udp, judge src-mac={3} (from {4})" -f $Board, $SchemeSide.Ip, $Port, $SchemeMac, $SchemeMacSrc)
+Say ("ADDR_PASSTHROUGH twin_send.py --scheme {0} --pair {1} | twin_recv.py --scheme {0} --pair {1} | static_arp.ps1 -Scheme {0} -BoardPcPair {1}" -f $IpScheme, $Board)
+
 # --------------------------------------------------------------- precheck block
 Say ""
 Say "--- precheck (offline, never fails a step) ---"
 $helperScripts = @('list_targets.tcl', 'twin_burn.ps1', 'serial_dma_mode.ps1', 'ila_capture.tcl',
-    'twin_send.py', 'twin_recv.py', 'npcap_capture.py', 'p1_judge.py', 'probes.ltx')
+    'twin_send.py', 'twin_recv.py', 'npcap_capture.py', 'p1_judge.py', 'static_arp.ps1', 'probes.ltx')
 $helperMap = @{}
 foreach ($h in $helperScripts) { $helperMap[$h] = Resolve-Helper $h }
 
@@ -348,6 +390,31 @@ if ($script:LtxPath -and -not ($script:LtxPath.StartsWith($Root, [System.StringC
     Say ("PRECHECK ltx/probes: " + $script:LtxPath + " (pairs with this project's bitstream)")
 } else {
     Say "PRECHECK ltx/probes: absent (build_impl.tcl writes it next to the bitstream)"
+}
+# The scheme table above MIRRORS pc\twin_send.py SCHEMES. Ask that script for its own
+# idea of the destination (offline --dry-run, nothing is sent) so the two cannot drift
+# apart silently: a mismatch here would be a wrong-address run.
+$tsPy = $helperMap['twin_send.py']
+if ($tsPy) {
+    try {
+        $syncOut = (& py $tsPy --dry-run --scheme $IpScheme --pair $Board --count 1 2>&1 | Out-String)
+        $ipM = [regex]::Match($syncOut, 'dst\s+:\s*([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}):')
+        $macM = [regex]::Match($syncOut, 'eth dst\s+:\s*([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})')
+        $pyIp = if ($ipM.Success) { $ipM.Groups[1].Value } else { '?' }
+        $pyMac = if ($macM.Success) { $macM.Groups[1].Value.ToLower() } else { '?' }
+        $ipOk = ($pyIp -eq $SchemeSide.Ip)
+        $macOk = ($pyMac -eq $SchemeMac.ToLower()) -or ($SchemeMac -eq '')
+        if ($ipOk -and $macOk) {
+            Say ("PRECHECK addr-sync : ok (pc\twin_send.py agrees: dst={0} mac={1} for scheme {2}/pair {3})" -f $pyIp, $pyMac, $IpScheme, $Board)
+        } else {
+            Say ("PRECHECK addr-sync : MISMATCH (selfcheck dst={0} mac={1} vs pc\twin_send.py dst={2} mac={3})" -f $SchemeSide.Ip, $SchemeMac, $pyIp, $pyMac)
+            Say "PRECHECK addr-sync : the two scheme tables drifted - fix the table in this script before burning anything."
+        }
+    } catch {
+        Say ("PRECHECK addr-sync : skipped ({0})" -f $_.Exception.Message)
+    }
+} else {
+    Say "PRECHECK addr-sync : skipped (twin_send.py not resolved)"
 }
 Say ""
 
@@ -435,6 +502,35 @@ if ($DryRun) {
     }
 }
 
+# ===================================================================== STEP 3b ARP
+# Manual section 2 step 4: static ARP is mandatory, not optional. The board's ARP reply
+# travels over Aurora to the PEER board, so this PC never learns the board MAC and
+# sendto() fails at the OS layer. The scheme decides which (ip -> mac) pair is bound.
+if ($SkipArp) {
+    Step '3b' 'ARP' 'SKIP' 'skip-arp (-SkipArp)'
+} elseif ($DryRun) {
+    $sa = $helperMap['static_arp.ps1']
+    if (-not $sa) {
+        Step '3b' 'ARP' 'SKIP' 'helper-missing static_arp.ps1'
+    } else {
+        $ifAliasShown = if ($Iface -eq '') { '<IFACE>' } else { $Iface }
+        Add-Cmd ('powershell -NoProfile -ExecutionPolicy Bypass -File ' + $sa + " -Scheme $IpScheme -BoardPcPair $Board -IfAlias `"$ifAliasShown`" -Apply")
+        Step '3b' 'ARP' 'SKIP' ("dry-run (would bind {0} -> {1} with scheme {2})" -f $SchemeSide.Ip, $SchemeMac, $IpScheme)
+    }
+} elseif (-not $helperMap['static_arp.ps1']) {
+    Step '3b' 'ARP' 'SKIP' 'helper-missing static_arp.ps1'
+} elseif ($Iface -eq '') {
+    Step '3b' 'ARP' 'SKIP' 'no-iface (-Iface required to pick the NIC for the static ARP entry)'
+} else {
+    $r = Invoke-Ps $helperMap['static_arp.ps1'] @('-Scheme', $IpScheme, '-BoardPcPair', $Board, '-IfAlias', $Iface, '-Apply')
+    if ($r.Text -match 'STATIC_ARP_RESULT:\s*PASS') {
+        Step '3b' 'ARP' 'PASS' ("{0} -> {1} Permanent (scheme {2})" -f $SchemeSide.Ip, $SchemeMac, $IpScheme)
+    } else {
+        $m = @($r.Text -split "`r?`n" | Where-Object { $_ -match 'STATIC_ARP_RESULT|FAIL' } | Select-Object -Last 3)
+        Step '3b' 'ARP' 'FAIL' ("rc={0} {1}" -f $r.Rc, ($m -join ' | '))
+    }
+}
+
 # ==================================================================== STEP 4 LINK
 $script:PkBase = $null
 # $script:LtxPath was decided in the precheck block (bit/ltx pairing rule)
@@ -499,7 +595,7 @@ if ($SkipProbe) {
     if (-not $ts) {
         Step 5 'PROBE3' 'SKIP' 'helper-missing twin_send.py'
     } else {
-        Add-Cmd ('py ' + $ts + ' --count 3 --len 100 --run-id 0x91')
+        Add-Cmd ('py ' + $ts + (" --count 3 --len 100 --run-id 0x91 --scheme {0} --pair {1}" -f $IpScheme, $Board))
         Step 5 'PROBE3' 'SKIP' 'dry-run (would send 3 probe frames and re-capture ILA expecting pk_frames +3)'
     }
 } elseif ($null -eq $script:PkBase) {
@@ -509,7 +605,7 @@ if ($SkipProbe) {
     if (-not $ts) {
         Step 5 'PROBE3' 'SKIP' 'helper-missing twin_send.py'
     } else {
-        $s = Invoke-Py $ts @('--count', '3', '--len', '100', '--run-id', '0x91')
+        $s = Invoke-Py $ts @('--count', '3', '--len', '100', '--run-id', '0x91', '--scheme', $IpScheme, '--pair', $Board)
         if ($s.Text -notmatch 'SEND_OK') {
             $m = @($s.Text -split "`r?`n" | Where-Object { $_ -match 'FAIL|HINT' } | Select-Object -Last 3)
             Step 5 'PROBE3' 'FAIL' ("send failed rc={0} {1}" -f $s.Rc, ($m -join ' | '))
@@ -566,11 +662,14 @@ foreach ($dir in $dirs) {
         $ifaceShown = if ($Iface -eq '') { '<IFACE>' } else { $Iface }
         Add-Cmd ('py ' + $capPy + " --iface `"$ifaceShown`" --seconds $CaptureSeconds --out $pcap")
         if ($isLocal -and $sendPy) {
-            Add-Cmd ('py ' + $sendPy + (" --count {0} --len {1} --run-id {2} --interval-ms {3}" -f $dir.Count, $dir.Len, $dir.Hex, $dir.Interval))
+            Add-Cmd ('py ' + $sendPy + (" --count {0} --len {1} --run-id {2} --interval-ms {3} --scheme {4} --pair {5}" -f $dir.Count, $dir.Len, $dir.Hex, $dir.Interval, $IpScheme, $Board))
         }
         if ($judgePy) {
             $extra = if ($dir.MiB) { " --print-frames 5 --json-out " + (Join-Path $prjOut ("judge_10mib_{0}.json" -f $script:Stamp)) } else { '' }
-            Add-Cmd ('py ' + $judgePy + (" --from-pcap $pcap --board-mac $BoardMac --port $Port --port-direction any --expect-count {0} --count-mode exact --expect-len {1} --expect-run-id {2} --allow-dup 0{3}" -f $dir.Count, $dir.Len, $dir.Hex, $extra))
+            Add-Cmd ('py ' + $judgePy + (" --from-pcap $pcap --board-mac $SchemeMac --port $Port --port-direction any --expect-count {0} --count-mode exact --expect-len {1} --expect-run-id {2} --allow-dup 0{3}" -f $dir.Count, $dir.Len, $dir.Hex, $extra))
+        }
+        if ($recvPy) {
+            Add-Cmd ('py ' + $recvPy + (" --from-pcap $pcap --scheme {0} --pair {1} --port $Port --port-direction any --expect-count {2} --expect-len {3} --expect-run-id {4}" -f $IpScheme, $Board, $dir.Count, $dir.Len, $dir.Hex))
         }
         $dualDetail += ("{0}:SKIP(dry-run)" -f $dir.Name)
         continue
@@ -596,7 +695,7 @@ foreach ($dir in $dirs) {
     if ($isLocal) {
         if ($sendPy) {
             Start-Sleep -Seconds $SendDelaySeconds
-            $s = Invoke-Py $sendPy @('--count', "$($dir.Count)", '--len', "$($dir.Len)", '--run-id', $dir.Hex, '--interval-ms', "$($dir.Interval)")
+            $s = Invoke-Py $sendPy @('--count', "$($dir.Count)", '--len', "$($dir.Len)", '--run-id', $dir.Hex, '--interval-ms', "$($dir.Interval)", '--scheme', $IpScheme, '--pair', $Board)
             $windowUsed = $true
             if ($s.Text -match 'SEND_OK') {
                 $dualDetail += ("{0}:SEND_OK" -f $dir.Name)
@@ -624,7 +723,7 @@ foreach ($dir in $dirs) {
     if ((-not $isLocal) -or $JudgeOwn) {
         $judged = $true
         $windowUsed = $true
-        $jargs = @($judgePy, '--from-pcap', $pcap, '--board-mac', $BoardMac, '--port', "$Port",
+        $jargs = @($judgePy, '--from-pcap', $pcap, '--board-mac', $SchemeMac, '--port', "$Port",
             '--port-direction', 'any', '--expect-count', "$($dir.Count)", '--count-mode', 'exact',
             '--expect-len', "$($dir.Len)", '--expect-run-id', $dir.Hex, '--allow-dup', '0')
         if ($dir.MiB) {
@@ -636,7 +735,7 @@ foreach ($dir in $dirs) {
         $ok = ($j.Rc -eq 0) -and ("$jline" -match 'JUDGE: PASS')
         if ($ok) { $dualDetail += ("{0}:JUDGE_PASS" -f $dir.Name) } else { $dualDetail += ("{0}:JUDGE_FAIL({1})" -f $dir.Name, "$jline"); $capOk = $false }
         if ($recvPy) {
-            $rargs = @('--from-pcap', $pcap, '--board-mac', $BoardMac, '--port', "$Port",
+            $rargs = @('--from-pcap', $pcap, '--scheme', $IpScheme, '--pair', $Board, '--port', "$Port",
                 '--port-direction', 'any', '--expect-count', "$($dir.Count)",
                 '--expect-len', "$($dir.Len)", '--expect-run-id', $dir.Hex)
             $rc2 = Invoke-Py $recvPy $rargs

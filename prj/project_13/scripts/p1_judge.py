@@ -25,6 +25,12 @@ Criteria alignment with prj12 P1 (see 操作文档/prj12_双板上板操作手�
   * payload must be the twin_send.py structure, fill verified byte by byte:
         "TWIN" | seq(u16 BE) | count(u16 BE) | run_id(u32 BE) | fill[i]=(seq+12+i)&0xFF
   * direction is carried by run_id (PC1 sends 0x1, PC2 sends 0x2).
+  * address-scheme AGNOSTIC: the judge never reads an IP literal and never looks at
+    eth.dst, so switching the address plan cannot silently change the verdict. The
+    only scheme-dependent input is the board MAC, and its default set already covers
+    all three schemes: p1 = 00:11:22:33:44:55, handbook/protocol = 02:00:00:00:0A:01
+    (board A) / 02:00:00:00:0B:01 (board B). Narrow it with --board-mac when a run
+    must be strict about which scheme the bitstream belongs to.
 
 Usage:
   py scripts\\p1_judge.py --from-pcap out\\rx.pcap --expect-count 20 --expect-len 100 \\
@@ -45,6 +51,17 @@ import sys
 MAGIC = b"TWIN"
 MIN_LEN = 12
 DEFAULT_BOARD_MAC = "00:11:22:33:44:55"
+# Address decision 2026-11-08: prj13 has three schemes (see pc/twin_send.py SCHEMES).
+#   p1       : the CURRENT P1 baseline bitstream hardcodes 00:11:22:33:44:55
+#   handbook : default for P2 candidates, board MACs 02:00:00:00:0A:01 / ...0B:01
+#   protocol : v0.2 contract, historical reference, same board MACs as handbook
+# The judge is address-agnostic by design (it never looks at eth.dst), so the safe
+# default is "any known board MAC". --board-mac still overrides for a strict run.
+KNOWN_BOARD_MACS = (
+    "00:11:22:33:44:55",     # P1 baseline (scheme p1)
+    "02:00:00:00:0a:01",     # handbook/protocol board A
+    "02:00:00:00:0b:01",     # handbook/protocol board B
+)
 VLAN_TPIDS = (0x8100, 0x88A8, 0x9100)
 
 
@@ -232,8 +249,10 @@ def build_parser():
     ap.add_argument("--from-pcap", dest="from_pcap", required=True,
                     help="classic pcap or pcapng captured on the receiving NIC")
     ap.add_argument("--board-mac", dest="board_mac", action="append", default=None,
-                    help="board MAC as eth.src criterion (repeatable; default %s)"
-                         % DEFAULT_BOARD_MAC)
+                    help="board MAC as eth.src criterion (repeatable). Default = every known board MAC, "
+                         "i.e. %s (scheme p1) and 02:00:00:00:0a:01 / 02:00:00:00:0b:01 (scheme handbook). "
+                         "Pass it explicitly for a strict single-scheme run."
+                         % ", ".join(KNOWN_BOARD_MACS))
     ap.add_argument("--port", type=int, default=1234, help="expected UDP port (default 1234)")
     ap.add_argument("--port-direction", dest="port_direction",
                     choices=["any", "sport", "dport"], default="any",
@@ -279,7 +298,7 @@ def main(argv=None):
         print("JUDGE: FAIL key=capture=FAIL(unreadable)")
         return 2
 
-    board = {normalize_mac(x) for x in split_multi(args.board_mac) if x} or {DEFAULT_BOARD_MAC}
+    board = {normalize_mac(x) for x in split_multi(args.board_mac) if x} or set(KNOWN_BOARD_MACS)
     want_lens = sorted({int(x, 0) for x in split_multi(args.expect_len)})
     want_rids = sorted({int(x, 0) for x in split_multi(args.expect_run_id)})
 

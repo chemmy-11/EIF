@@ -45,8 +45,10 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 - [x] 骨架 fork（源码 + 脚本路径改写 + README + fork manifest）
 - [x] P2 RTL：`rtl/p2/{ipv4_packet_extract,eth_rewrap,local_steer}.v`（v0.2）+ 单板环路 TB（`sim/p2/`，**xsim 21/21 PASS**，含 4 组变异测试；2026-11-08）
 - [x] P0/P1 离线工程化（2026-11-08）：地址/ARP 方案、`p1_selfcheck.ps1` + `p1_judge.py`（mock 25/25）、PC 侧发帧基准、B1 回归 `sim/regress.ps1`（12/12）、`stall_watchdog.ps1`、QSPI 方案、吞吐批量方案
-- [ ] P2 顶层集成（接 `aurora_mem_bridge.v` + 关掉 `des_mac=src_mac` 旧回显 + 本地栈应答出本板 GE2）
-- [ ] 首次构建出 P2 候选位流
+- [x] P2 顶层集成（2026-11-08）：`rtl/p2/p2_frame_buf.v` + `rtl/p2/p2_relay_top.v`；泵A 写侧 ← 转发流；桥② 写侧 ← 已重加 14 B 头的完整帧；**本地栈应答改走本板 GE2**（P1 跨板回声结构上消失）
+- [x] 首次构建 P2 候选位流 **`CFA98553`**（11,459,804 B，WNS **+0.015** / WHS **+0.004**、0 失败端点；位流/ltx 成对；登记 `docs/M1_prj13_P2候选位流登记_2026-11-08.md`）
+- [ ] 板 B 版位流（同源码换参数：`BOARD_IP=.12 / BOARD_MAC=0B:01 / PEER_IP=.1 / PC_IP=.2`）
+- [ ] P2 计数器挂 ILA（本候选为保时序余量未加，V4 前必做）
 - [ ] 上板验收（需板）
 
 ### 2026-11-08 离线产出索引（证据在磁盘、不入库；见 `.gitignore`）

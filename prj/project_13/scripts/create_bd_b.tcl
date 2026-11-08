@@ -14,7 +14,7 @@
 set P D:/FPGA/prj/project_13
 
 if {[llength [get_projects -quiet]] == 0} {
-    open_project $P/vivado/prj12.xpr
+    open_project $P/vivado/prj13.xpr
 }
 
 # ---- idempotent: drop any previous BD (hard clean by path) ----
@@ -24,8 +24,8 @@ if {[llength [get_bd_designs -quiet mb_ctrl]]} {
 foreach f [get_files -quiet *.bd] {
     remove_files -quiet $f
 }
-file delete -force $P/vivado/prj12.srcs/sources_1/bd/mb_ctrl
-file delete -force $P/vivado/prj12.srcs/sources_1/bd/probe
+file delete -force $P/vivado/prj13.srcs/sources_1/bd/mb_ctrl
+file delete -force $P/vivado/prj13.srcs/sources_1/bd/probe
 
 # axi_lite_regs.v must be a project source for the module reference
 if {[llength [get_files -quiet axi_lite_regs.v]] == 0} {

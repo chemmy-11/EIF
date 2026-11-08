@@ -95,18 +95,36 @@ module aurora_mem_bridge (
 );
 
 //parameter define (official values)
-parameter  BOARD_MAC = 48'h00_11_22_33_44_55;
-parameter  BOARD_IP  = {8'd192,8'd168,8'd1,8'd10};
+// ★ prj13 P2 (v0.2)：地址按开工手册 §8 裁决的 10.10.0.x 落地（2026-11-08 20:40 定）
+//   板 A 一套；板 B 只换参数：BOARD_MAC=..0B_01 / BOARD_IP=.12 / PEER_IP=.1 / PC_IP=.2
+parameter  BOARD_MAC = 48'h02_00_00_00_0A_01;                 // 本板（板 A）
+parameter  BOARD_IP  = {8'd10,8'd10,8'd0,8'd11};              // 本板管理/本地栈 IP
+parameter  PEER_MAC  = 48'hA8_2B_DD_76_DF_A2;                 // ★对端 PC 的 MAC（板 A = PC2 网卡）
+parameter  PEER_IP   = {8'd10,8'd10,8'd0,8'd2};               // ★对端 PC 的 IP（唯一允许跨板的 dst）
+parameter  PC_IP     = {8'd10,8'd10,8'd0,8'd1};               // 本板直连 PC 的 IP
 parameter  DES_MAC   = 48'hff_ff_ff_ff_ff_ff;
-parameter  DES_IP    = {8'd192,8'd168,8'd1,8'd102};
+parameter  DES_IP    = {8'd10,8'd10,8'd0,8'd1};               // 本地栈回包的缺省 dst（实际由 src_ip 覆盖）
 
 //*******************************************************************
 // 以太网栈侧连线（eth_rxc 域）—— 与 prj9 逐位相同
 //*******************************************************************
 wire          gmii_rx_clk, gmii_rx_dv, gmii_tx_clk;
 wire [7:0]    gmii_rxd;
-wire [7:0]    stack_txd;                  // 栈 TX（eth_ctrl 输出）→ 帧泵A
+wire [7:0]    stack_txd;                  // 栈 TX（eth_ctrl 输出）→ 本地 GE2（P2 起不再进 Aurora）
 wire          stack_tx_en;
+// ---- prj13 P2: 透明转发通路连线 ----
+wire [7:0]    p2_relay_txd;               // 转发出口：IP 字节流（无以太头）→ 帧泵A
+wire          p2_relay_tx_en;
+wire [7:0]    p2_lan_txd;                 // 回程出口：完整以太帧 → 内存桥②
+wire          p2_lan_tx_en;
+wire [31:0]   p2_st_rx_frames, p2_st_rx_drop, p2_st_relay, p2_st_local, p2_st_arp;
+wire [31:0]   p2_st_drop_vlan, p2_st_drop_ipv6, p2_st_drop_ethertype;
+wire [31:0]   p2_st_drop_broadcast, p2_st_drop_multicast, p2_st_drop_unknown_dst;
+wire [31:0]   p2_st_drop_oversize, p2_st_drop_bad_csum, p2_st_drop_truncated;
+wire [31:0]   p2_st_drop_mac;
+wire [31:0]   p2_st_aur_frames, p2_st_aur_drop, p2_st_lan_frames, p2_st_aur_bad_v4;
+reg           stack_takeover = 1'b0;      // 本地栈应答接管 RGMII TX（帧级）
+reg           stack_tx_en_d  = 1'b0;
 // ---- W5 命令通道：应答帧注入（同域 mux，见文件头 7）----
 wire [7:0]    cmd_resp_txd;
 wire          cmd_resp_tx_en;
@@ -818,15 +836,74 @@ mb_ctrl u_mb_ctrl (
 (* mark_debug = "true" *) wire [15:0] dbg_lite_exec  = lite_exec_cnt;
 
 //*******************************************************************
-// 帧泵 A：栈 TX（eth_rxc）→ user_clk —— 与 prj9 相同
+// ★ prj13 P2 v0.2：透明 IPv4 转发（顶层集成，2026-11-08）
+//   契约：交付仓 issue #10 + docs/M1_prj13_P2_RTL接口契约_v0.2_2026-11-08.md
+//   两条通路（每块板一份源码，A/B 只换参数）：
+//     ① 转发 PC→光纤：gmii_rx → [整帧缓冲] → extract → local_steer
+//                      → 只放行 dst==PEER_IP → 帧泵A 写侧
+//     ② 回程 光纤→PC：unpack → [整帧缓冲] → eth_rewrap（加 14 B 头）
+//                      → 内存桥② 写侧 → 帧泵B → RGMII TX
+//   与 P1 的关键语义差异（★必读）：
+//     · 栈 TX（stack_txd）**不再进 Aurora**，改走本地 GE2（见下方 stack_takeover）；
+//       于是 P1 的"跨板回声"结构上消失（不再有 des_mac=src_mac 的回声帧跨板）。
+//     · 本地应答（ARP/ICMP/管理 UDP）因此真的能回到本板 PC —— 这正是 §7.3 记录的
+//       "本地栈应答出板通路缺失"的修法。
+//     · 两个生产者（MAC 接收 / Aurora 解包）都不反压，故各加一级**整帧粒度**
+//       弹性缓冲（p2_frame_buf）；bank 满时整帧丢弃并计数，绝不留半帧上电路。
+//*******************************************************************
+p2_relay_top #(
+    .BOARD_MAC    (BOARD_MAC),
+    .PEER_MAC     (PEER_MAC ),
+    .BOARD_IP     (BOARD_IP ),
+    .PEER_IP      (PEER_IP  ),
+    .PC_IP        (PC_IP    ),
+    .PROXY_ARP_EN (1'b0     )
+) u_p2_relay (
+    // ---- 以太网域（eth_rxc）----
+    .eth_clk          (gmii_rx_clk   ),
+    .eth_rst_n        (~aurora_rst   ),
+    .rx_data          (gmii_rxd      ),
+    .rx_dv            (gmii_rx_dv    ),
+    .relay_data       (p2_relay_txd  ),
+    .relay_en         (p2_relay_tx_en),
+    .st_rx_frames     (p2_st_rx_frames    ),
+    .st_rx_drop       (p2_st_rx_drop      ),
+    .st_relay         (p2_st_relay        ),
+    .st_local         (p2_st_local        ),
+    .st_arp           (p2_st_arp          ),
+    .st_drop_vlan     (p2_st_drop_vlan    ),
+    .st_drop_ipv6     (p2_st_drop_ipv6    ),
+    .st_drop_ethertype(p2_st_drop_ethertype),
+    .st_drop_broadcast(p2_st_drop_broadcast),
+    .st_drop_multicast(p2_st_drop_multicast),
+    .st_drop_unknown_dst(p2_st_drop_unknown_dst),
+    .st_drop_oversize (p2_st_drop_oversize),
+    .st_drop_bad_csum (p2_st_drop_bad_csum),
+    .st_drop_truncated(p2_st_drop_truncated),
+    .st_drop_mac      (p2_st_drop_mac     ),
+    // ---- Aurora/user 域（user_clk）----
+    .aur_clk          (user_clk      ),
+    .aur_rst_n        (~aurora_rst   ),
+    .aur_data         (unpack_data   ),
+    .aur_en           (unpack_en     ),
+    .lan_data         (p2_lan_txd    ),
+    .lan_en           (p2_lan_tx_en  ),
+    .st_aur_frames    (p2_st_aur_frames),
+    .st_aur_drop      (p2_st_aur_drop  ),
+    .st_lan_frames    (p2_st_lan_frames),
+    .st_aur_bad_v4    (p2_st_aur_bad_v4)
+);
+
+//*******************************************************************
+// 帧泵 A：转发出口（eth_rxc）→ user_clk
+// ★prj13 P2 起输入改为 P2 转发流（IP 字节流）；栈 TX 已改走本地 GE2
 // （输出不再直连 pack, 改喂内存桥写侧 —— 两根线之一）
-// W5: 输入保持直连 stack_txd —— 应答不走这条路（见 pump B 末级注入）
 //*******************************************************************
 frame_fifo_pump u_pump_fwd (
     .wr_clk       (gmii_rx_clk   ),
     .wr_rst_n     (~aurora_rst   ),
-    .wr_data      (stack_txd     ),
-    .wr_en        (stack_tx_en   ),
+    .wr_data      (p2_relay_txd  ),
+    .wr_en        (p2_relay_tx_en),
     .rd_clk       (user_clk      ),
     .rd_rst_n     (~aurora_rst   ),
     .rd_data      (pump_fwd_data ),
@@ -1001,7 +1078,7 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
 frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538), .HAS_DMA(0)) u_mem2 (
     // 帧侧 (user_clk)
     .user_clk(user_clk), .user_rst_n(~aurora_rst),
-    .wr_data (unpack_data  ), .wr_en (unpack_en   ),   // ← W4 回程拦截点: 解包输出
+    .wr_data (p2_lan_txd ), .wr_en (p2_lan_tx_en),   // ★P2: 已在用户域重加 14 B 以太头
     .wr_hold (mem2_wr_hold),                            // 悬空: 满时整帧拒收+计数
     .rd_data (mem2_rd_data), .rd_en (mem2_rd_en),        // → pack（帧中零气泡, 见 PRIME）
     .rd_slot_o(mem2_rd_slot_o), .rd_len_o(mem2_rd_len_o),
@@ -1308,24 +1385,41 @@ frame_fifo_pump u_pump_rev (
 );
 
 //*******************************************************************
-// ★W5 命令通道应答注入点：RGMII TX 末级（eth_rxc 域，零 CDC）
-//   为什么在这里（而非泵A 输入）：
+// ★prj13 P2：本地栈应答接管 RGMII TX（帧级，与 W5 命令注入同法）
+//   为什么需要：P2 起栈 TX（ARP 应答/ICMP echo/管理 UDP）不再进 Aurora，
+//   必须从本板 GE2 出去，否则 dst==BOARD_IP 的包永远回不到本板 PC
+//   （这正是 docs/M1_prj13_P2_RTL接口契约 §7.3 记录的缺口）。
+//   接管规则（与 cmd_takeover 同口径）：
+//     1) 仅在 TX 末级空闲 ≥64 拍（tx_idle_cnt[6]）时才允许接管 —— 同时满足 IFG；
+//     2) 锁存后保持到整帧发完，绝不在帧中途切换；
+//     3) 优先级 cmd > stack(本地应答) > relay(光纤回程)。
+//   残余风险（与 W5 命令注入同类，已登记）：若本地应答与回程帧同一拍起帧，
+//     被抢占那一帧会坏（PC 侧表现为该帧丢失/校验错，不会静默通过）。
+//*******************************************************************
+always @(posedge gmii_rx_clk or negedge sys_rst_n) begin
+    if (!sys_rst_n) begin
+        stack_takeover <= 1'b0;
+        stack_tx_en_d  <= 1'b0;
+    end else begin
+        stack_tx_en_d <= stack_tx_en;
+        if (~stack_tx_en & stack_tx_en_d)
+            stack_takeover <= 1'b0;                  // 本帧发完
+        else if (stack_tx_en & ~stack_tx_en_d & cmd_tx_idle & ~cmd_takeover)
+            stack_takeover <= 1'b1;                  // 空闲窗口起帧才接管
+    end
+end
+
+assign rgmii_txd_i   = pump_rev_data;      // 泵B 原始（P2 起内容已是完整以太帧）
+assign rgmii_tx_en_i = pump_rev_en;
+assign rgmii_txd_o   = cmd_takeover   ? cmd_resp_txd   :
+                       stack_takeover ? stack_txd      : rgmii_txd_i;
+assign rgmii_tx_en_o = cmd_takeover   ? cmd_resp_tx_en :
+                       stack_takeover ? stack_tx_en    : rgmii_tx_en_i;
+//   为什么 W5 命令应答放在末级（而非泵A 输入）——历史依据保留：
 //     泵A→桥① 是**内存写侧**。RND 模式下桥① 不再自动读，应答帧会被写进
 //     槽里、要等读序轮到它才出得来 —— ACK 事实上到不了 PC（GET_WATERMARK
 //     自锁）。故应答必须**绕开两级内存桥**，从网口末级直出。
-//   为什么安全：
-//     1) 仅在 TX 末级空闲 ≥64 拍时才允许接管（同时满足以太网 IFG）；
-//     2) 接管锁存后保持到整帧发完，绝不在帧中途切换；
-//     3) 命令为控制面稀疏流量，PC 侧同步流程（一条命令→等该命令的数据帧）
-//        下泵B 在应答时刻为空闲，接管不与他帧竞争。
-//   残余风险（已登记）：若应答发出的同一拍泵B 恰好起一帧，该帧首字节会被
-//     吞掉（PC 侧表现为该数据帧损坏/缺失，**不会静默通过**）。彻底消除需把
-//     注入点移到泵B 输入并引入 eth→user 字节 CDC，属后续可选项。
-//*******************************************************************
-assign rgmii_txd_i   = pump_rev_data;      // 泵B 原始
-assign rgmii_tx_en_i = pump_rev_en;
-assign rgmii_txd_o   = cmd_takeover ? cmd_resp_txd   : rgmii_txd_i;
-assign rgmii_tx_en_o = cmd_takeover ? cmd_resp_tx_en : rgmii_tx_en_i;
+//     P2 起本地栈应答（stack_takeover）沿用同一条理由。
 
 //*******************************************************************
 // 观测 LED

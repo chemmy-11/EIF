@@ -62,6 +62,15 @@ param(
     [string]$SerialScript = 'D:\FPGA\prj\project_12\out\serial_snapshot.ps1',
     [string]$OutDir = '',
     [string]$PythonExe = 'py',
+    # ADDRESS SEMANTICS (project decision 2026-11-08 20:40):
+    #   This watchdog guards the P1/B1 BASELINE bitstream, whose board IP is
+    #   hard-coded to 192.168.1.10 -> the 3-frame probe MUST use --scheme p1.
+    #   The 10.10.0.x 'handbook' scheme is only valid once a P2 bitstream is on
+    #   the board; 'protocol' (192.168.50.x) is the third preset.
+    #   twin_send.py's own --scheme default is 'protocol', so an omitted flag
+    #   would silently probe the wrong address space -- hence the explicit
+    #   default below and SelfTest assertion G4 which pins it.
+    [ValidateSet('p1', 'handbook', 'protocol')][string]$IpScheme = 'p1',
     [switch]$DryRun,
     [switch]$SelfTest,
     [switch]$StrictFingerprint,
@@ -332,12 +341,23 @@ function Enter-DmaMode {
     return $LASTEXITCODE
 }
 
+# --- one place that builds the probe argv, so the real call, the dry-run
+#     preview and the SelfTest assertion can never drift apart ---------------
+function Get-ProbeArgs([string]$scheme) {
+    return @($SendScript, '--scheme', $scheme, '--count', '3', '--len', '100', '--run-id', '0x91')
+}
+
+function Get-ProbeCmdline([string]$scheme) {
+    return ("{0} {1}" -f $PythonExe, ((Get-ProbeArgs $scheme) -join ' '))
+}
+
 # acceptance: a 3-frame probe must advance pk_frames by exactly >= 3
 function Test-Recovered([int]$PkBefore, [string]$tag) {
-    Say ("VERIFY: 3-frame probe (run-id 0x91), pk_frames must advance from {0}" -f $PkBefore)
-    $preview = "{0} {1} --count 3 --len 100 --run-id 0x91" -f $PythonExe, $SendScript
+    Say ("VERIFY: 3-frame probe (run-id 0x91, scheme={0}), pk_frames must advance from {1}" -f $IpScheme, $PkBefore)
+    $preview = Get-ProbeCmdline $IpScheme
     if (-not (Test-CanLaunch '3-frame probe (sends Ethernet frames)' $preview)) { return $false }
-    & $PythonExe $SendScript --count 3 --len 100 --run-id 0x91 2>&1 | ForEach-Object { Say ("  send: " + $_) }
+    $probeArgs = Get-ProbeArgs $IpScheme
+    & $PythonExe @probeArgs 2>&1 | ForEach-Object { Say ("  send: " + $_) }
     Start-Sleep -Seconds $ProbeWaitSeconds
     $csv = Get-Ila6Csv $tag $IlaScript
     if ($null -eq $csv) { return $false }
@@ -474,6 +494,20 @@ function Invoke-SelfTest {
     $m3 = 'FAIL'; if ($okG3) { $m3 = 'OK' }
     Say ("  [{0}] {1,-34} expect={2,-16} got={3,-16} {4}" -f $m3, 'no new ILA capture log', '0', $newConsoles.Count, 'nothing launched')
 
+    #---------------------------------------------------------------------
+    # G4: ADDRESS SEMANTICS PIN (project decision 2026-11-08 20:40)
+    #   This watchdog guards the P1/B1 baseline bitstream whose board IP is
+    #   192.168.1.10, so the probe must carry "--scheme p1". twin_send.py's own
+    #   default is "--scheme protocol"; if the pc/ defaults ever change, or if
+    #   someone drops the flag while refactoring, this assertion fails instead
+    #   of silently probing the wrong address space.
+    #---------------------------------------------------------------------
+    $probeCmd = Get-ProbeCmdline $IpScheme
+    $okG4 = (($IpScheme -eq 'p1') -and ($probeCmd -match '--scheme\s+p1(\s|$)'))
+    if ($okG4) { $pass = $pass + 1 } else { $fail = $fail + 1 }
+    $m4 = 'FAIL'; if ($okG4) { $m4 = 'OK' }
+    Say ("  [{0}] {1,-34} expect={2,-16} got={3,-16} {4}" -f $m4, 'probe scheme pinned to p1', 'p1 + --scheme p1', ("scheme={0}" -f $IpScheme), $probeCmd)
+
     Say ("SELFTEST: PASS={0} FAIL={1}" -f $pass, $fail)
     if ($fail -eq 0) { Say "SELFTEST_RESULT: PASS"; return 0 }
     Say "SELFTEST_RESULT: FAIL"
@@ -487,6 +521,9 @@ Say "=== stall_watchdog (prj13 P1-6) ==="
 Say ("log        : " + $script:LogPath)
 Say ("board/com  : {0} / {1} @ {2}" -f $Board, $Com, $Baud)
 Say ("mode       : recover={0} maxrecover={1} poll={2}s raise>={3}" -f $RecoverMode, $MaxRecover, $PollSeconds, $RaiseThreshold)
+$schemeLabel = @{ p1 = 'P1 baseline'; handbook = 'P2 / handbook 10.10.0.x'; protocol = 'protocol v0.2 192.168.50.x' }
+Say ("ADDR_SCHEME {0} ({1}); use -IpScheme handbook after a P2 bitstream" -f $IpScheme, $schemeLabel[$IpScheme])
+Say ("probe cmd  : " + (Get-ProbeCmdline $IpScheme))
 Say ("dryrun     : {0}  strict={1}  ila3confirm={2}" -f $DryRun.IsPresent, $StrictFingerprint.IsPresent, $Ila3Confirm.IsPresent)
 
 if ($SelfTest.IsPresent) {
@@ -524,7 +561,7 @@ if ($DryRun.IsPresent) {
     if (($RecoverMode -eq 'system') -or ($RecoverMode -eq 'ladder')) { Say ("  step 1 : xsct rst -system (unvalidated)") }
     if (($RecoverMode -eq 'bitelf') -or ($RecoverMode -eq 'ladder')) { Say ("  step 2 : powershell -File {0} -Board {1} -Mode BitElf -Run" -f $BurnScript, $Board) }
     Say ("  then   : powershell -File {0} -Com {1}" -f $DmaScript, $Com)
-    Say ("  verify : {0} {1} --count 3 --len 100 --run-id 0x91 ; ILA6 pk_frames must advance >= 3" -f $PythonExe, $SendScript)
+    Say ("  verify : {0} ; ILA6 pk_frames must advance >= 3" -f (Get-ProbeCmdline $IpScheme))
     Say ("limits   : MaxRecover={0}, PollSeconds={1}, raise>={2}" -f $MaxRecover, $PollSeconds, $RaiseThreshold)
     Say ("evidence : {0}" -f $OutDir)
 }
