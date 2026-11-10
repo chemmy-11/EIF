@@ -147,3 +147,16 @@ prj/project_13/sim/p2/*_stdout.txt
 prj/project_13/sim/p2/run_p2_sim.log
 prj/project_13/sim/p1_regress/run_*.log
 prj/project_13/sim/p1_regress/*_console.txt
+
+# ===== 本地产物隔离（2026-11-10 收口，方案 A：只忽略、不删除任何文件）=====
+# ① 仓库里的 267 MB 打包件：GitHub 单文件硬限 100 MB，一旦被 add 就 push 失败
+prj/project_12.zip
+# ② prj12 证据/打包件（prj12 是冻结基线，只收 B1 类修复 → 证据不入库，磁盘留档）
+prj/project_12/out/*.csv
+prj/project_12/out/serial_*.txt
+prj/project_12/out/*.err
+prj/project_12/out/handoff_pc2_*/
+prj/project_12/out/*.zip
+prj/project_12/out/baseline_*/
+# ③ MCP 作业运行态（run_tcl 的 cmd/console/job.json，随时可再生成）
+tcljob-*
