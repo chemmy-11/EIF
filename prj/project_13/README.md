@@ -55,7 +55,9 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 
 | 主题 | 文档 | 一键入口 |
 |---|---|---|
+| **上板验证（当前执行中）** | `docs/M1_prj13_P2上板验证执行单_2026-11-10.md`（单板两档 + 双板 V3/V4 + 六点差分链 + 分诊） | `out/twin_config_13.json` → `prj12/out/twin_burn.ps1 -Root . -Config out/twin_config_13.json` |
 | P2 RTL 接口契约 | `docs/M1_prj13_P2_RTL接口契约_v0.2_2026-11-08.md` | `sim/p2/run_p2_sim.ps1` |
+| P2 候选位流登记 | `docs/M1_prj13_P2候选位流登记_2026-11-08.md` | `out/b_p2_CFA98553/` |
 | 地址与 ARP | `docs/M1_P2地址与ARP方案_v0.2_2026-11-08.md` | `pc/static_arp.ps1 -DryRun` |
 | M1 判据 | `docs/M1_多尺寸与10MiB判据_2026-11-08.md` | `scripts/p1_selfcheck.ps1 -DryRun` |
 | PC 发帧基准 | `docs/M1_PC侧发帧能力基准_2026-11-08.md` | `pc/twin_send.py --bench` |
