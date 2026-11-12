@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """m1a_sweep.py -- prj12 M1-A 双板对称采集脚本（PC1/PC2 各跑一份，互为收发）。
 
@@ -39,15 +39,22 @@ BIG_LEN = 1200
 BIG_COUNT = (BIG_BYTES + BIG_LEN - 1) // BIG_LEN
 
 
-def build_plan(send_base, phase):
+def build_plan(send_base, phase, small_interval=0.0, big_interval=0.7):
+    """small_interval/big_interval 是 2026-11-12 加的节奏参数。
+
+    为什么必须能调（实测）：20 帧 `interval=0` 是背靠背突发，PC 会在同一毫秒内把 20 帧
+    全塞给网卡，板卡 RX 侧扛不住 —— 两个方向都只到 5–9/20；而 8739 帧 @0.7 ms 的连续流
+    在 B→A 上是 8739/8739=100%。所以"丢包"主要由发送节奏决定，与帧长/方向无关。
+    默认值保持 0.0 / 0.7 不变，保证旧命令的行为与哈希语义不变。
+    """
     items = []
     for i, L in enumerate((26, 64, 100, 512, 1024, 1472), start=1):
-        items.append(dict(label="size%d" % L, length=L, count=20, run=send_base + i, interval=0.0))
-    items.append(dict(label="bidir1472", length=1472, count=20, run=send_base + 0xF1, interval=0.0))
+        items.append(dict(label="size%d" % L, length=L, count=20, run=send_base + i, interval=small_interval))
+    items.append(dict(label="bidir1472", length=1472, count=20, run=send_base + 0xF1, interval=small_interval))
     for i in range(1, 6):
-        items.append(dict(label="round%d" % i, length=100, count=20, run=send_base + 0x10 + i, interval=0.0))
+        items.append(dict(label="round%d" % i, length=100, count=20, run=send_base + 0x10 + i, interval=small_interval))
     if phase == "all":
-        items.append(dict(label="big10MiB", length=BIG_LEN, count=BIG_COUNT, run=send_base + 0xA0, interval=0.7))
+        items.append(dict(label="big10MiB", length=BIG_LEN, count=BIG_COUNT, run=send_base + 0xA0, interval=big_interval))
     return items
 
 
@@ -66,13 +73,18 @@ def main():
     ap.add_argument("--seconds", type=float, default=180.0)
     ap.add_argument("--start-delay", type=float, default=20.0)
     ap.add_argument("--phase", choices=["all", "basic"], default="all")
+    ap.add_argument("--small-interval", type=float, default=0.0,
+                    help="小项(20帧)的帧间隔 ms；默认 0.0=背靠背(旧行为)。"
+                         "实测 0.0 时板卡 RX 只收到 5-9/20，建议 1.0")
+    ap.add_argument("--big-interval", type=float, default=0.7,
+                    help="big10MiB 的帧间隔 ms；默认 0.7（实测 B→A 8739/8739 零丢）")
     ap.add_argument("--out-dir", default=None)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     out_dir = args.out_dir or os.path.join(os.path.dirname(HERE), "out", "evidence_20261112_m1a_dualboard", "judge")
     os.makedirs(out_dir, exist_ok=True)
-    plan = build_plan(args.send_base, args.phase)
+    plan = build_plan(args.send_base, args.phase, args.small_interval, args.big_interval)
     ts = time.strftime("%Y%m%d_%H%M%S")
     pcap = os.path.join(os.path.dirname(HERE), "out", "evidence_20261112_m1a_dualboard", "pcap", "m1a_%s_%s.pcap" % (args.role, ts))
     os.makedirs(os.path.dirname(pcap), exist_ok=True)
