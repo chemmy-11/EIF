@@ -37,8 +37,16 @@ current_hw_target $tgt
 open_hw_target
 set dev [lindex [get_hw_devices] 0]
 current_hw_device $dev
-refresh_hw_device -update_hw_probes false $dev
+# LTX 必须先关联再 refresh，否则 run_hw_ila 报 Labtools 27-188（2026-11-06 上板实抓发现）
+# ltx 可用 -tclargs 第 5 参覆盖；缺省取本工程 scripts/probes.ltx（与位流成对）
+set ltx [lindex $argv 4]
+if {$ltx eq ""} { set ltx {D:/FPGA/prj/project_12/scripts/probes.ltx} }
+if {![file exists $ltx]} { error "ltx not found: $ltx (must pair with bitstream)" }
+set_property PROBES.FILE $ltx $dev
+set_property FULL_PROBES.FILE $ltx $dev
+refresh_hw_device $dev
 puts "ILA_HW_DEVICE: $dev"
+puts "ILA_LTX: $ltx"
 
 set ilas [get_hw_ilas -of_objects $dev]
 puts "ILA_LIST: $ilas"
@@ -47,6 +55,15 @@ if {[llength $ilas] == 0} { error "no ILA in device (bitstream 是否带 ILA? �
 set ila ""
 foreach i $ilas {
     if {[string match "*ila_6*" $i]} { set ila $i }
+}
+if {$ila eq ""} {
+    # 硬件名是 hw_ila_N，名字匹配不中；LTX 后探针名=RTL net 名(dbg_*)，
+    # u_ila_6 的唯一特征 = 含 dbg_ch_up 探针（2026-11-06 上板实测：4 核探针数 13/14/9/14，无 10 探针核）
+    foreach i $ilas {
+        set np [llength [get_hw_probes -quiet -of_objects $i]]
+        puts "ILA_PROBE_COUNT: $i -> $np"
+        if {[llength [get_hw_probes -quiet dbg_ch_up -of_objects $i]] >= 1} { set ila $i }
+    }
 }
 if {$ila eq ""} {
     puts "ILA6_NOT_FOUND: fallback to [lindex $ilas 0]（旧位流/回退构建时）"
@@ -62,8 +79,10 @@ if {$trig ne ""} {
         puts "ILA_TRIGGER_SKIP: probe '$trig' not uniquely found ([llength $p]) -> 立即抓"
         run_hw_ila -trigger_now $ila
     } else {
-        puts "ILA_TRIGGER: $trig <= eq1"
-        if {[catch {set_property TRIGGER_COMPARE_VALUE eq1 $p} e]} { puts "ILA_TRIGGER_CFG_ERR: $e" }
+        puts "ILA_TRIGGER: $trig <= eq1'b1"
+        # 2026-11-12 实测：裸 eq1 被拒（[Designutils 20-614] No apostrophe specified in string: eq1）
+        # 正确写法是带进制的 Verilog 字面量 eq1'b1；eq1'h1 也可，eq1'd1 被拒（radix d 非法）
+        if {[catch {set_property TRIGGER_COMPARE_VALUE eq1'b1 $p} e]} { puts "ILA_TRIGGER_CFG_ERR: $e" }
         if {[catch {run_hw_ila $ila; wait_on_hw_ila -timeout 10 $ila} e2]} {
             puts "ILA_TRIGGER_TIMEOUT: $e2 -> 立即抓"
             run_hw_ila -trigger_now $ila
@@ -75,7 +94,7 @@ if {$trig ne ""} {
 }
 wait_on_hw_ila $ila
 set data [upload_hw_ila_data $ila]
-write_hw_ila_data -csv_file $out $data
+write_hw_ila_data -force -csv_file $out $data
 puts "ILA_CSV_OK: $out"
 close_hw_target
 disconnect_hw_server

@@ -53,7 +53,8 @@ foreach p [get_hw_probes -of_objects $ila] { puts "ILA_PROBE: $p" }
 if {$trig ne "" && $trig ne "-"} {
     set p [get_hw_probes -quiet $trig -of_objects $ila]
     if {[llength $p] == 1} {
-        set_property TRIGGER_COMPARE_VALUE eq1 $p
+        # 2026-11-12 实测：必须用带进制的字面量（裸 eq1 报 [Designutils 20-614]）
+        set_property TRIGGER_COMPARE_VALUE eq1'b1 $p
         if {[catch {run_hw_ila $ila; wait_on_hw_ila -timeout 10 $ila} e]} {
             puts "ILA_TRIGGER_TIMEOUT: $e -> trigger_now"
             run_hw_ila -trigger_now $ila

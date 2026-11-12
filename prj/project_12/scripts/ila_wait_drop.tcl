@@ -49,11 +49,13 @@ foreach i [get_hw_ilas -of_objects $dev] {
 }
 if {$ila eq ""} { error "no ILA with dbg_ch_up (P1 bitstream not loaded?)" }
 current_hw_ila $ila
-puts "ARM_ILA: $ila  wait=${wait}s  trigger=dbg_ch_up ne1 (== ch_up fell)"
+puts "ARM_ILA: $ila  wait=${wait}s  trigger=dbg_ch_up eq1'b0 (== ch_up fell)"
 
 set p [get_hw_probes -quiet dbg_ch_up -of_objects $ila]
 if {[llength $p] != 1} { error "dbg_ch_up probe not uniquely found" }
-set_property TRIGGER_COMPARE_VALUE ne1 $p
+# 2026-11-12 实测：`ne` 不是合法逻辑算子（[Designutils 20-610] Invalid logic operator 'ne'），
+# 且裸 eq1/eq0 都因缺进制被拒（20-614）。"等 ch_up 掉" 的正确写法 = eq1'b0。
+set_property TRIGGER_COMPARE_VALUE eq1'b0 $p
 run_hw_ila $ila
 
 if {[catch {wait_on_hw_ila -timeout $wait $ila} emsg]} {

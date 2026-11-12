@@ -21,6 +21,15 @@ import subprocess
 import sys
 import tempfile
 
+# GBK 控制台护栏（2026-11-12）：判据脚本绝不能因为"某个字符不在 GBK 里"而崩掉。
+# 崩溃会让 m1a_sweep 把每一项都记成 rc=1 → 全项 FAIL（假失败），比丢一行输出严重得多。
+# errors="replace" 只影响无法编码的字符（变成 '?'），不影响判据逻辑与退出码。
+try:
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
+except Exception:
+    pass
+
 MAGIC = b"TWIN"
 
 
@@ -294,7 +303,7 @@ def main():
             print(f"FAIL: payload len(s) {sorted(got - want)} not in expected {sorted(want)}")
             ok = False
         else:
-            print(f"payload len(s) {sorted(got)} ⊆ expected {sorted(want)}: OK")
+            print(f"payload len(s) {sorted(got)} <= expected {sorted(want)}: OK")
     if vlan_n:
         print(f"WARN: {vlan_n} frame(s) carry 802.1Q VLAN tag（板卡不发光 VLAN；已按 VLAN 解析）")
     if fcs_n:
