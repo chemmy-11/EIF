@@ -17,6 +17,14 @@
 //   I10 long_back_to_back     3 × **1472 B 满帧**背靠背（帧间 1 拍）→ 同上守恒判据；
 //                             这是"2-bank + 暂存转发"吞吐上限真正会顶到的地方
 //                             （I04 的 142 B 短帧压不到上限），打 [INFO] I10 实测值
+//   I11 fcs_tail              MAC 未剥 FCS：帧尾多 4 B 且 rx_dv 连续
+//                             → relay 仍严格 = total_len(128) 的 IP 包，FCS 必须被丢
+//   I13 runt_then_good        先 12 B 碎片再正常帧（1 拍空档）→ 碎片 DROP_TRUNCATED，
+//                             正常帧照常逐字节转出（残留状态不卡死后面）
+//   I14 preamble_sfd          ★2026-11-12 板上缺陷回归：7×0x55 + 0xD5 与 MAC 头
+//                             **同一个 rx_dv burst**（150 B 连续）→ relay 仍 = 128 B IP 包
+//   I15 preamble_two_frames   连续两帧都带前导（帧间 1 拍）→ 两帧都正确、缓冲帧数 = 2
+//                             （防止对齐器在帧尾状态机上卡住）
 //   I06 rewrap_aur_1472       aur 1472 B IP → lan = 14 B 头 + 原包逐字节，总长 1486
 //   I07 rewrap_aur_26_pad     aur 26 B IP → lan 60 B，第 40..59 字节全 0
 //   I08 counters_clean        两域计数器逐一比对
@@ -488,6 +496,8 @@ module tb_p2_relay_top;
     integer i, t;
     integer base_r, base_l;
     integer n_rel, d_obs, d_drop0, ok4, j;
+    // I11/I13/I14/I15 专用观测变量
+    integer base_wrf, base_rdf, wrf_delta, rdf_delta, base_trunc, base_detype, relay_bytes_delta;
     // I04 专用：把 3 帧的期望内容各存一份（背靠背连发时 wb 会被下一帧覆盖）
     reg [7:0] seq3 [0:1023];
     // I10 专用：3 × 1486 B 的期望内容存档（3*1486 = 4458）
@@ -536,6 +546,10 @@ module tb_p2_relay_top;
         req(r_frames == base_r + 1, "I01 exactly one relay frame");
         chk_relay_bytes(base_r, 14, 1472);
         req(r_frame_len[base_r] == 1472, "I01 relay byte count == 1472 (IP packet only)");
+        // 观测旁证（Lead 指定）：进缓冲 / 出缓冲都只能发生一次
+        req(dut.u_rxbuf.o_wr_frame_cnt == 16'd1, "I01 u_rxbuf.o_wr_frame_cnt == 1 (buffered once)");
+        req(dut.u_rxbuf.o_rd_frame_cnt == 16'd1, "I01 u_rxbuf.o_rd_frame_cnt == 1 (drained once)");
+        req(dut.u_rxbuf.o_wr_drop_cnt  == 16'd0, "I01 u_rxbuf.o_wr_drop_cnt == 0");
         m_rx = m_rx + 1; m_relay = m_relay + 1;
         chk_cnts;
         end_case("I01_relay_1472");
@@ -674,6 +688,142 @@ module tb_p2_relay_top;
         m_rxdrop = m_rxdrop + d_obs;
         chk_cnts;
         end_case("I10_long_back_to_back");
+
+        //=====================================================================
+        // I11 FCS 尾：MAC 未剥 FCS 的形态 —— 4 B FCS 附在帧尾、rx_dv 连续
+        //   期望：forward 出去的仍严格 = total_len(128) 的 IP 包，FCS 必须被丢掉。
+        //   （这条钉住"按 total_len 截断输出"而不是"按收到的帧长输出"）
+        //=====================================================================
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd128, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h1101);
+        for (i = 34; i < 14 + 128; i = i + 1) wb[i] = (i * 3 + 11) & 8'hFF;
+        wb[14 + 128]     = 8'hDE;         // 假 FCS 4 B
+        wb[14 + 128 + 1] = 8'hAD;
+        wb[14 + 128 + 2] = 8'hBE;
+        wb[14 + 128 + 3] = 8'hEF;
+        base_r   = r_frames;
+        base_wrf = dut.u_rxbuf.o_wr_frame_cnt;
+
+        rx_frame(14 + 128 + 4, 1);        // 146 B 一次给完（含 FCS）
+        wait_eth(12 * 146 + 2000);
+
+        req(r_frames == base_r + 1, "I11 exactly one relay frame");
+        chk_relay_bytes(base_r, 14, 128);
+        req(r_frame_len[base_r] == 128, "I11 relay byte count == 128 (FCS NOT included)");
+        req((dut.u_rxbuf.o_wr_frame_cnt - base_wrf) == 16'd1,
+            "I11 one frame buffered (FCS does not create a 2nd frame)");
+        m_rx = m_rx + 1; m_relay = m_relay + 1;
+        chk_cnts;
+        end_case("I11_fcs_tail");
+
+        //=====================================================================
+        // I13 碎片 -> 正常帧：先 12 B 碎片，1 拍空档后立刻一帧正常 dst=PEER_IP
+        //   期望：碎片被 DROP_TRUNCATED，但绝不影响后面那帧 —— 正常帧照常逐字节转出
+        //=====================================================================
+        for (i = 0; i < 12; i = i + 1) wb[i] = 8'h5A;      // 12 B 碎片（首字节≠0x55）
+        rx_frame(12, 1);                                    // 帧间 1 拍空档
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd128, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h1301);
+        for (i = 34; i < 14 + 128; i = i + 1) wb[i] = (i * 5 + 17) & 8'hFF;
+        base_r     = r_frames;
+        base_wrf   = dut.u_rxbuf.o_wr_frame_cnt;
+        base_trunc = st_drop_truncated;
+
+        rx_frame(14 + 128, 1);
+        wait_eth(16 * 146 + 3000);
+
+        req(r_frames == base_r + 1, "I13 good frame still relayed after a runt");
+        chk_relay_bytes(base_r, 14, 128);
+        req((dut.u_rxbuf.o_wr_frame_cnt - base_wrf) == 16'd2,
+            "I13 two frames buffered (runt + good)");
+        req((st_drop_truncated - base_trunc) == 1, "I13 runt counted as DROP_TRUNCATED");
+        m_rx = m_rx + 2; m_relay = m_relay + 1; m_dtrunc = m_dtrunc + 1;
+        chk_cnts;
+        end_case("I13_runt_then_good");
+
+        //=====================================================================
+        // I14 前导码 + SFD（★2026-11-12 板上缺陷的核心回归）
+        //   板上 gmii_rxd 的帧从 7×0x55 + 0xD5 开始，与 MAC 头是**同一个 rx_dv
+        //   burst**（栈自己跳这 8 B，见 udp_rx.v:161-169）。所以这里也必须做成
+        //   连续形态：150 B 一口气给完 = 8 B 前导/SFD + 142 B 正常帧。
+        //   （若在 SFD 后插空档，对齐器会退回 PA_IDLE 把该帧当"无前导"透传 ——
+        //     那样修前版本也能过，测不到 bug。这点写进报告。）
+        //   期望：relay 仍严格 = 128 B IP 包、逐字节正确，只产生 1 帧。
+        //=====================================================================
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd128, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h1401);
+        for (i = 34; i < 14 + 128; i = i + 1) wb[i] = (i * 7 + 19) & 8'hFF;
+        for (i = 141; i >= 0; i = i - 1) wb[i + 8] = wb[i];      // 帧整体后移 8 B
+        for (i = 0; i < 7; i = i + 1) wb[i] = 8'h55;             // 7 B 前导
+        wb[7] = 8'hD5;                                            // 1 B SFD
+        base_r   = r_frames;
+        base_wrf = dut.u_rxbuf.o_wr_frame_cnt;
+
+        rx_frame(150, 1);                    // 150 B 连续：前导+SFD+帧
+        wait_eth(16 * 150 + 3000);
+
+        req(r_frames == base_r + 1, "I14 exactly one relay frame (preamble stripped)");
+        chk_relay_bytes(base_r, 8 + 14, 128);          // 帧在 wb[8..]，IP 包在 wb[22..]
+        req(r_frame_len[base_r] == 128, "I14 relay byte count == 128 (IP packet only)");
+        req((dut.u_rxbuf.o_wr_frame_cnt - base_wrf) == 16'd1,
+            "I14 preamble bytes never reach the frame buffer");
+        m_rx = m_rx + 1; m_relay = m_relay + 1;
+        chk_cnts;
+        end_case("I14_preamble_sfd");
+
+        //=====================================================================
+        // I15 连续两帧都带前导（帧间 1 拍空档）
+        //   期望：两帧都逐字节正确、只占 2 个缓冲帧（防止对齐器在帧尾状态机卡住）
+        //=====================================================================
+        // ---- frame 1 ----
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd128, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h1501);
+        for (i = 34; i < 14 + 128; i = i + 1) wb[i] = (i * 11 + 23) & 8'hFF;
+        for (i = 141; i >= 0; i = i - 1) wb[i + 8] = wb[i];
+        for (i = 0; i < 7; i = i + 1) wb[i] = 8'h55;
+        wb[7] = 8'hD5;
+        for (i = 0; i < 128; i = i + 1) seq10[i] = wb[22 + i];    // 存 frame1 期望
+        base_r   = r_frames;
+        base_wrf = dut.u_rxbuf.o_wr_frame_cnt;
+        rx_frame(150, 1);
+
+        // ---- frame 2（1 拍空档后）----
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd128, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h1502);
+        for (i = 34; i < 14 + 128; i = i + 1) wb[i] = (i * 13 + 29) & 8'hFF;
+        for (i = 141; i >= 0; i = i - 1) wb[i + 8] = wb[i];
+        for (i = 0; i < 7; i = i + 1) wb[i] = 8'h55;
+        wb[7] = 8'hD5;
+        rx_frame(150, 1);
+
+        wait_eth(20 * 150 + 4000);
+
+        req(r_frames == base_r + 2, "I15 both preamble frames relayed");
+        // 帧 1 与存档比对
+        ok4 = 1'b1;
+        if (r_frame_len[base_r] != 128) begin
+            ok4 = 1'b0;
+            $display("  [DET] I15 frame1 len=%0d exp=128", r_frame_len[base_r]);
+        end
+        for (i = 0; i < 128; i = i + 1) begin
+            if (rc[r_off(base_r) + i] !== seq10[i]) begin
+                if (ok4) $display("  [DET] I15 frame1 byte[%0d]=%02h exp=%02h",
+                                  i, rc[r_off(base_r) + i], seq10[i]);
+                ok4 = 1'b0;
+            end
+        end
+        req(ok4, "I15 frame1 byte-identical");
+        chk_relay_bytes(base_r + 1, 22, 128);          // 帧 2 与当前 wb 比对
+        req((dut.u_rxbuf.o_wr_frame_cnt - base_wrf) == 16'd2,
+            "I15 exactly 2 buffer frames for 2 preamble frames (aligner not stuck)");
+        m_rx = m_rx + 2; m_relay = m_relay + 2;
+        chk_cnts;
+        end_case("I15_preamble_two_frames");
 
         //=====================================================================
         // I06 aur 侧 1472 B

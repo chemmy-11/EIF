@@ -73,7 +73,7 @@ $tbs = @(
     @{ key='framebuf'; top='tb_p2_frame_buf'; snap='p2_sim_fbuf';
        srcs=$tb_fbuf;  verdict='P2_FRAMEBUF_TB: PASS='; min=5;  label='framebuf' },
     @{ key='relay';    top='tb_p2_relay_top'; snap='p2_sim_relay';
-       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=9;  label='relay' }
+       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=13; label='relay' }
 )
 
 Write-Head 'prj13 P2 xsim runner (unit + framebuf + relay)'

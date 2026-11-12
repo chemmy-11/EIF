@@ -76,6 +76,61 @@ module p2_relay_top #(
     //=====================================================================
     // ① 以太网域：整帧缓冲 → 提取 → 判决 → 转发出口
     //=====================================================================
+    //=====================================================================
+    // 前导码 / SFD 对齐（★2026-11-12 板上实测缺陷修复）
+    //---------------------------------------------------------------------
+    // 板上 `gmii_rxd/gmii_rx_dv` 的帧**从 7 B 前导码(0x55) + 1 B SFD(0xD5) 开始**，
+    // 而不是从目的 MAC 开始 —— 官方栈自己就是靠跳这 8 B 工作的：
+    //   rtl/udp/udp_rx.v:161 `if((gmii_rx_dv==1 && gmii_rxd==8'h55)) skip_en<=1`，
+    //   :167 `if((cnt<6) && (gmii_rxd!=8'h55))`（校验 7 个 0x55），:169 `cnt==6` 后进 SFD。
+    // 集成时把裸 `gmii_rxd` 直接喂给 p2_frame_buf ⇒ 侧带 eth_dst 变成 `55 55 55 55 55 55`、
+    // eth_type 取到源 MAC 字节 ⇒ local_steer 判 DROP_MAC ⇒ relay_en 永不高 ⇒ 泵A 写侧
+    // 计数恒 0（2026-11-12 板 A 单板那轮的实测现象，六点差分八点全 0）。
+    //
+    // 修法：**自适应**跳前导 —— 首字节是 0x55 才当前导处理（后面必须仍是 0x55，
+    // 假前导概率极低），否则原样透传。这样既修板上形态，也不破坏"无前导"的仿真向量。
+    // 修复后 `u_rxbuf` 收到的帧从**目的 MAC 第 1 字节**开始，与单元件契约一致。
+    //=====================================================================
+    localparam [1:0] PA_IDLE = 2'd0,   // 等帧首
+                     PA_PRE  = 2'd1,   // 已见 0x55，数前导
+                     PA_PASS = 2'd2;   // 透传（MAC 头起）
+    reg [1:0] pa_st;
+    reg [3:0] pa_cnt;                  // 已确认的 0x55 个数
+    reg       al_dv;                   // 对齐后字节流 valid
+    reg [7:0] al_data;
+
+    always @(posedge eth_clk or negedge eth_rst_n) begin
+        if (!eth_rst_n) begin
+            pa_st <= PA_IDLE; pa_cnt <= 4'd0; al_dv <= 1'b0; al_data <= 8'd0;
+        end else begin
+            al_dv <= 1'b0;                         // 默认只高 1 拍
+            case (pa_st)
+                PA_IDLE: if (rx_dv) begin
+                    if (rx_data == 8'h55) begin    // 疑似前导
+                        pa_st <= PA_PRE; pa_cnt <= 4'd1;
+                    end else begin                 // 无前导形态：从本字节开始透传
+                        al_dv <= 1'b1; al_data <= rx_data; pa_st <= PA_PASS;
+                    end
+                end
+                PA_PRE: if (!rx_dv) begin
+                    pa_st <= PA_IDLE; pa_cnt <= 4'd0;   // 帧过短/假前导：丢弃
+                end else if (rx_data == 8'h55) begin
+                    if (pa_cnt == 4'd7) pa_st <= PA_PASS;  // 防御：>7 个 0x55
+                    else                pa_cnt <= pa_cnt + 1'b1;
+                end else begin
+                    // 非 0x55 ⇒ 这就是 SFD(0xD5)：**丢掉本字节**，下一字节起才是 MAC 头
+                    pa_st <= PA_PASS;
+                end
+                PA_PASS: if (rx_dv) begin
+                    al_dv <= 1'b1; al_data <= rx_data;
+                end else begin
+                    pa_st <= PA_IDLE; pa_cnt <= 4'd0;   // 帧尾，准备下一帧
+                end
+                default: pa_st <= PA_IDLE;
+            endcase
+        end
+    end
+
     wire [7:0]  rxbf_data;
     wire        rxbf_vld, rxbf_sop, rxbf_eop, rxbf_rdy;
     wire [15:0] rxbf_wr_cnt, rxbf_drop_cnt, rxbf_rd_cnt;
@@ -86,8 +141,8 @@ module p2_relay_top #(
     p2_frame_buf #(.AW(11)) u_rxbuf (
         .clk            (eth_clk),
         .rst_n          (eth_rst_n),
-        .wr_data        (rx_data),
-        .wr_en          (rx_dv),
+        .wr_data        (al_data),
+        .wr_en          (al_dv),
         .o_wr_frame_cnt (rxbf_wr_cnt),
         .o_wr_drop_cnt  (rxbf_drop_cnt),
         .rd_data        (rxbf_data),

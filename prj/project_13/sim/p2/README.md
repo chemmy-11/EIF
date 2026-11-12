@@ -124,7 +124,7 @@ m_total_len/m_ip_id/m_csum/m_proto/m_ttl/m_tos/m_ihl/m_ip_flags/m_frag_off/m_is_
 (3) rewrap 输出**帧数 + 总字节数 + 逐字节**比对。第 (3) 条的"总字节数"是关键——
 它把"没有完整帧"升级成"一个字节都没漏"，否则切通实现的半包泄漏查不出来。
 
-### 3.2 集成 TB `tb_p2_relay_top.v`（9 条，双时钟 eth 125 MHz / aur 200 MHz）
+### 3.2 集成 TB `tb_p2_relay_top.v`（13 条，双时钟 eth 125 MHz / aur 200 MHz）
 
 被测件 `p2_relay_top`（v2）+ 内部 `p2_frame_buf` + 三件套。两域时钟**故意不同频**，
 跨域接错会立刻表现为帧错位/计数不对。
@@ -136,6 +136,10 @@ m_total_len/m_ip_id/m_csum/m_proto/m_ttl/m_tos/m_ihl/m_ip_flags/m_frag_off/m_is_
 | I03 | `arp_no_cross` | 广播 ARP(0x0806) → relay 零字节、`st_arp=1`、`st_drop_ethertype` **不动**（ARP 不算 ethertype 丢弃） |
 | I04 | `back_to_back_3` | 3 帧连发（帧间仅 1 拍空档，142 B 短帧）→ **守恒判据** `relayed + st_rx_drop == 3` + 已转出的帧逐字节正确；打 `[INFO] I04: relayed/dropped` |
 | I10 | `long_back_to_back` | 3 × **1472 B 满帧**背靠背（帧长 1486，帧间 1 拍）→ 同守恒判据 + 逐字节正确；打 `[INFO] I10: relayed/dropped`。这是"2-bank + 暂存转发"吞吐上限真正会顶到的位置（I04 的短帧压不到） |
+| I11 | `fcs_tail` | MAC 未剥 FCS：帧尾多 4 B + `rx_dv` 连续 → relay **仍严格 = `total_len`(128)**、逐字节正确、FCS 不得计入 IP 包；`o_wr_frame_cnt` 只 +1 |
+| I13 | `runt_then_good` | 12 B 碎片 → 1 拍空档 → 正常帧：碎片计 `DROP_TRUNCATED`，正常帧照常逐字节转出（残留状态不卡死后面） |
+| I14 | `preamble_sfd` | ★**2026-11-12 板上缺陷回归**：`7×0x55 + 0xD5` 与 MAC 头**同一 `rx_dv` burst**（150 B 连续）→ relay 仍 = 128 B IP 包；`o_wr_frame_cnt` +1（前导从未进缓冲） |
+| I15 | `preamble_two_frames` | 连续两帧都带前导（帧间 1 拍）→ 两帧都逐字节正确、`o_wr_frame_cnt` +2（对齐器帧尾不死锁） |
 | I06 | `rewrap_aur_1472` | `aur_data/aur_en` 送 1472 B IP → `lan` = `PEER_MAC/BOARD_MAC/0x0800` + 原包逐字节，总长 1486 |
 | I07 | `rewrap_aur_26_pad` | 26 B IP → `lan` 60 B，第 40..59 字节全 0 |
 | I08 | `counters_clean` | 两域 19 个计数器逐一比对（含 `st_rx_frames/st_rx_drop/st_drop_*` 不被误加、`st_aur_bad_v4=0`） |
@@ -287,6 +291,7 @@ drop reason，到 `S_SEND` 首拍时已经稳定。若把脉冲寄存到 `S_SEND
 | 2026-11-08 | 首版：三件套 RTL（v0.2 契约）+ 21 例自检 TB + 一键脚本；xsim 21/21 PASS；4 组变异测试验证断言有牙。LOCAL 分支（C19/C20）在本轮自查"cnt_local 全程为 0 = 断言空跑"后补上 |
 | 2026-11-08（二） | 地址方案切 **handbook §8 的 10.10.0.x**；加 C22（旧 192.168.50.11 → DROP_UNKNOWN_DST）、C23（用**不带参数覆盖**的实例验 RTL 默认值 + 字节序）；unit 23 例 |
 | 2026-11-08（三） | 新增集成层两个 TB：`tb_p2_relay_top`（9 例，双时钟）+ `tb_p2_frame_buf`（5 例）；runner 改表驱动跑 3 个 TB 并**自动打印 5 个 RTL 的 SHA256**；I04 改成守恒判据，新增 I10（满帧背靠背）；实测 unit 23 / framebuf 5 / relay 9（I10 实测 3/3、0 丢） |
+| 2026-11-12 | 板上实测抓到真因：`gmii_rxd` 帧含 7 B 前导 + 1 B SFD，裸喂缓冲导致侧带 `eth_dst=55…` → DROP_MAC → `pfwd_wr≡0`。Lead 在 `p2_relay_top` 加自适应前导对齐器后，本组新增 **I11（FCS 尾）/ I13（碎片→正常帧）/ I14（前导+SFD，连续 burst 形态）/ I15（两帧都带前导）**；`I01` 无前导向量保留作"自适应不误伤"回归；撤销 I12（帧内 dv 空洞非病根）。实测 **unit 23 / framebuf 5 / relay 13**，exit 0，35.3 s |
 
 ### 本轮踩到的坑（写下来免得重犯）
 
