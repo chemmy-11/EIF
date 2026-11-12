@@ -104,7 +104,9 @@ v1.1 §5.1 说明原因：B 组 PyTorch 需要把完整 Tensor 拆成**正常 UD
 1. **可靠路径**（v1.1 §5.3）：业务 DATA 与 ACK 都必须走同一 FPGA 路径。prj13 只转发 `dst == PEER_IP` 的 IPv4；若 B 组 ACK 从管理口/串口回，判据无效。
 2. **能力数字不能外推**：`max_*` 四项没有板上实测前只能写 `TO_MEASURE`；本仓只有 I10 的 3 帧背靠背（`契约:311`），不能外推成吞吐或任意连发安全。
 3. **帧槽容量口径冲突**（§3 备注）：256×4 KiB（指南）vs 2×2048 B（本仓实测）—— 需导师确认指南引用的是哪一版工程。
-4. **板 B 参数集**：v1.1 §5 的双向路径需要板 B 位流。参数集必须给 `PEER_MAC = PC1 网卡 MAC = 08:3C:03:A0:26:96`（`docs/M1_P2地址与ARP方案_v0.2_2026-11-08.md:35`）；而 `out/twin_config_13.json` 的 B 块 `peer_mac` 写的是 `02:00:00:00:0A:01`（板 A MAC），**口径不同**，在生成 B 位流前必须订正并复核（L1，待确认该字段是否被脚本当真）。
+4. **板 B 参数集**：v1.1 §5 的双向路径需要板 B 位流。板 B 的 `PEER_MAC` 必须是 **PC1 网卡 MAC = `08:3C:03:A0:26:96`**（地址表 `docs/M1_P2地址与ARP方案_v0.2_2026-11-08.md:35`）——它是**RTL 参数**（`rtl/aurora_mem_bridge.v:102` 的 `PEER_MAC`），**不在** `out/twin_config_13.json` 里。
+   > 订正（2026-11-12，Lead 复核）：「`out/twin_config_13.json` 的 B 块 `peer_mac` 写的是 `02:00:00:00:0A:01`」这句不成立 —— PC1 侧该文件的 B 块**没有 `peer_mac` 字段**（只有 `role/jtag_serial/hw_server/cable_serial/com/baud/board_ip/board_mac/pc_ip/pc_nic`，且 `board_mac=02:00:00:00:0b:01`）；`twin_config` 只服务于**烧录**（位流/ELF 路径 + 期望哈希 + 板卡串口/IP），不承载 RTL 参数。若别的机器上那份副本真的多了 `peer_mac`，属**仓库外本地改动**，不能当成口径依据。
+   → 生成板 B 位流时，要改的是 RTL 参数（`BOARD_IP=.12 / BOARD_MAC=0B:01 / PEER_IP=.1 / PC_IP=.2 / PEER_MAC=PC1 网卡`），改完按 `docs/M1_prj13_P2位流重建登记_2026-11-12.md` 的流程重新指纹登记。
 5. **XDC 注释旧称**：`xdc/aurora_mem_bridge.xdc:39` 写 `GE1`，与 v1.1 §1.3 的 `GE2` 冲突；实测定案（prj12 清点）是 GE2。注释待办，不改约束。
 6. **P2 计数器无 ILA**（契约 `:314`）：v1.1 §5.4 的 `buffer_full_behavior` 与"各类 DROP 分别计数"当前抓不到；补探针要重出位流（预计 32–48 bit，需重掷 place directive）。
 

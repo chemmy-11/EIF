@@ -55,9 +55,13 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 
 | 主题 | 文档 | 一键入口 |
 |---|---|---|
-| **上板验证（当前执行中）** | `docs/M1_prj13_P2上板验证执行单_2026-11-10.md`（单板两档 + 双板 V3/V4 + 六点差分链 + 分诊） | `out/twin_config_13.json` → `prj12/out/twin_burn.ps1 -Root . -Config out/twin_config_13.json` |
+| **上板操作单（11-12 下午场）** | `docs/M1_prj13_P2上板操作单_2026-11-12.md`（板 A + 单 PC 两档 + v1.1 能力项采集） | 照单执行 |
+| **上板验证（判据全表）** | `docs/M1_prj13_P2上板验证执行单_2026-11-10.md`（单板两档 + 双板 V3/V4 + 六点差分链 + 分诊） | `out/twin_config_13.json` → `prj12/out/twin_burn.ps1 -Root . -Config out/twin_config_13.json` |
+| P2 环境勘误与档 2 前置 | `docs/M1_prj13_P2上板环境勘误与档2前置_2026-11-10.md`（junction / 安装盘瞬时读 / COM5 / 免管理员注入） | — |
+| 导师 v1.1 指南影响分析 | `docs/M1_prj13_导师v1.1指南影响分析_2026-11-11.md`（7 条影响 + 能力边界 + 验收映射） | — |
 | P2 RTL 接口契约 | `docs/M1_prj13_P2_RTL接口契约_v0.2_2026-11-08.md` | `sim/p2/run_p2_sim.ps1` |
-| P2 候选位流登记 | `docs/M1_prj13_P2候选位流登记_2026-11-08.md` | `out/b_p2_CFA98553/` |
+| P2 候选位流登记 | `docs/M1_prj13_P2候选位流登记_2026-11-08.md`（§0 活跃候选：两片等价） | `out/b_p2_CFA98553/` |
+| P2 位流重建登记 | `docs/M1_prj13_P2位流重建登记_2026-11-12.md`（`F16FCE70`，组员机重建，档 2 BLOCKED） | `out/b_p2_F16FCE70/` |
 | 地址与 ARP | `docs/M1_P2地址与ARP方案_v0.2_2026-11-08.md` | `pc/static_arp.ps1 -DryRun` |
 | M1 判据 | `docs/M1_多尺寸与10MiB判据_2026-11-08.md` | `scripts/p1_selfcheck.ps1 -DryRun` |
 | PC 发帧基准 | `docs/M1_PC侧发帧能力基准_2026-11-08.md` | `pc/twin_send.py --bench` |
