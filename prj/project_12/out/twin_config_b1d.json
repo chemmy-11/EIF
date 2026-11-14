@@ -1,0 +1,44 @@
+{
+    "stage":  "B1D-diag",
+    "_comment":  "prj12 B1D diagnostic bitstream (2026-11-15). ASCII only. Paired with probes_b1d.ltx - DO NOT mix with B1 or baseline ltx.",
+    "artifacts":  {
+                      "baseline_bit":  "out/baseline_C856BA83_2026-11-06/aurora_mem_bridge.bit",
+                      "elf":  "out/j3_soft_r2_BA3C0220.elf",
+                      "probes_ltx_sha256":  "e04481898594232dd38b6f1692572c9534c9f24126566e7693125d69a0d8de14",
+                      "bit":  "out/b1d_D550FD6B/aurora_mem_bridge_b1d.bit",
+                      "baseline_bit_sha256":  "c856ba83781fe85ccdcb684b6cd3c60873aa43e92f89ad30000b5954e5667401",
+                      "expect_elf_sha256":  "ba3c02209720b59d9f0fbc4083c2ab80b16efc9a148448b9dcfbcda001bb3559",
+                      "probes_ltx":  "out/b1d_D550FD6B/probes_b1d.ltx",
+                      "expect_bit_sha256":  "d550fd6b2dde12dbd5fa3ba07ee33d0be44ed1f0770d747bbcf5858a7fdcf321"
+                  },
+    "_ila7_note":  "u_ila_7 @user_clk, depth 1024, 99 bit: dbg_up_bytes/up_stall/up_ovf/pk_ovf/pfwd_stuck/pfwd_drop/prev_drop/pk_ovf_cnt/pfwd_stuck_cnt",
+    "_pairing_note":  "B1D ltx has 5 ILA cores / 59 probes / 527 bit. get_hw_ilas=5 same as B1 -\u003e core count CANNOT distinguish; check ltx sha.",
+    "prj":  "project_12",
+    "_timing":  "ExtraPostPlacementOpt: WNS +0.020 / WHS +0.004 (impl1 ExtraTimingOpt failed at -0.013)",
+    "boards":  {
+                   "A":  {
+                             "board_ip":  "192.168.1.10",
+                             "board_mac":  "00:11:22:33:44:55",
+                             "pc_nic":  "以太网",
+                             "jtag_serial":  "210512180081",
+                             "baud":  9600,
+                             "role":  "PC1 / left",
+                             "cable_serial":  "210512180081",
+                             "hw_server":  "localhost:3121",
+                             "com":  "COM7",
+                             "pc_ip":  "192.168.1.102"
+                         },
+                   "B":  {
+                             "board_ip":  "192.168.1.10",
+                             "board_mac":  "00:11:22:33:44:55",
+                             "pc_nic":  "\u003cFILL\u003e",
+                             "jtag_serial":  "\u003cFILL\u003e",
+                             "baud":  9600,
+                             "role":  "PC2 / right",
+                             "cable_serial":  "\u003cFILL\u003e",
+                             "hw_server":  "localhost:3121",
+                             "com":  "\u003cFILL\u003e",
+                             "pc_ip":  "192.168.1.102"
+                         }
+               }
+}
