@@ -454,6 +454,77 @@ connect_debug_port u_ila_6/probe9 [list [one_net dbg_aurora_rst]]
 puts "ILA6_PROBES: status=4 err=2 evt=16 hec=16 sec=16 pktx=16 pkrx=16 pfwd=16 prev=16 rst=1 (total=[expr {4+2+16*7+1}])"
 }
 
+# ============ ILA7 @ user_clk -- B1D 诊断核（2026-11-14, 纯观测, 不改行为）============
+#   目的: 定位 "A->B 每帧尾部固定少 64 B"（R2）。静态分析已把范围收敛到 unpack 吐字节数
+#     / 描述符长度这一级，但现有 53 条探针一条都看不到它。本核把已存在的 mark_debug 别名
+#     接进来，一次上板即可读出:
+#       dbg_up_bytes   -- unpack 累计吐出的字节数（与发送字节数对比，直接看少多少）
+#       dbg_up_stall   -- 设计自带金丝雀（axis_word_unpack.v:26 注释: 整帧转发后应恒为 0）
+#       dbg_up_ovf / dbg_pk_ovf_cnt -- 打包/解包溢出
+#       dbg_pfwd_drop / dbg_prev_drop -- 两个方向泵侧丢弃（当前完全不可观测）
+#       dbg_pfwd_stuck / dbg_pfwd_stuck_cnt -- 泵写通路是否粘滞
+#   判据示例: 发 1 帧 len=100（帧 142 B）-> dbg_up_bytes 应 +142；若 +78 则缺口在 unpack。
+#   域归属: 全部 user_clk 域（与 ILA6 同域，不跨域）。
+#   回退: P12_SKIP_ILA7=1 整核跳过（时序余量不足时；ltx 由 6 核变 5 核）
+if {[info exists ::env(P12_SKIP_ILA7)]} {
+    puts "ILA7_SKIPPED: env P12_SKIP_ILA7 set (timing fallback, ltx = 5 cores)"
+} else {
+create_debug_core u_ila_7 ila
+# Vivado 2023.1 硬约束（本 kit 已记录）：C_DATA_DEPTH 合法值从 1024 起，512 会报
+#   ERROR: [Vivado 12-206] Invalid value '512' for 'C_DATA_DEPTH'
+#   Valid values are: 1024 2048 4096 8192 ...  —— 2026-11-14 实测踩到，勿再试小深度
+set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_7]
+set_property C_TRIGIN_EN false [get_debug_cores u_ila_7]
+set_property C_TRIGOUT_EN false [get_debug_cores u_ila_7]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_7]
+set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_7]
+set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_7]
+set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_7]
+set_property port_width 1 [get_debug_ports u_ila_7/clk]
+connect_debug_port u_ila_7/clk $uclk_net
+
+# probe0: unpack 累计字节数（16b）-- 本核主角
+set_property port_width 16 [get_debug_ports u_ila_7/probe0]
+connect_debug_port u_ila_7/probe0 [bus_nets dbg_up_bytes 16]
+# probe1: unpack stall 金丝雀（16b，正常恒 0）
+create_debug_port u_ila_7 probe
+set_property port_width 16 [get_debug_ports u_ila_7/probe1]
+connect_debug_port u_ila_7/probe1 [bus_nets dbg_up_stall 16]
+# ---- probe2..6: 分 full / slim 两种装配（slim 只留决策必需的 33 bit）----
+if {[info exists ::env(P12_ILA7_SLIM)]} {
+    # slim: up_bytes(16) + up_stall(16) + up_ovf(1) = 33 bit
+    create_debug_port u_ila_7 probe
+    set_property port_width 1 [get_debug_ports u_ila_7/probe2]
+    connect_debug_port u_ila_7/probe2 [list [one_net dbg_up_ovf]]
+    set ::ila7_bits 33
+} else {
+    # probe2: 事件位 3b（up_ovf / pk_ovf / pfwd_stuck）
+    create_debug_port u_ila_7 probe
+    set nets7c {}
+    foreach t {dbg_up_ovf dbg_pk_ovf dbg_pfwd_stuck} { lappend nets7c [one_net $t] }
+    set_property port_width [llength $nets7c] [get_debug_ports u_ila_7/probe2]
+    connect_debug_port u_ila_7/probe2 $nets7c
+    # probe3: 泵A 写丢弃（16b）-- A-6 盲区
+    create_debug_port u_ila_7 probe
+    set_property port_width 16 [get_debug_ports u_ila_7/probe3]
+    connect_debug_port u_ila_7/probe3 [bus_nets dbg_pfwd_drop 16]
+    # probe4: 桥②->eth 泵丢弃（16b）-- 出口侧盲区
+    create_debug_port u_ila_7 probe
+    set_property port_width 16 [get_debug_ports u_ila_7/probe4]
+    connect_debug_port u_ila_7/probe4 [bus_nets dbg_prev_drop 16]
+    # probe5: pk 溢出粘滞计数（16b）
+    create_debug_port u_ila_7 probe
+    set_property port_width 16 [get_debug_ports u_ila_7/probe5]
+    connect_debug_port u_ila_7/probe5 [bus_nets dbg_pk_ovf_cnt 16]
+    # probe6: pfwd 粘滞计数（16b）
+    create_debug_port u_ila_7 probe
+    set_property port_width 16 [get_debug_ports u_ila_7/probe6]
+    connect_debug_port u_ila_7/probe6 [bus_nets dbg_pfwd_stuck_cnt 16]
+    set ::ila7_bits 99
+}
+puts "ILA7_PROBES: mode=[expr {[info exists ::env(P12_ILA7_SLIM)] ? {slim} : {full}}] total=$::ila7_bits bit"
+}
+
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design
 
