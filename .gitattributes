@@ -3,3 +3,6 @@
 *.ltx binary
 *.elf binary
 *.dcp binary
+
+# Reference copies are integrity-checked by SHA256; preserve their bytes exactly.
+docs/refs/** -text
