@@ -1,0 +1,5 @@
+# Binary artifacts must be stored byte-for-byte (no CRLF normalization).
+*.bit binary
+*.ltx binary
+*.elf binary
+*.dcp binary
