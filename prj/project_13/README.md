@@ -42,6 +42,8 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 
 ## 状态
 
+> **2026-11-17 更新**：旧候选 `CFA98553`/`F16FCE70` 均已因前导/SFD 修复作废；修复后位流**尚未取得**（PC2 A 参数对照构建 11-17 停止，无 `IMPL_GATE`/bit）。板 B 版仍未构建；P2 计数器 ILA 未加。下一轮按 [`docs/M1_prj12_prj13_下一轮操作口径_2026-11-17.md`](../../docs/M1_prj12_prj13_下一轮操作口径_2026-11-17.md) 执行：G0 B1D → G1–G3 prj12 收尾 → G4 单板档 1/2 → G5 双板 V4 → G6 A3。
+
 - [x] 骨架 fork（源码 + 脚本路径改写 + README + fork manifest）
 - [x] P2 RTL：`rtl/p2/{ipv4_packet_extract,eth_rewrap,local_steer}.v`（v0.2）+ 单板环路 TB（`sim/p2/`，**xsim 21/21 PASS**，含 4 组变异测试；2026-11-08）
 - [x] P0/P1 离线工程化（2026-11-08）：地址/ARP 方案、`p1_selfcheck.ps1` + `p1_judge.py`（mock 25/25）、PC 侧发帧基准、B1 回归 `sim/regress.ps1`（12/12）、`stall_watchdog.ps1`、QSPI 方案、吞吐批量方案
