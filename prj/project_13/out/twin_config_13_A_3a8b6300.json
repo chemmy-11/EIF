@@ -1,0 +1,49 @@
+﻿{
+    "_comment":  "prj13 P2 candidate burn config. Board A parameter set (10.10.0.x). ASCII only on purpose (PS 5.1 + GBK console safety).",
+    "prj":  "project_13",
+    "stage":  "P2-A-REPAIR-3a8b6300",
+    "artifacts":  {
+                      "bit":  "out/b_p2_A_3a8b6300_b30c3903/aurora_mem_bridge_p2_3a8b6300.bit",
+                      "elf":  "out/j3_soft_r2_BA3C0220.elf",
+                      "expect_bit_sha256":  "3a8b630045fd3d20c12dec18b33484bfc512b971fec42934f60b1b2152a284dd",
+                      "expect_elf_sha256":  "ba3c02209720b59d9f0fbc4083c2ab80b16efc9a148448b9dcfbcda001bb3559"
+                  },
+    "boards":  {
+                   "A":  {
+                             "role":  "PC1 / left",
+                             "jtag_serial":  "210512180081",
+                             "hw_server":  "localhost:3121",
+                             "cable_serial":  "210512180081",
+                             "com":  "COM6",
+                             "baud":  9600,
+                             "board_ip":  "10.10.0.11",
+                             "board_mac":  "02:00:00:00:0a:01",
+                             "pc_ip":  "10.10.0.1",
+                             "pc_nic":  "Ethernet (localized; check Get-NetAdapter Name)"
+                         },
+                   "B":  {
+                             "role":  "PC2 / right",
+                             "jtag_serial":  "210512180081",
+                             "hw_server":  "localhost:3121",
+                             "cable_serial":  "210512180081",
+                             "com":  "COM4",
+                             "baud":  9600,
+                             "board_ip":  "10.10.0.12",
+                             "board_mac":  "02:00:00:00:0b:01",
+                             "pc_ip":  "10.10.0.2",
+                             "pc_nic":  "Ethernet (localized; check Get-NetAdapter Name)"
+                         }
+               },
+    "sfp":  {
+                "link_port":  "SFPA=X1Y11",
+                "unused_port":  "SFPB=X1Y9 (B core idle)",
+                "module":  "10G SFP+",
+                "refclk_mhz":  156.25,
+                "loopback_note":  "single-board test: patch cord TX-\u003eRX on SFPA"
+            },
+    "_addr_note":  "handbook scheme (project-owner decision 2026-11-08 20:40): board A .11 / board B .12 / PC1 .1 / PC2 .2; MAC 02:00:00:00:0A:01 / 0B:01",
+    "_elf_note":  "ELF is the prj12 BA3C0220 build, unchanged (prj13 sw/ not rebuilt). P2 relay needs BitElf + serial \u0027d\u0027 (DMA write mode); bit-only burn makes pfwd_wr rise but mem_wr_frm/pk_frames stay 0.",
+    "_board_b_note":  "This bit is BOARD A parameter set. Board B needs a separate build (BOARD_IP .12 / BOARD_MAC 0B:01 / PEER_IP .1 / PC_IP .2 / PEER_MAC = PC1 NIC MAC).",
+    "_ltx_note":  "pair = out/b_p2_A_3a8b6300_b30c3903/probes_p2_b30c3903.ltx (ltx sha256 b30c3903272bc7517b7db1ab9960751e73a67d0b0d761d0900184f5fe80dc525). Bit/ltx are a pair; never mix.",
+    "_build_note":  "2026-11-17 PC1 build. Source 3ce6eb1 (preamble/SFD fix included). A parameter set. Recipe: build_synth_only.tcl + build_impl.tcl with P12_PLACE_DIRECTIVE. NOT the formal V4 bit: P2 DROP/stat counters are NOT on ILA yet."
+}

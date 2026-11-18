@@ -42,7 +42,7 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 
 ## 状态
 
-> **2026-11-17 更新**：旧候选 `CFA98553`/`F16FCE70` 均已因前导/SFD 修复作废；修复后位流**尚未取得**（PC2 A 参数对照构建 11-17 停止，无 `IMPL_GATE`/bit）。板 B 版仍未构建；P2 计数器 ILA 未加。下一轮按 [`docs/M1_prj12_prj13_下一轮操作口径_2026-11-17.md`](../../docs/M1_prj12_prj13_下一轮操作口径_2026-11-17.md) 执行：G0 B1D → G1–G3 prj12 收尾 → G4 单板档 1/2 → G5 双板 V4 → G6 A3。
+> **2026-11-18 更新**：修复后 **A 参数**位流已由 PC1 出片 **`3A8B6300`**（11,497,656 B，`3a8b6300…84dd`；WNS **+0.007** / WHS +0.004、0 失败端点；ltx `B30C3903…` 成对），登记见 [`docs/M1_prj13_P2位流重建登记_2026-11-18.md`](docs/M1_prj13_P2位流重建登记_2026-11-18.md)。**未上板**，且**不是正式 V4 位流**（P2 DROP/统计仍无 ILA 出口）。**板 B 版位流仍未构建**。旧候选 `CFA98553`/`F16FCE70` 仍作废（不含前导/SFD 修复）。PC2 11-17 构建超时的归因与受控对照见 [`docs/M1_prj13_构建超时根因定位_2026-11-17.md`](docs/M1_prj13_构建超时根因定位_2026-11-17.md)。PC2 物理板 B 的单板 A_repair_control 执行卡见 [`docs/M1_prj13_P2_PC2单板A_repair_control执行卡_2026-11-18.md`](docs/M1_prj13_P2_PC2单板A_repair_control执行卡_2026-11-18.md)（**用 A 参数、非正式 B、非 V4**）。下一轮按 EIF #9 D1–D10 执行：G0 B1D → G1–G3 prj12 收尾 → G4 单板档 1/2 → G5 双板 V4 → G6 A3。
 
 - [x] 骨架 fork（源码 + 脚本路径改写 + README + fork manifest）
 - [x] P2 RTL：`rtl/p2/{ipv4_packet_extract,eth_rewrap,local_steer}.v`（v0.2）+ 单板环路 TB（`sim/p2/`，**xsim 21/21 PASS**，含 4 组变异测试；2026-11-08）
@@ -64,6 +64,8 @@ vivado -mode batch -source scripts\build_impl.tcl -notrace
 | P2 RTL 接口契约 | `docs/M1_prj13_P2_RTL接口契约_v0.2_2026-11-08.md` | `sim/p2/run_p2_sim.ps1` |
 | P2 候选位流登记 | `docs/M1_prj13_P2候选位流登记_2026-11-08.md`（§0 活跃候选：两片等价） | `out/b_p2_CFA98553/` |
 | P2 位流重建登记 | `docs/M1_prj13_P2位流重建登记_2026-11-12.md`（`F16FCE70`，组员机重建，档 2 BLOCKED） | `out/b_p2_F16FCE70/` |
+| **P2 修复后 A 片登记（当前候选）** | `docs/M1_prj13_P2位流重建登记_2026-11-18.md`（`3A8B6300`，PC1 出片，未上板，非正式 V4） | `out/b_p2_A_3a8b6300_b30c3903/` |
+| 构建超时根因定位 | `docs/M1_prj13_构建超时根因定位_2026-11-17.md`（受控对照：配方确定性 vs 机器墙钟） | `.tmp/prj13_attempt1_*`、`.tmp/prj13_roundB_*` |
 | 地址与 ARP | `docs/M1_P2地址与ARP方案_v0.2_2026-11-08.md` | `pc/static_arp.ps1 -DryRun` |
 | M1 判据 | `docs/M1_多尺寸与10MiB判据_2026-11-08.md` | `scripts/p1_selfcheck.ps1 -DryRun` |
 | PC 发帧基准 | `docs/M1_PC侧发帧能力基准_2026-11-08.md` | `pc/twin_send.py --bench` |
