@@ -1,4 +1,4 @@
-/**
+﻿/**
  * dsh-vivado-team-link — 宿主插件半边（host plugin half）。
  *
  * 这个文件把「本插件的配置」变成「服务端能读的东西」：
@@ -474,14 +474,16 @@ function tokenSlots(config) {
     {
       slot: 'peer-a2a',
       label: '对端 A2A（出站）',
-      ref: String(pick(config, 'peer', 'a2a', '')?.tokenRef ?? '').trim() || defaults.peer.a2a.tokenRef,
-      file: String(pick(config, 'peer', 'a2a', '')?.tokenFile ?? '').trim() || defaults.peer.a2a.tokenFile,
+      // 用 pickPath 逐层解引用：pick() 的第三参是 field、第四参才是兜底，
+      // 写成 pick(config,'peer','a2a','') 会把 peer.a2a 整个对象当值返回（volatile 引用 → [object Object]）。
+      ref: String(pickPath(config, ['peer', 'a2a', 'tokenRef']) ?? '').trim() || defaults.peer.a2a.tokenRef,
+      file: String(pickPath(config, ['peer', 'a2a', 'tokenFile']) ?? '').trim() || defaults.peer.a2a.tokenFile,
     },
     {
       slot: 'peer-mcp',
       label: '对端 MCP（出站）',
-      ref: String(pick(config, 'peer', 'mcp', '')?.tokenRef ?? '').trim() || defaults.peer.mcp.tokenRef,
-      file: String(pick(config, 'peer', 'mcp', '')?.tokenFile ?? '').trim() || defaults.peer.mcp.tokenFile,
+      ref: String(pickPath(config, ['peer', 'mcp', 'tokenRef']) ?? '').trim() || defaults.peer.mcp.tokenRef,
+      file: String(pickPath(config, ['peer', 'mcp', 'tokenFile']) ?? '').trim() || defaults.peer.mcp.tokenFile,
     },
   ]
 }
