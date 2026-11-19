@@ -39,7 +39,7 @@ function resolveConfigPath(given) {
 }
 
 function readConfig(cfgPath) {
-  try { return JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { throw new Error('配置文件不可读或非法 JSON: ' + e.message); }
+  try { return JSON.parse(fs.readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { throw new Error('配置文件不可读或非法 JSON: ' + e.message); }
 }
 
 function tokenPath(cfgPath, tokenFile) {
