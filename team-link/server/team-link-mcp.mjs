@@ -320,7 +320,10 @@ async function toolCollabStatus(ctx) {
   const mcpPort = Number(mcpCfg.port || 18790);
   const a2aHost = typeof a2aCfg.host === 'string' && a2aCfg.host ? a2aCfg.host : LOOPBACK;
   const mcpHost = typeof mcpCfg.host === 'string' && mcpCfg.host ? mcpCfg.host : LOOPBACK;
-  const [a2aUp, mcpUp] = await Promise.all([probeListening(LOOPBACK, a2aPort, 400), probeListening(LOOPBACK, mcpPort, 400)]);
+    // 探配置里的实际绑定地址，而不是回环：跨机模式下服务只绑 LAN 地址，
+  // 写死 127.0.0.1 会让本工具在部署模式里恒报「未监听」（健康检查说谎）。
+const probeHostOf = (h) => (!h || h === '0.0.0.0' || h === '::' ? LOOPBACK : h);
+  const [a2aUp, mcpUp] = await Promise.all([probeListening(probeHostOf(a2aHost), a2aPort, 400), probeListening(probeHostOf(mcpHost), mcpPort, 400)]);
   ctx.log('[mcp] tool collab_status a2a=' + a2aUp + ' mcp=' + mcpUp);
   return {
     role: ctx.role,
