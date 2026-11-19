@@ -486,3 +486,11 @@ node --input-type=module -e "const m = await import('file:///<本目录>/lib/ind
 powershell -NoProfile -File install.ps1 -Profile desktop -Role pc1   # 期望 PASS kit 未改动
 ```
 GUI 侧：设置里应出现一级分区「PC 协作」（`settings.section`，id `team-link`，order 20），以及插件页该行的配置页（key `dsh-vivado-team-link#team-link`）。
+
+### 11.4 已知限制：`team_link_setup` 在 rc5 下不注册（2026-11-19 确认，暂不修）
+
+- **现象**：插件行正常、`mcp__team_link__*` 五个工具正常，但宿主工具 `team_link_setup`（token 值的唯一输入入口）不出现在会话工具目录里。
+- **已排除**：包解析（从 profile 目录 `import('dsh-vivado-team-link')` 得到 `Config,apply,inject,name` 且 `inject=['tools']`）、行配置（`- id: team-link` 块完整、无 `disabled`）、工具名不匹配。
+- **未定性**：rc5 里 `ctx.tools` 是否仍注入到本插件；或 `tools.register(definition)` 是否新增了形状要求（`browser-view` 内部要求 `output:{schema,render}`，但那可能是它自己的包装类而非平台契约）。宿主侧告警走 `ctx.logger`，本机拿不到宿主 console，**必须先有文件日志才能定性**。
+- **影响面**：只影响 `set-token` / `clear-token`。**token 文件在位即可正常协作**——把对端 token 直接放进 `state/peer-*.token`（交付说明里的「方式 B」），双向认证与证据搬运都不受影响。
+- **要修的话**：给宿主半区加 `logs/host-plugin.log` 文件日志 + 注册形状兼容（先按现有形状注册，捕获 `TypeError` 后带 `output:{schema,render}` 重试），一次宿主重启即可定性。
