@@ -105,7 +105,7 @@ function resolveConfigPath(given) {
 function loadConfig(cfgPath) {
   const raw = fs.readFileSync(cfgPath, 'utf8');
   let cfg;
-  try { cfg = JSON.parse(raw); } catch (e) { throw new Error('配置文件不是合法 JSON: ' + e.message); }
+  try { cfg = JSON.parse(raw.replace(/^\uFEFF/, '')); } catch (e) { throw new Error('配置文件不是合法 JSON: ' + e.message); }
   if (!cfg || typeof cfg !== 'object') throw new Error('配置文件内容必须为对象');
   return cfg;
 }
@@ -451,7 +451,7 @@ async function runSelftest(ctx) {
     if (t.artifacts[0].name !== 'reply') throw new Error('artifact.name 必须为 reply');
     const reply = t.artifacts[0].parts[0].text;
     if (!reply.startsWith('[pong]')) throw new Error('回复必须以 [pong] 开头，实际: ' + reply);
-    if (!reply.includes('from ' + ctx.role + ' (team-link 0.1.0)')) throw new Error('回复未带本机 role，实际: ' + reply);
+    if (!reply.includes('from ' + ctx.role + ' (' + SERVER_NAME + ' ' + VERSION + ')')) throw new Error('回复未带本机 role/版本，实际: ' + reply);
     if (!Array.isArray(t.history) || t.history.length !== 1) throw new Error('history 必须含原 message');
     const onDisk = path.join(ctx.tasksDir, t.id + '.json');
     if (!fs.existsSync(onDisk)) throw new Error('任务未持久化: ' + onDisk);
