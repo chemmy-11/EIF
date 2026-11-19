@@ -218,23 +218,30 @@ if (Test-Path -LiteralPath $lockPath) { $lockBackup = Join-Path $StateDir ("pnpm
 Write-Info ("备份 -> " + $pkgBackup)
 $entryName = (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $Bundle "package.json") | ConvertFrom-Json).name
 $registered = $false
+# dsh CLI 的解析放到模式分支之前：便携安装（<安装根>\resources\runtime\cli\bin）常常不在 PATH 里，
+# 找不到就自动降级为 Manual，而不是让整个安装停在 7/9。
+$dshCmd = Get-Command dsh -ErrorAction SilentlyContinue
+if (-not $dshCmd) {
+  $cliCandidates = @(
+    (Join-Path $DshHome 'dsh-runtimes\dsh-primary-runtime\cli\bin\dsh.cmd'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'),
+    (Join-Path $env:ProgramFiles 'DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'),
+    (Join-Path ${env:ProgramFiles(x86)} 'DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd')
+  )
+  if ($env:DSH_INSTALL_ROOT) { $cliCandidates += (Join-Path $env:DSH_INSTALL_ROOT 'resources\runtime\cli\bin\dsh.cmd') }
+  if ($env:DSH_RESOURCES_DIR) { $cliCandidates += (Join-Path $env:DSH_RESOURCES_DIR 'runtime\cli\bin\dsh.cmd') }
+  if ($env:DSH_HOME) { $cliCandidates += (Join-Path $env:DSH_HOME 'resources\runtime\cli\bin\dsh.cmd') }
+  foreach ($cand in $cliCandidates) {
+    if ($cand -and (Test-Path -LiteralPath $cand)) { $dshCmd = Get-Item -LiteralPath $cand; break }
+  }
+}
+if ($RegisterMode -eq "Cli" -and -not $dshCmd) {
+  Write-Warn2 "找不到 dsh CLI（含便携安装候选）：自动改用 -RegisterMode Manual 注册"
+  $RegisterMode = 'Manual'
+}
 if ($RegisterMode -eq "None") {
   Write-Warn2 "-RegisterMode None：只装文件与 skill，不注册（不重启宿主即可用 tools/ 与 skill）"
 } elseif ($RegisterMode -eq "Cli") {
-  $dshCmd = Get-Command dsh -ErrorAction SilentlyContinue
-  if (-not $dshCmd) {
-    # dsh CLI 的兜底探测：从本机装的东西找，不要写死某台机器的安装盘。
-    $cliCandidates = @(
-      (Join-Path $DshHome 'dsh-runtimes\dsh-primary-runtime\cli\bin\dsh.cmd'),
-      (Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'),
-      (Join-Path $env:ProgramFiles 'DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd'),
-      (Join-Path ${env:ProgramFiles(x86)} 'DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd')
-    )
-    foreach ($cand in $cliCandidates) {
-      if ($cand -and (Test-Path -LiteralPath $cand)) { $dshCmd = Get-Item -LiteralPath $cand; break }
-    }
-  }
-  if (-not $dshCmd) { Write-Fail "找不到 dsh CLI；改用 -RegisterMode Manual"; exit 1 }
   $cliPath = if ($dshCmd -is [System.Management.Automation.CommandInfo]) { $dshCmd.Source } else { $dshCmd.FullName }
   Write-Info ("pnpm link: " + $cliPath + " plugin --profile " + $Profile + " add link:" + $Bundle)
 $prevEA2 = $ErrorActionPreference
