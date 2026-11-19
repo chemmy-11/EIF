@@ -301,6 +301,14 @@ check('返回值里没有 token 值', !JSON.stringify(setOut).includes(secret), 
 const statusOut = await registered.execute({ action: 'status' })
 check('status 报告 credential=configured', /credential=configured/.test(statusOut?.report ?? ''))
 check('status 报告里没有 token 值', !(statusOut?.report ?? '').includes(secret))
+check('status 报告里没有 [object Object]（peer 槽位曾被 pick 取成对象）',
+  !(statusOut?.report ?? '').includes('[object Object]'), String(statusOut?.report ?? '').slice(0, 200))
+check('status 报告里 peer 两槽的 ref 仍是合法引用名（曾被 pick 取成对象）',
+  /peer-a2a[^\n]*ref=TEAM_LINK_PEER_A2A_TOKEN/.test(statusOut?.report ?? '') &&
+  /peer-mcp[^\n]*ref=TEAM_LINK_PEER_MCP_TOKEN/.test(statusOut?.report ?? ''),
+  String(statusOut?.report ?? '').slice(0, 300))
+const peerSetOut = await registered.execute({ action: 'set-token', token: 'peer-a2a', value: 'E'.repeat(64) })
+check('peer-a2a set-token 可用（不再报槽位非法）', peerSetOut?.ok === true, JSON.stringify(peerSetOut))
 
 const clearOut = await registered.execute({ action: 'clear-token', token: 'a2a' })
 check('clear-token 成功', clearOut?.ok === true, JSON.stringify(clearOut))
