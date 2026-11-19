@@ -121,3 +121,15 @@ powershell -NoProfile -File uninstall.ps1 -Profile desktop      # 期望 kit 未
 ## 7. 回报
 
 按 `skills/prj-team-collab/SKILL.md` 的口令：`TEAM-REPORT <id> | status | 一句话结论带数字`，证据带路径 + SHA256。进度与阻塞回 issue #7。
+
+## 8. 如果你的 DSH 已升级到 0.2.2-rc.5（必读）
+
+升级后若设置里插件行还在、但 `mcp__team_link__*` 工具**全部消失**，原因是 MCP 客户端版本被兼容性 gate 拒了：
+profile 里的 `@deepseek-ai/dsh-mcp-client` 还是 `0.1.7-rc.2`，其 peer 钉在 0.1.7，与 rc5 不匹配，而豁免清单只写到 `0.2.2-rc.3`。
+
+```powershell
+cd "$env:USERPROFILE\.dsh\profiles\desktop"
+pnpm add "@deepseek-ai/dsh-mcp-client@0.2.2-rc.5"    # 期望 installed=0.2.2-rc.5
+```
+
+改完**重启宿主**。详见 `README.md` §11.0（含应急豁免做法与同因受累的其它插件）。
