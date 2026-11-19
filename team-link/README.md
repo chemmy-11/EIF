@@ -429,7 +429,7 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
 0.2.0 —— **宿主半边落地版**：`cordis.patch.yml` 从一行变两行（`team-link` + `mcp-team-link`）、配置项进 profile、token 值走凭据存储、宿主工具 `team_link_setup` 上线；GUI 配置面板仍未做（§4.1 / §4.7）。
 版本号以 `package.json` / `plugin.json` 为准；清单字段见 `plugin.json` 的 `provides` / `writes` / `rollback`。
 
-## 11. 兼容性基线（DSH 0.2.2-rc.3 + dsh-vivado 0.2.4）
+## 11. 兼容性基线（DSH 0.2.2-rc.5 + dsh-vivado 0.2.4）
 
 以下结论是本插件在 **DSH 0.2.2-rc.3** 下的实测结果，不是推测。换 DSH 版本后请重跑本节第 4 条的命令。
 
@@ -441,7 +441,29 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
 | 槽位名 | **未变** | `settings.section`（29 次）与 `plugins.row.config`（9 次）在 rc.3 内置 bundle 中仍存在 |
 | 客户端 `inject` | **一致** | rc.3 内置客户端声明 `inject=[…,'configForms',…]`；本包为 `['slots','configForms']`，两者都存在于 rc.3 |
 | 宿主 `inject` | **本轮修复** | 见下条 |
+| MCP 客户端版本 | **rc5 起必须 ≥ 0.2.2-rc.5** | 见 §11.0：旧版 `0.1.7-rc.2` 的 peer 钉在 0.1.7，rc5 下被兼容性 gate 拒，`mcp__team_link__*` 会整个消失 |
 
+
+### 11.0 rc5 必做：升级 `@deepseek-ai/dsh-mcp-client`（否则工具面直接消失）
+
+**症状**：DSH 升到 0.2.2-rc.5 后，设置里插件行还在，但 `mcp__team_link__*` 五个工具**全部不见**，`team_link` 命名空间也不出现在工具目录里。
+
+**根因**：本插件的 MCP 行按包名 `@deepseek-ai/dsh-mcp-client` 解析。profile 里装的是 `0.1.7-rc.2`，它的 peerDependencies 把 `@deepseek-ai/dsh-tools` 等钉在 `0.1.7-rc.2`，与 rc5 运行时不符。DSH 的兼容性 gate 因此拒绝挂载该行，只有**逐版本精确豁免**（`profiles/<p>/compatibility.json`）能放行，而豁免清单只写到 `0.2.2-rc.3`。
+
+**修法（推荐：升级，不再靠豁免）**：
+
+```powershell
+cd "$env:USERPROFILE\.dsh\profiles\desktop"
+Copy-Item package.json,pnpm-lock.yaml,compatibility.json -Destination . -ErrorAction SilentlyContinue  # 先自行备份
+pnpm add "@deepseek-ai/dsh-mcp-client@0.2.2-rc.5"
+# 期望：installed=0.2.2-rc.5；其 peer 与运行时同版本 → 无需豁免
+```
+
+**临时应急（不推荐，仅当无法联网升级）**：把 `0.2.2-rc.5` 追加进 `compatibility.json` 里 `@deepseek-ai/dsh-mcp-client@0.1.7-rc.2` 的数组。这是接受版本错配风险。
+
+**改完必须重启宿主**（宿主插件与服务都是启动时建立）。
+
+> 同一 gate 也会拒其它钉死 `0.1.7-rc.2` 的插件（如 `dsh-computer-use` / `dsh-experimental-computer-use-cua-driver-native`）。它们与本插件无关，但会让你以为“插件都正常”时缺东西——排查时先看这一条。
 ### 11.1 本轮修掉的真实缺陷：宿主半区缺 `inject`，`team_link_setup` 从未注册
 
 - 症状：`mcp__team_link__*` 正常，但 README §4.5 说的 token 输入工具 `team_link_setup` **根本不存在**，所以「凭据存储 → token 文件」那条路在真实部署里是死的。
