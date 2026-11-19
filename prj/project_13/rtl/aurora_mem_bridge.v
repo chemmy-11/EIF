@@ -97,6 +97,18 @@ module aurora_mem_bridge (
 //parameter define (official values)
 // ★ prj13 P2 (v0.2)：地址按开工手册 §8 裁决的 10.10.0.x 落地（2026-11-08 20:40 定）
 //   板 A 一套；板 B 只换参数：BOARD_MAC=..0B_01 / BOARD_IP=.12 / PEER_IP=.1 / PC_IP=.2
+// ★ 2026-11-19: A/B 双参数组。构建时用 fileset verilog_define 选择：
+//     -define BOARD_B  => 板 B 参数组；不定义 => 板 A 参数组（与旧版逐位等价）
+//   依据：开工手册 §8（10.10.0.x）；PEER_MAC 必须是对端 PC 的网卡 MAC（板 B = PC1 网卡 08-3C-03-A0-26-96）。
+`ifdef BOARD_B
+parameter  BOARD_MAC = 48'h02_00_00_00_0B_01;                 // 本板（板 B）
+parameter  BOARD_IP  = {8'd10,8'd10,8'd0,8'd12};              // 本板管理/本地栈 IP
+parameter  PEER_MAC  = 48'h08_3C_03_A0_26_96;                 // ★对端 PC 的 MAC（板 B = PC1 网卡）
+parameter  PEER_IP   = {8'd10,8'd10,8'd0,8'd1};               // ★对端 PC 的 IP（唯一允许跨板的 dst）
+parameter  PC_IP     = {8'd10,8'd10,8'd0,8'd2};               // 本板直连 PC 的 IP
+parameter  DES_MAC   = 48'hff_ff_ff_ff_ff_ff;
+parameter  DES_IP    = {8'd10,8'd10,8'd0,8'd2};               // 本地栈回包的缺省 dst（实际由 src_ip 覆盖）
+`else
 parameter  BOARD_MAC = 48'h02_00_00_00_0A_01;                 // 本板（板 A）
 parameter  BOARD_IP  = {8'd10,8'd10,8'd0,8'd11};              // 本板管理/本地栈 IP
 parameter  PEER_MAC  = 48'hA8_2B_DD_76_DF_A2;                 // ★对端 PC 的 MAC（板 A = PC2 网卡）
@@ -104,6 +116,7 @@ parameter  PEER_IP   = {8'd10,8'd10,8'd0,8'd2};               // ★对端 PC �
 parameter  PC_IP     = {8'd10,8'd10,8'd0,8'd1};               // 本板直连 PC 的 IP
 parameter  DES_MAC   = 48'hff_ff_ff_ff_ff_ff;
 parameter  DES_IP    = {8'd10,8'd10,8'd0,8'd1};               // 本地栈回包的缺省 dst（实际由 src_ip 覆盖）
+`endif
 
 //*******************************************************************
 // 以太网栈侧连线（eth_rxc 域）—— 与 prj9 逐位相同

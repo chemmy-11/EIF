@@ -14,6 +14,19 @@ set proj  D:/FPGA/prj/project_13
 file mkdir $proj/out
 
 open_project $proj/vivado/prj13.xpr
+
+# ---- ★2026-11-19: A/B 参数组选择（env P13_BOARD=B => verilog_define BOARD_B）----
+#   板 A：不定义（与旧版逐位等价）；板 B：定义 BOARD_B，切换 BOARD_MAC/BOARD_IP/PEER_*/PC_IP/DES_IP
+#   参数实际值见 rtl/aurora_mem_bridge.v 的 ifdef 块。
+set _board [expr {[info exists ::env(P13_BOARD)] ? $::env(P13_BOARD) : "A"}]
+if {$_board eq "B"} {
+    set_property verilog_define {BOARD_B} [get_filesets sources_1]
+} else {
+    set_property verilog_define {} [get_filesets sources_1]
+}
+puts "BOARD_VARIANT: $_board"
+puts "BOARD_VERILOG_DEFINE: [get_property verilog_define [get_filesets sources_1]]"
+
 # ---- B3-1: 新增 RTL 幂等纳入工程（create_project 只在首建加文件）----
 if {[llength [get_files -quiet axi_arb_3to1.v]] == 0} {
     add_files -fileset sources_1 $proj/rtl/axi_arb_3to1.v
