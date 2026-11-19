@@ -510,7 +510,8 @@ function writeAtomic(path, content) {
 function readExistingConfig(path) {
   try {
     if (!existsSync(path)) return {}
-    const parsed = JSON.parse(readFileSync(path, 'utf8'))
+    // 记事本 / Set-Content -Encoding UTF8 会写 BOM；不剥掉就会解析失败被当成「没有配置」，进而覆盖用户设置。
+    const parsed = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''))
     return parsed !== null && typeof parsed === 'object' ? parsed : {}
   } catch {
     return {}
