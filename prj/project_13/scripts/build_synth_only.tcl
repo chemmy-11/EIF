@@ -480,6 +480,63 @@ connect_debug_port u_ila_6/probe9 [list [one_net dbg_aurora_rst]]
 puts "ILA6_PROBES: status=4 err=2 evt=16 hec=16 sec=16 pktx=16 pkrx=16 pfwd=16 prev=16 rst=1 (total=[expr {4+2+16*7+1}])"
 }
 
+# =============================================================================
+# ★2026-11-19 D1 诊断核 u_ila_7（gmii_rx_clk / eth_rxc 域）
+#   目的：定位「泵B 写入(prev_wr 涨) 但 RGMII TX 无帧出」—— 怀疑三路 mux 的接管锁存卡死
+#         (cmd_takeover > stack_takeover > pump_rev_en)
+#   时钟依据：UG908 "Debug Core Clocks" —— debug 核时钟必须自由运行稳定，且与被测信号同域同步。
+#         以上信号全部在 `posedge gmii_rx_clk` 域，故本核挂 gmii_rx_clk（RGMII RX 时钟，链路上行时自由运行）。
+#   回退：env P13_SKIP_ILA7=1 整核跳过
+# =============================================================================
+if {[info exists ::env(P13_SKIP_ILA7)]} {
+    puts "ILA7_SKIPPED: env P13_SKIP_ILA7 set"
+} else {
+set grx_net [get_nets -quiet [list gmii_rx_clk]]
+if {[llength $grx_net] == 0} { set grx_net [get_nets -hier -quiet -filter {NAME =~ *gmii_rx_clk}] }
+puts "ILA7_CLK_NET: count=[llength $grx_net]"
+if {[llength $grx_net] == 0} {
+    puts "ILA7_SKIPPED: gmii_rx_clk net not found"
+} else {
+create_debug_core u_ila_7 ila
+set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_7]
+set_property C_TRIGIN_EN false [get_debug_cores u_ila_7]
+set_property C_TRIGOUT_EN false [get_debug_cores u_ila_7]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_7]
+set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_7]
+set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_7]
+set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_7]
+set_property port_width 1 [get_debug_ports u_ila_7/clk]
+connect_debug_port u_ila_7/clk [lindex $grx_net 0]
+
+# probe0: 三个接管/出口控制 1bit（stack_takeover / cmd_takeover / pump_rev_en）
+set nets7a {}
+foreach t {dbg_stack_takeover dbg_cmd_takeover dbg_pump_rev_en} {
+    lappend nets7a [one_net $t]
+}
+set_property port_width [llength $nets7a] [get_debug_ports u_ila_7/probe0]
+connect_debug_port u_ila_7/probe0 $nets7a
+
+# probe1: 末级 TX 使能 vs 栈使能（rgmii_tx_en_o / stack_tx_en）
+create_debug_port u_ila_7 probe
+set nets7b {}
+foreach t {dbg_rgmii_tx_en_o dbg_stack_txen} {
+    lappend nets7b [one_net $t]
+}
+set_property port_width [llength $nets7b] [get_debug_ports u_ila_7/probe1]
+connect_debug_port u_ila_7/probe1 $nets7b
+
+# probe2: 泵B 读出帧数（15:0）
+create_debug_port u_ila_7 probe
+set_property port_width 16 [get_debug_ports u_ila_7/probe2]
+connect_debug_port u_ila_7/probe2 [bus_nets dbg_prev_rd 16]
+
+# ★2026-11-19 时序回退：probe3(prev_wr)/probe4(prev_drop) 已裁掉（首版 53bit 导致 WNS -0.214 不写位流）。
+#   保留最小可判定集：ctl(3) + txen(2) + prev_rd(16) = 21 bit；配合 R3C_SKIP_ILA4 释放余量。
+#   依据：dbg_prev_wr 可由 u_ila_6 probe8 读取，dbg_prev_drop 暂不采集。
+puts "ILA7_PROBES: ctl=3 txen=2 rd=16 (total=[expr {3+2+16}])"
+}
+}
+
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design
 
