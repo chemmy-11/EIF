@@ -1512,6 +1512,14 @@ end
 (* mark_debug = "true" *) wire        dbg_soft_err  = soft_err;
 (* mark_debug = "true" *) wire [15:0] dbg_prev_wr   = pump_rev_wr;
 (* mark_debug = "true" *) wire [15:0] dbg_prev_drop = pump_rev_drop;
+// ★2026-11-19 D1 诊断探针（全部 gmii_rx_clk / eth_rxc 域）：
+//   目的：定位"泵B 写入(prev_wr 涨) 但 RGMII TX 无帧出"——怀疑三路 mux 的接管锁存卡死。
+//   依据：UG908 "Debug Core Clocks" 要求 debug 核时钟自由运行且与被测信号同域，故新核挂 gmii_rx_clk。
+(* mark_debug = "true" *) wire        dbg_stack_takeover = stack_takeover;   // mux 第2优先（本地栈应答）
+(* mark_debug = "true" *) wire        dbg_cmd_takeover   = cmd_takeover;     // mux 第1优先（命令应答）
+(* mark_debug = "true" *) wire        dbg_pump_rev_en    = pump_rev_en;      // 泵B 读出使能（转发帧出口）
+(* mark_debug = "true" *) wire [15:0] dbg_prev_rd        = pump_rev_rd;      // 泵B 读出帧数
+(* mark_debug = "true" *) wire        dbg_rgmii_tx_en_o  = rgmii_tx_en_o;    // 末级 TX 使能（真正上线的那根）
 // ★ prj10 user 域新增: 桥的用户侧计数 + 读侧发射使能（帧连续性观测）
 (* mark_debug = "true" *) wire [15:0] dbg_mem_u_wr  = mem_u_wr_frame;
 (* mark_debug = "true" *) wire [15:0] dbg_mem_u_rd  = mem_u_rd_frame;
