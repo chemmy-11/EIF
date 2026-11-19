@@ -101,7 +101,7 @@ function resolveConfigPath(given) {
 
 function loadConfig(cfgPath) {
   let cfg;
-  try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch (e) { throw new Error('配置文件不可读或非法 JSON: ' + e.message); }
+  try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { throw new Error('配置文件不可读或非法 JSON: ' + e.message); }
   if (!cfg || typeof cfg !== 'object') throw new Error('配置文件内容必须为对象');
   return cfg;
 }
