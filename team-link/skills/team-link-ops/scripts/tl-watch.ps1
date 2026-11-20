@@ -21,7 +21,10 @@ param(
   [string]$CursorFile = '',
   [string]$DshHome = (Join-Path $env:USERPROFILE '.dsh'),
   [switch]$Json,
-  [switch]$NoAdvance
+  [switch]$NoAdvance,
+  [switch]$Lock,
+  [int]$LockStaleMinutes = 10,
+  [switch]$Advance
 )
 $ErrorActionPreference = 'Stop'
 
@@ -38,6 +41,26 @@ function Read-JsonSafe([string]$Path) {
 }
 
 $cfg = Read-JsonSafe $cfgPath
+# 排他锁：自动化任务会定时反复触发，两次运行重叠会重复处理同一批任务。
+# 用 -Lock 时同一时刻只允许一个巡检；超过 LockStaleMinutes 的锁视为残留并回收。
+$lockPath = Join-Path $Bundle 'state\ops-watch.lock'
+$lockHeld = $false
+if ($Lock) {
+  if (Test-Path -LiteralPath $lockPath) {
+    $age = ((Get-Date) - (Get-Item -LiteralPath $lockPath).LastWriteTime).TotalMinutes
+    if ($age -gt $LockStaleMinutes) { Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue }
+  }
+  try {
+    $fs = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $b = [System.Text.Encoding]::UTF8.GetBytes(('pid=' + $PID + ' at=' + (Get-Date).ToString('s')))
+    $fs.Write($b, 0, $b.Length); $fs.Close()
+    $lockHeld = $true
+  } catch {
+    Write-Host 'FAIL 另一个巡检正在运行（lock 被占用），本次跳过，避免重复处理同一批任务'
+    if ($Json) { '{"verdict":"locked"}' }
+    exit 11
+  }
+}
 if (-not $cfg) { if ($Json) { '{"verdict":"no-config"}' } else { Write-Host "FAIL 读不到 state\config.json" }; exit 2 }
 $a2aPort = [int]$cfg.a2a.port
 $mcpPort = [int]$cfg.mcp.port
@@ -76,6 +99,16 @@ $newTasks = @($allTasks | Where-Object { $_.LastWriteTimeUtc.Ticks -gt $cursor }
 $maxTicks = $cursor
 foreach ($t in $allTasks) { if ($t.LastWriteTimeUtc.Ticks -gt $maxTicks) { $maxTicks = $t.LastWriteTimeUtc.Ticks } }
 
+# -Advance：只把游标推到当前最新（"处理成功后才算读过"），不探测、不输出清单。
+if ($Advance) {
+  if ($maxTicks -le $cursor) { Write-Host ("OK 游标已是最新（" + $allTasks.Count + " 条任务）") ; exit 0 }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $CursorFile) | Out-Null
+  ([pscustomobject]@{ lastTicks = $maxTicks; time = (Get-Date).ToString("s") } | ConvertTo-Json) |
+    Set-Content -LiteralPath $CursorFile -Encoding UTF8
+  Write-Host ("OK 游标已推进到最新（" + $allTasks.Count + " 条任务）")
+  exit 0
+}
+
 $brief = @()
 foreach ($t in ($newTasks | Select-Object -Last 5)) {
   $obj = Read-JsonSafe $t.FullName
@@ -112,6 +145,8 @@ if (-not $NoAdvance -and $maxTicks -gt $cursor) {
     Set-Content -LiteralPath $CursorFile -Encoding UTF8
 }
 
-if ($verdict -eq "degraded") { exit 2 }
-if ($verdict -eq "new-tasks") { exit 10 }
-exit 0
+$exitCode = 0
+if ($verdict -eq "degraded") { $exitCode = 2 }
+elseif ($verdict -eq "new-tasks") { $exitCode = 10 }
+if ($lockHeld) { Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue }
+exit $exitCode
