@@ -269,7 +269,9 @@ assign drp_rready  = 1'b0;
 // ★ prj10 新增: MIG (ddr4_0) 连线 —— ui_clk 域
 //*******************************************************************
 wire        calib;                     // init_calib_complete
-wire        ui_clk;                    // ~300 MHz
+wire        ui_clk;                    // 75 MHz（MIG mmcm_clkout5；存储时钟 300 MHz 的四分频。
+                                       //   2026-11-20 由 post-route DCP 实证：dbg_hub/clk ← mmcm_clkout5
+                                       //   = 13.333 ns = 75.002 MHz。原注释 "~300 MHz" 是把存储时钟当成了 ui_clk）
 wire        ui_sync_rst;               // MIG 同步复位(高有效, ui_clk 域)
 wire [511:0] dbg_bus;
 wire        mig_sys_rst = ~sys_rst_n;  // ★ 取反! prj4 教训(见文件头注释 4)

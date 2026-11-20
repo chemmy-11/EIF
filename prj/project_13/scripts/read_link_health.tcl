@@ -25,6 +25,9 @@
 
 set PROBE_ORDER {probe_in0 probe_in1 probe_in2 probe_in3 probe_in4}
 set PROBE_LABEL {ui_rst_n calib armed down sticky}
+# 网名兜底：硬件对象名可能是端口名（probe_inN）也可能是网名，只在板上才知道。
+# 两级查找：先按端口名，再按网名；两级都必须唯一命中，否则 UNKNOWN。
+set PROBE_NETNAME {dbg_link_ui_rst_n dbg_link_calib_ui dbg_link_armed_ui dbg_link_down_ui dbg_link_lost_sticky_ui}
 
 proc emit_unknown {board reason} {
     puts "UNKNOWN $board $reason"
@@ -83,6 +86,15 @@ if {[catch {
 if {[catch {
     set vios [get_hw_vios -of_objects $dev]
 } e]} { emit_unknown $board "get_hw_vios_failed:$e" }
+# 多核时按 INSTANCE_NAME 收窄到 u_vio_link；该属性在 2023.1 是否可用未在板上验证，
+# 因此只在"多核"时尝试，且失败不影响单核情形。
+if {[llength $vios] > 1} {
+    if {![catch {
+        set f [get_hw_vios -quiet -of_objects $dev -filter {INSTANCE_NAME =~ *u_vio_link*}]
+    }]} {
+        if {[llength $f] == 1} { set vios $f }
+    }
+}
 if {[llength $vios] != 1} {
     emit_unknown $board "vio_not_unique -> [llength $vios] core(s): $vios"
 }
@@ -98,14 +110,20 @@ if {[catch {
 
 # ---- 逐探针读值，要求唯一且二值 ----
 set vals {}
+set idx 0
 foreach pn $PROBE_ORDER {
-    if {[catch {
-        set hits [get_hw_probes -quiet $pn -of_objects $vio]
-    } e]} { emit_unknown $board "probe_query_failed($pn):$e" }
-    if {[llength $hits] != 1} {
-        emit_unknown $board "probe_not_unique($pn) -> [llength $hits]"
+    set netn [lindex $PROBE_NETNAME $idx]
+    incr idx
+    # 两级查找：端口名优先，找不到再按网名
+    set p ""
+    foreach cand [list $pn $netn] {
+        if {[catch {
+            set hits [get_hw_probes -quiet $cand -of_objects $vio]
+        } e]} { emit_unknown $board "probe_query_failed($cand):$e" }
+        if {[llength $hits] == 1} { set p [lindex $hits 0]; break }
+        if {[llength $hits] > 1} { emit_unknown $board "probe_not_unique($cand) -> [llength $hits]" }
     }
-    set p [lindex $hits 0]
+    if {$p eq ""} { emit_unknown $board "probe_not_found($pn|$netn)" }
     if {[catch {
         set v [get_property INPUT_VALUE $p]
     } e]} { emit_unknown $board "probe_read_failed($pn):$e" }
