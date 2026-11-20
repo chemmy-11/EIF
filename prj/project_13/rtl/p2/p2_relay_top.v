@@ -35,7 +35,8 @@
 
 module p2_relay_top #(
     parameter [47:0] BOARD_MAC = 48'h02_00_00_00_0A_01,   // 板 A；板 B 0B:01
-    parameter [47:0] PEER_MAC  = 48'h00_00_00_00_00_00,   // ★对端 PC 的 MAC（板 A 填 PC2）
+    parameter [47:0] PEER_MAC  = 48'h00_00_00_00_00_00,   // ★对端 PC 的 MAC（跨板方向用）
+parameter [47:0] PC_MAC    = 48'h00_00_00_00_00_00,   // ★2026-11-20 D1 修复：本板直连 PC 的网卡 MAC（出口 dst）
     parameter [31:0] BOARD_IP  = {8'd10,8'd10,8'd0,8'd11},// 板 A；板 B .12
     parameter [31:0] PEER_IP   = {8'd10,8'd10,8'd0,8'd2}, // 板 A 的对端 PC2；板 B .1
     parameter [31:0] PC_IP     = {8'd10,8'd10,8'd0,8'd1}, // 本板直连 PC；板 B .2
@@ -300,7 +301,7 @@ module p2_relay_top #(
 
     eth_rewrap #(
         .SRC_MAC       (BOARD_MAC),
-        .DST_MAC       (PEER_MAC),
+        .DST_MAC       (PC_MAC),   // ★2026-11-20 D1 修复：出口帧发给本板直连 PC，用 PC_MAC（原为 PEER_MAC，接反）
         .MIN_FRAME_LEN (16'd60)
     ) u_rewrap (
         .clk         (aur_clk),

@@ -104,6 +104,7 @@ module aurora_mem_bridge (
 parameter  BOARD_MAC = 48'h02_00_00_00_0B_01;                 // 本板（板 B）
 parameter  BOARD_IP  = {8'd10,8'd10,8'd0,8'd12};              // 本板管理/本地栈 IP
 parameter  PEER_MAC  = 48'h08_3C_03_A0_26_96;                 // ★对端 PC 的 MAC（板 B = PC1 网卡）
+parameter  PC_MAC    = 48'hA8_2B_DD_76_DF_A2;                 // ★2026-11-20 D1 修复：本板直连 PC 网卡 MAC（板 B = PC2）
 parameter  PEER_IP   = {8'd10,8'd10,8'd0,8'd1};               // ★对端 PC 的 IP（唯一允许跨板的 dst）
 parameter  PC_IP     = {8'd10,8'd10,8'd0,8'd2};               // 本板直连 PC 的 IP
 parameter  DES_MAC   = 48'hff_ff_ff_ff_ff_ff;
@@ -112,6 +113,7 @@ parameter  DES_IP    = {8'd10,8'd10,8'd0,8'd2};               // 本地栈回包
 parameter  BOARD_MAC = 48'h02_00_00_00_0A_01;                 // 本板（板 A）
 parameter  BOARD_IP  = {8'd10,8'd10,8'd0,8'd11};              // 本板管理/本地栈 IP
 parameter  PEER_MAC  = 48'hA8_2B_DD_76_DF_A2;                 // ★对端 PC 的 MAC（板 A = PC2 网卡）
+parameter  PC_MAC    = 48'h08_3C_03_A0_26_96;                 // ★2026-11-20 D1 修复：本板直连 PC 网卡 MAC（板 A = PC1）
 parameter  PEER_IP   = {8'd10,8'd10,8'd0,8'd2};               // ★对端 PC 的 IP（唯一允许跨板的 dst）
 parameter  PC_IP     = {8'd10,8'd10,8'd0,8'd1};               // 本板直连 PC 的 IP
 parameter  DES_MAC   = 48'hff_ff_ff_ff_ff_ff;
@@ -911,6 +913,7 @@ mb_ctrl u_mb_ctrl (
 p2_relay_top #(
     .BOARD_MAC    (BOARD_MAC),
     .PEER_MAC     (PEER_MAC ),
+    .PC_MAC       (PC_MAC   ),   // 2026-11-20 D1 修复：出口帧 dst = 本板直连 PC
     .BOARD_IP     (BOARD_IP ),
     .PEER_IP      (PEER_IP  ),
     .PC_IP        (PC_IP    ),
@@ -1564,6 +1567,7 @@ end
 (* mark_debug = "true" *) wire        dbg_pump_rev_en    = pump_rev_en;      // 泵B 读出使能（转发帧出口）
 (* mark_debug = "true" *) wire [15:0] dbg_prev_rd        = pump_rev_rd;      // 泵B 读出帧数
 (* mark_debug = "true" *) wire        dbg_rgmii_tx_en_o  = rgmii_tx_en_o;    // 末级 TX 使能（真正上线的那根）
+(* mark_debug = "true" *) wire [7:0]  dbg_rgmii_txd_o    = rgmii_txd_o;      // 2026-11-20 D1 修复同轮：TX 数据总线字节证据
 // ★ prj10 user 域新增: 桥的用户侧计数 + 读侧发射使能（帧连续性观测）
 (* mark_debug = "true" *) wire [15:0] dbg_mem_u_wr  = mem_u_wr_frame;
 (* mark_debug = "true" *) wire [15:0] dbg_mem_u_rd  = mem_u_rd_frame;

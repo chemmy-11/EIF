@@ -55,7 +55,9 @@ module eth_rewrap #(
                      S_HDR  = 3'd1,   // 吐 14 B 新以太网头
                      S_FIRST= 3'd2,   // 吐被暂存的首个 IP 字节
                      S_DATA = 3'd3,   // 1:1 直通
-                     S_PAD  = 3'd4;   // 补零到 MIN_FRAME_LEN
+                     S_PAD  = 3'd4,
+                     S_FCS  = 3'd5,   // 2026-11-20 D1 fix: 4B FCS
+                     S_PRE  = 3'd6;   // 2026-11-20 D1 fix: 8B 前导码+SFD (7x55 + D5)   // 补零到 MIN_FRAME_LEN
 
     localparam [15:0] ETH_HDR_LEN = 16'd14;
     localparam [15:0] MIN_PAYLOAD = MIN_FRAME_LEN - ETH_HDR_LEN;  // 默认 46
@@ -72,6 +74,13 @@ module eth_rewrap #(
     reg [15:0] in_cnt;       // 已收到的 IP 字节数
     reg        in_done;      // 输入包已收完（s_eop 已见）
     reg        len_err_r;
+    // 2026-11-20 D1 fix: 前导码/SFD + FCS 相关声明
+    reg  [3:0] pre_idx;      // 0..7 前导码/SFD
+    reg  [1:0] fcs_idx;
+    reg  [7:0] fcs_byte;
+    reg        crc_clr_w;
+    wire [31:0] crc_data_w, crc_next_w;
+    localparam [7:0] PRE_SFD = 8'hD5;   // 前 7 字节恒 0x55，第 8 字节为 SFD
 
     //-------------------------------------------------------------------------
     // 输出字节选择
@@ -105,10 +114,10 @@ module eth_rewrap #(
                      ((state == S_DATA) ? m_ready : 1'b0);
 
     assign m_sop  = (state == S_HDR) && (hdr_idx == 4'd0);
-    assign m_eop  = ((state == S_DATA) && s_eop && (out_pos >= (tot_len - 16'd1))) ||
-                    ((state == S_PAD) && (out_pos == (tot_len - 16'd1)));
+    // 2026-11-20 D1 fix: EOP 移到 4 字节 FCS 的最后一拍
+    assign m_eop  = (state == S_FCS) && (fcs_idx == 2'd3);
 
-    assign m_frame_len = tot_len;
+    assign m_frame_len = tot_len + 16'd12;   // 2026-11-20 D1 fix: +8 前导/SFD +4 FCS
     assign o_len_err   = len_err_r;
 
     // 输出有效与数据
@@ -118,6 +127,10 @@ module eth_rewrap #(
         m_valid_r = 1'b0;
         m_data_r  = 8'h00;
         case (state)
+            S_PRE: begin
+                m_valid_r = 1'b1;
+                m_data_r  = (pre_idx == 4'd7) ? PRE_SFD : 8'h55;   // 7x55 + D5
+            end
             S_HDR: begin
                 m_valid_r = 1'b1;
                 m_data_r  = hdr_byte;
@@ -134,6 +147,10 @@ module eth_rewrap #(
                 m_valid_r = 1'b1;
                 m_data_r  = 8'h00;
             end
+            S_FCS: begin
+                m_valid_r = 1'b1;
+                m_data_r  = fcs_byte;
+            end
             default: begin
                 m_valid_r = 1'b0;
                 m_data_r  = 8'h00;
@@ -146,6 +163,36 @@ module eth_rewrap #(
 
     wire out_ace = m_valid_r && m_ready;
     wire in_ace  = s_valid && s_ready;
+
+    //-------------------------------------------------------------------------
+    // 2026-11-20 D1 修复：CRC32 (FCS) 生成
+    // CRC 只覆盖 MAC 头 + IP + 填充（不含前导码/SFD，不含 FCS 自身）
+    wire crc_en_w = out_ace && (state != S_FCS) && (state != S_PRE);
+    // 新帧起始时清零（S_IDLE 收到首个字节那一拍）
+    always @* crc_clr_w = (!rst_n) || ((state == S_IDLE) && s_valid);
+
+    crc32_d8 u_fcs_crc (
+        .clk      (clk       ),
+        .rst_n    (rst_n     ),
+        .data     (m_data_r  ),
+        .crc_en   (crc_en_w  ),
+        .crc_clr  (crc_clr_w ),
+        .crc_data (crc_data_w),
+        .crc_next (crc_next_w)
+    );
+
+    always @* begin
+        case (fcs_idx)
+            2'd0: fcs_byte = {~crc_data_w[24], ~crc_data_w[25], ~crc_data_w[26], ~crc_data_w[27],
+                              ~crc_data_w[28], ~crc_data_w[29], ~crc_data_w[30], ~crc_data_w[31]};
+            2'd1: fcs_byte = {~crc_data_w[16], ~crc_data_w[17], ~crc_data_w[18], ~crc_data_w[19],
+                              ~crc_data_w[20], ~crc_data_w[21], ~crc_data_w[22], ~crc_data_w[23]};
+            2'd2: fcs_byte = {~crc_data_w[8],  ~crc_data_w[9],  ~crc_data_w[10], ~crc_data_w[11],
+                              ~crc_data_w[12], ~crc_data_w[13], ~crc_data_w[14], ~crc_data_w[15]};
+            default: fcs_byte = {~crc_data_w[0], ~crc_data_w[1], ~crc_data_w[2], ~crc_data_w[3],
+                              ~crc_data_w[4], ~crc_data_w[5], ~crc_data_w[6], ~crc_data_w[7]};
+        endcase
+    end
 
     //-------------------------------------------------------------------------
     // 主状态机
@@ -161,6 +208,8 @@ module eth_rewrap #(
             in_cnt     <= 16'd0;
             in_done    <= 1'b0;
             len_err_r  <= 1'b0;
+            pre_idx    <= 4'd0;
+            fcs_idx    <= 2'd0;
         end else begin
             len_err_r <= 1'b0;
 
@@ -179,7 +228,20 @@ module eth_rewrap #(
                 else                          tot_len <= MIN_FRAME_LEN;
                 // 只有一个字节的包：立刻能判长度不符
                 if (s_eop && (i_pkt_len != 16'd1)) len_err_r <= 1'b1;
-                state       <= S_HDR;
+                pre_idx     <= 4'd0;
+                state       <= S_PRE;      // 2026-11-20: 先出前导码/SFD
+            end
+
+            //-------------------------------------------------------------
+            // 2026-11-20 D1 fix: 前导码 7x55 + SFD D5（CRC 不覆盖此段）
+            //-------------------------------------------------------------
+            if ((state == S_PRE) && out_ace) begin
+                if (pre_idx == 4'd7) begin
+                    pre_idx <= 4'd0;
+                    state   <= S_HDR;
+                end else begin
+                    pre_idx <= pre_idx + 4'd1;
+                end
             end
 
             //-------------------------------------------------------------
@@ -202,7 +264,7 @@ module eth_rewrap #(
                 out_pos <= out_pos + 16'd1;
                 if (in_done) begin
                     // 输入包只有 1 字节：该补零就补零，否则正好结束
-                    if ((out_pos + 16'd1) >= tot_len) state <= S_IDLE;
+                    if ((out_pos + 16'd1) >= tot_len) begin state <= S_FCS; fcs_idx <= 2'd0; end
                     else                              state <= S_PAD;
                 end else begin
                     state <= S_DATA;
@@ -219,7 +281,7 @@ module eth_rewrap #(
                     if (s_eop) begin
                         in_done <= 1'b1;
                         if (in_cnt + 16'd1 != lat_pkt_len) len_err_r <= 1'b1;
-                        if ((out_pos + 16'd1) >= tot_len) state <= S_IDLE;
+                        if ((out_pos + 16'd1) >= tot_len) begin state <= S_FCS; fcs_idx <= 2'd0; end
                         else                              state <= S_PAD;
                     end
                 end
@@ -229,8 +291,20 @@ module eth_rewrap #(
             // 补零
             //-------------------------------------------------------------
             if ((state == S_PAD) && out_ace) begin
-                if (out_pos == (tot_len - 16'd1)) state <= S_IDLE;
+                if (out_pos == (tot_len - 16'd1)) begin state <= S_FCS; fcs_idx <= 2'd0; end
                 else                              out_pos <= out_pos + 16'd1;
+            end
+
+            //-------------------------------------------------------------
+            // 2026-11-20 D1 修复：追加 4 B FCS
+            //-------------------------------------------------------------
+            if ((state == S_FCS) && out_ace) begin
+                if (fcs_idx == 2'd3) begin
+                    fcs_idx <= 2'd0;
+                    state   <= S_IDLE;
+                end else begin
+                    fcs_idx <= fcs_idx + 2'd1;
+                end
             end
         end
     end

@@ -568,6 +568,21 @@ connect_debug_port u_ila_7/probe2 [bus_nets dbg_prev_rd 16]
 #   保留最小可判定集：ctl(3) + txen(2) + prev_rd(16) = 21 bit；配合 R3C_SKIP_ILA4 释放余量。
 #   依据：dbg_prev_wr 可由 u_ila_6 probe8 读取，dbg_prev_drop 暂不采集。
 puts "ILA7_PROBES: ctl=3 txen=2 rd=16 (total=[expr {3+2+16}])"
+
+# ★2026-11-20 D1 修复同轮：probe3 = RGMII TX 数据总线 8bit（字节证据）
+#   用途：与 dbg_rgmii_tx_en_o / dbg_pump_rev_en 同窗对照，验证发给 PHY 的字节
+#         （前导 55x7+D5 / MAC / 0800 / IP / 填充 / FCS）是否正确。
+#   代价：ILA7 21 -> 29 bit，depth 1024 不变（内存增量约 8 Kbit）。
+#   时序有压力时按裁决"优先裁掉附加探针"= 设 P13_SKIP_ILA7_TXD=1。
+if {[info exists ::env(P13_SKIP_ILA7_TXD)] && $::env(P13_SKIP_ILA7_TXD) eq "1"} {
+    puts "ILA7_TXD: SKIPPED (P13_SKIP_ILA7_TXD=1)"
+} else {
+    create_debug_port u_ila_7 probe
+    set nets7d [bus_nets dbg_rgmii_txd_o 8]
+    set_property port_width [llength $nets7d] [get_debug_ports u_ila_7/probe3]
+    connect_debug_port u_ila_7/probe3 $nets7d
+    puts "ILA7_PROBES_EXT: +txd=8 (total=[expr {3+2+16+8}])"
+}
 }
 }
 
