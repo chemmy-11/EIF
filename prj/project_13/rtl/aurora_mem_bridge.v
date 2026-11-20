@@ -295,6 +295,48 @@ end
 wire aurora_rst_ui = |arst_ui_pipe;
 wire ui_link_rst_n = ui_rst_n & ~aurora_rst_ui;
 
+//*******************************************************************
+// ★C (2026-11-20): 链路丢失粘滞告警 —— 决策「prj13 FIFO 复位补丁去留」选 C
+//   动机：ch_up_evt_cnt 在 aurora_rst 分支里被清零（见下方判决计数器段），
+//         链路一掉就把「发生过闪断」的证据抹掉 ⇒ 运维无法判定是否该整板重烧。
+//   本单元把「上电并成功建链之后发生过一次数据面链路复位」变成粘滞位，
+//   只由 ui_rst_n（掉电/PL 重配置/MIG UI 复位）清除，不提供软件清旗。
+//   跨域：aurora_rst 在 user 域；用 xpm_cdc_async_rst 进 ui 域（异步断言、
+//         同步释放 4 级），再过两级 ASYNC_REG，粘滞采样不直接用异步输出。
+//   观测：u_vio_link（ui_clk，5 个 1bit 输入）经 JTAG 轮询读取，
+//         读出入口 scripts/read_link_health.tcl。
+//   回归：sim/tb_link_loss_monitor.sv —— 13 用例，xsim RESULT: PASS 13（2026-11-20 本地复现）。
+//   不做的事：不门控、不关闭、不影响数据面（B1/DMA/AXI/双桥逻辑全不变）。
+//*******************************************************************
+(* mark_debug = "true" *) wire dbg_link_ui_rst_n       = ui_rst_n;
+(* mark_debug = "true" *) wire dbg_link_calib_ui       = calib;
+(* mark_debug = "true" *) wire dbg_link_armed_ui;
+(* mark_debug = "true" *) wire dbg_link_down_ui;
+(* mark_debug = "true" *) wire dbg_link_lost_sticky_ui;
+
+link_loss_monitor u_link_loss_monitor (
+    .ui_clk               (ui_clk                ),
+    .ui_rst_n             (ui_rst_n              ),
+    .calib                (calib                 ),
+    .aurora_rst           (aurora_rst            ),
+    .link_armed_ui        (dbg_link_armed_ui     ),
+    .link_lost_sticky_ui  (dbg_link_lost_sticky_ui),
+    .link_down_ui         (dbg_link_down_ui      )
+);
+
+// ★C: VIO 读出点（IP，见 scripts/build_synth_only.tcl 的 create_ip 块）
+//   2023.1 的 create_debug_core 只支持 ila，不能建 vio（[Vivado 12-3620]），故用 IP。
+//   探针顺序与 scripts/read_link_health.tcl 硬绑定：
+//     probe_in0=ui_rst_n  probe_in1=calib  probe_in2=armed  probe_in3=down  probe_in4=sticky
+vio_link_health u_vio_link (
+    .clk        (ui_clk),
+    .probe_in0  (dbg_link_ui_rst_n),
+    .probe_in1  (dbg_link_calib_ui),
+    .probe_in2  (dbg_link_armed_ui),
+    .probe_in3  (dbg_link_down_ui),
+    .probe_in4  (dbg_link_lost_sticky_ui)
+);
+
 // ---- 内存桥 ↔ MIG 的 AXI4（37 信号）----
 wire [31:0] m_awaddr; wire [7:0] m_awlen; wire [2:0] m_awsize; wire [1:0] m_awburst;
 wire        m_awvalid, m_awready;

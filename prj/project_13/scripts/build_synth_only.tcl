@@ -54,6 +54,40 @@ if {[llength [get_files -quiet dma_rd_shim.v]] > 0} {
     remove_files -fileset sources_1 [get_files -quiet dma_rd_shim.v]
     puts "REMOVE_FILES: dma_rd_shim.v (v1 退役)"
 }
+# ---- ★C (2026-11-20): 链路丢失粘滞告警单元（决策 结论_prj13_FIFO复位补丁去留）----
+if {[llength [get_files -quiet link_loss_monitor.v]] == 0} {
+    add_files -fileset sources_1 $proj/rtl/link_loss_monitor.v
+    puts "ADD_FILES: link_loss_monitor.v"
+    update_compile_order -fileset sources_1
+}
+puts "LINK_MONITOR_SRC: [llength [get_files -quiet link_loss_monitor.v]] file(s)"
+
+# =============================================================================
+# ★C (2026-11-20): VIO ---- 链路丢失粘滞告警的 JTAG 读出点
+#   注：Vivado 2023.1 的 create_debug_core **只支持 ila**，不能建 vio
+#       （[Vivado 12-3620]，2026-11-20 实测），故 VIO 必须走 IP 路线。
+#   为什么是 VIO 而不是 ILA：ILA 要 arm + 抓一次；值守流程要反复 poll 当前值。
+#   域：ui_clk（与 link_loss_monitor 同域）；5 个 1bit 输入、0 输出。
+#   探针顺序与 scripts/read_link_health.tcl 硬绑定，勿改序。
+#   回退：env P13_SKIP_VIO=1 不建（时序不足时）
+# =============================================================================
+if {[llength [get_ips -quiet vio_link_health]] == 0} {
+    create_ip -name vio -vendor xilinx.com -library ip -module_name vio_link_health
+    set_property -dict [list \
+        CONFIG.C_NUM_PROBE_IN   {5} \
+        CONFIG.C_NUM_PROBE_OUT  {0} \
+        CONFIG.C_PROBE_IN0_WIDTH {1} \
+        CONFIG.C_PROBE_IN1_WIDTH {1} \
+        CONFIG.C_PROBE_IN2_WIDTH {1} \
+        CONFIG.C_PROBE_IN3_WIDTH {1} \
+        CONFIG.C_PROBE_IN4_WIDTH {1} \
+    ] [get_ips vio_link_health]
+    generate_target {instantiation_template synthesis simulation} [get_ips vio_link_health]
+    update_compile_order -fileset sources_1
+    puts "CREATE_IP: vio_link_health (in=5 out=0)"
+} else {
+    puts "CREATE_IP: vio_link_health 已存在，复用"
+}
 update_compile_order -fileset sources_1
 # ---- ddr4_0 产物：create_project 已在 No_Buffer 配置下 generate_target all ----
 #   仅当 synth 产物缺失时才重建（实测 2026-10-24: 重建路径偶发
@@ -536,6 +570,8 @@ connect_debug_port u_ila_7/probe2 [bus_nets dbg_prev_rd 16]
 puts "ILA7_PROBES: ctl=3 txen=2 rd=16 (total=[expr {3+2+16}])"
 }
 }
+
+
 
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design
