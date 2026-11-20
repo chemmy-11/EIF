@@ -172,6 +172,13 @@ def check_doc_names(files: list[Path]) -> None:
 
 # ---------- 2. 相对链接可解析 ----------
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+# 行号引用约定（2026-11-20 增补）：本库文档大量使用 `[说明](路径/file.md:281)`、
+# `(路径/file.py:369)`、`(file.md:301-322)` 这种「带行号/行号区间」的引用形式。
+# 它不是 Markdown 的合法链接目标，但作为**引用标注**长期在用（任务书、执行报告、
+# 决策记录都这么写）。检查时把行尾的 `:NNN` 或 `:NNN-MMM` 剥掉再查文件是否存在，
+# 既能继续约束"文件必须真实存在"，又不会把行号引用误判成断链。
+# 注意：只剥「结尾的 :数字」，Windows 盘符 `C:` 后面跟 `/`，不会被匹配到。
+LINE_SUFFIX = re.compile(r":\d+(?:-\d+)?$")
 
 
 def check_links(files: list[Path]) -> None:
@@ -187,6 +194,7 @@ def check_links(files: list[Path]) -> None:
             t = t.split("#", 1)[0]
             if not t:
                 continue
+            t = LINE_SUFFIX.sub("", t)
             # 占位符示例（文档里演示写法用）不当作真链接
             if re.search(r"[<>*]|\.\.\.|xxx", t):
                 continue
