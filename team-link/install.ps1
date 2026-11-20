@@ -41,8 +41,8 @@ if (Test-Path -LiteralPath $kitPkgJson) {
 }
 $StateDir  = Join-Path $Bundle "state"
 $LogDir    = Join-Path $Bundle "logs"
-$SkillSrc  = Join-Path $Bundle "skills\prj-team-collab"
-$SkillDst  = Join-Path (Join-Path $DshHome "skills") "prj-team-collab"
+$SkillsSrcRoot = Join-Path $Bundle "skills"
+$SkillsDstRoot = Join-Path $DshHome "skills"
 $ProfileDir= Join-Path (Join-Path $DshHome "profiles") $Profile
 $ProfilePkg= Join-Path $ProfileDir "package.json"
 $Token     = ""
@@ -193,20 +193,28 @@ Write-Ok "cordis.patch.yml 渲染完成（team-link 行在前 + stdio MCP 行在
 
 Write-Step "6/9 拷贝 skill 到用户 skills 目录"
 $skillManifest = @()
+$skillDirs = @()
 if ($SkipSkill) { Write-Warn2 "已跳过（-SkipSkill）" } else {
-  if (-not (Test-Path -LiteralPath $SkillSrc)) { Write-Fail ("skill 源缺失: " + $SkillSrc); exit 1 }
-  if (Test-Path -LiteralPath $SkillDst) {
-    $prev = Join-Path $StateDir ("skill-backup-" + $Stamp)
-    Copy-Item -LiteralPath $SkillDst -Destination $prev -Recurse -Force
-    Write-Warn2 ("目标已存在，旧副本备份到 " + $prev)
-  }
-  New-Item -ItemType Directory -Force -Path $SkillDst | Out-Null
-  Copy-Item -Path (Join-Path $SkillSrc "*") -Destination $SkillDst -Recurse -Force
-  foreach ($sf in (Get-ChildItem -LiteralPath $SkillDst -Recurse -File)) {
-    $skillManifest += (($sf.FullName.Substring($SkillDst.Length)).TrimStart("\") + " " + (Get-FileHash -LiteralPath $sf.FullName -Algorithm SHA256).Hash)
+  $skillDirs = @(Get-ChildItem -LiteralPath $SkillsSrcRoot -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") })
+  if ($skillDirs.Count -eq 0) { Write-Fail ("skills 目录下没有带 SKILL.md 的子目录: " + $SkillsSrcRoot); exit 1 }
+  New-Item -ItemType Directory -Force -Path $SkillsDstRoot | Out-Null
+  foreach ($sd in $skillDirs) {
+    $dst = Join-Path $SkillsDstRoot $sd.Name
+    if (Test-Path -LiteralPath $dst) {
+      $prev = Join-Path $StateDir ("skill-backup-" + $sd.Name + "-" + $Stamp)
+      Copy-Item -LiteralPath $dst -Destination $prev -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    Copy-Item -Path (Join-Path $sd.FullName "*") -Destination $dst -Recurse -Force
+    $n = 0
+    foreach ($sf in (Get-ChildItem -LiteralPath $dst -Recurse -File)) {
+      $skillManifest += ($sd.Name + "/" + ($sf.FullName.Substring($dst.Length).TrimStart("\")) + " " + (Get-FileHash -LiteralPath $sf.FullName -Algorithm SHA256).Hash)
+      $n++
+    }
+    Write-Ok ("skill " + $sd.Name + " -> " + $dst + " (" + $n + " 文件)")
   }
   [System.IO.File]::WriteAllLines((Join-Path $StateDir "skill-manifest.sha256"), $skillManifest)
-  Write-Ok ("skill -> " + $SkillDst + " (" + $skillManifest.Count + " 文件, 已记指纹)")
+  Write-Ok ("共 " + $skillDirs.Count + " 个 skill / " + $skillManifest.Count + " 个文件，已记指纹")
 }
 
 Write-Step "7/9 注册独立 bundle 到 profile "
@@ -353,7 +361,7 @@ $manifest = [ordered]@{
   role        = $Role
   ports       = [ordered]@{ a2a = $A2aPort; mcp = $McpPort }
   backups     = [ordered]@{ profilePackage = $pkgBackup; pnpmLock = $lockBackup }
-  skill       = $SkillDst
+  skills      = (@($skillDirs | ForEach-Object { $_.Name }) -join ',')
   skillCopied = (-not $SkipSkill)
   kitVerified = $kitVerified
   kitFileCount= $kitBaseline.Count

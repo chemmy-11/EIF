@@ -26,7 +26,7 @@ $OptionalD  = Split-Path -Parent $Bundle
 $KitRoot    = Split-Path -Parent $OptionalD
 $StateDir   = Join-Path $Bundle "state"
 $LogDir     = Join-Path $Bundle "logs"
-$SkillDst   = Join-Path (Join-Path $DshHome "skills") "prj-team-collab"
+$SkillsDstRoot = Join-Path $DshHome "skills"
 $ProfileDir = Join-Path (Join-Path $DshHome "profiles") $Profile
 $ProfilePkg = Join-Path $ProfileDir "package.json"
 $manifestPath = Join-Path $StateDir "install-manifest.json"
@@ -140,40 +140,50 @@ else { Write-Warn2 ("dsh plugin remove 退出码 " + $rmCode + "，转 Manual") 
   }
 
 Write-Step "3/6 处理 skill 副本"
-if (Test-Path -LiteralPath $SkillDst) {
-  $skillMan = Join-Path $StateDir "skill-manifest.sha256"
+$skillMan = Join-Path $StateDir "skill-manifest.sha256"
+$ownSkill = @{}
+if (Test-Path -LiteralPath $skillMan) {
+  Get-Content -LiteralPath $skillMan | ForEach-Object {
+    if ($_ -notmatch "^(?<key>\S+)\s+(?<hash>[0-9A-Fa-f]{64})$") { return }
+    $key = $Matches["key"]; $h = $Matches["hash"]
+    if ($key -match "^(?<n>[^/\\]+)[/\\](?<r>.+)$") { $n = $Matches["n"]; $r = $Matches["r"] } else { $n = "prj-team-collab"; $r = $key }
+    if (-not $ownSkill.ContainsKey($n)) { $ownSkill[$n] = @() }
+    $ownSkill[$n] += [pscustomobject]@{ Rel = $r; Hash = $h }
+  }
+}
+if ($ownSkill.Count -eq 0) { $ownSkill["prj-team-collab"] = @() }
+$removedSkills = @()
+foreach ($name in @($ownSkill.Keys)) {
+  $dst = Join-Path $SkillsDstRoot $name
+  if (-not (Test-Path -LiteralPath $dst)) { Write-Info ("skill " + $name + " 不在，跳过") ; continue }
   $drift = @()
-  if (Test-Path -LiteralPath $skillMan) {
-    Get-Content -LiteralPath $skillMan | ForEach-Object {
-      $parts = $_ -split " ", 2
-      $rel = $parts[0]; $want = $parts[1]
-      $full = Join-Path $SkillDst $rel
-      if (-not (Test-Path -LiteralPath $full)) { $drift += ("缺失 " + $rel) }
-      elseif ((Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash -ne $want) { $drift += ("改动 " + $rel) }
-    }
+  foreach ($e in $ownSkill[$name]) {
+    $full = Join-Path $dst $e.Rel
+    if (-not (Test-Path -LiteralPath $full)) { $drift += ("缺失 " + $e.Rel) }
+    elseif ((Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash -ne $e.Hash) { $drift += ("改动 " + $e.Rel) }
   }
-  $prevSkill = Get-ChildItem -LiteralPath $StateDir -Directory -Filter "skill-backup-*" -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
   if ($drift.Count -gt 0 -and -not $Force) {
-    Write-Warn2 ("skill 副本有 " + $drift.Count + " 处本地改动，未删除（可能含你的编辑）：" + ($drift -join ", "))
+    Write-Warn2 ("skill " + $name + " 有 " + $drift.Count + " 处本地改动，未删除（可能含你的编辑）: " + ($drift -join ", "))
     Write-Info "确认可丢再跑 uninstall.ps1 -Force"
-  } else {
-    Remove-Item -LiteralPath $SkillDst -Recurse -Force
-    Write-Ok ("删除 skill 副本 " + $SkillDst)
+    continue
   }
-  # 还原"安装前的 skill 副本"改成**显式开关**，不再无条件执行。
-  # 原因（真踩过）：无条件还原会把刚删掉的副本又拷回来，于是紧接着的"残留检查"必然 FAIL ——
-  # 而且拷回来的是同一插件上一轮自己的副本，等于卸载没卸干净。
-  # 备份本身留在 state\skill-backup-*，要还原请显式加 -RestoreSkillBackup。
-  if ($prevSkill) {
-    if ($RestoreSkillBackup) {
-      Copy-Item -Path (Join-Path $prevSkill.FullName "*") -Destination $SkillDst -Recurse -Force -ErrorAction SilentlyContinue
-      if (Test-Path -LiteralPath $SkillDst) { Write-Warn2 ("已按 -RestoreSkillBackup 还原安装前的副本: " + $prevSkill.Name) }
-    } else {
-      Write-Info ("安装前的 skill 副本备份保留（未自动还原）：" + $prevSkill.FullName)
-      Write-Info "  需要还原：加 -RestoreSkillBackup 重跑，或手工把该目录内容拷回 skills\prj-team-collab"
+  Remove-Item -LiteralPath $dst -Recurse -Force
+  Write-Ok ("删除 skill " + $name + " -> " + $dst)
+  $removedSkills += $name
+}
+if ($RestoreSkillBackup) {
+  foreach ($name in $removedSkills) {
+    $prevSkill = Get-ChildItem -LiteralPath $StateDir -Directory -Filter ("skill-backup-" + $name + "-*") -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+    if ($prevSkill) {
+      $dst = Join-Path $SkillsDstRoot $name
+      Copy-Item -Path (Join-Path $prevSkill.FullName "*") -Destination $dst -Recurse -Force -ErrorAction SilentlyContinue
+      if (Test-Path -LiteralPath $dst) { Write-Warn2 ("已按 -RestoreSkillBackup 还原 " + $name + ": " + $prevSkill.Name) }
     }
   }
-} else { Write-Ok "skill 副本本就不存在" }
+} else {
+  $anyBackup = Get-ChildItem -LiteralPath $StateDir -Directory -Filter "skill-backup-*" -ErrorAction SilentlyContinue
+  if ($anyBackup) { Write-Info "安装前的 skill 备份保留（未自动还原），需要还原加 -RestoreSkillBackup" }
+}
 
 Write-Step "4/6 残留检查"
 $pkgNow = Get-Content -Raw -Encoding UTF8 -LiteralPath $ProfilePkg | ConvertFrom-Json
@@ -181,7 +191,8 @@ $stillListed = @(@($pkgNow.dsh.profile.bundles) ) -contains $entryName
 $stillLinked = Test-Path -LiteralPath (Join-Path (Join-Path $ProfileDir "node_modules") $entryName)
 if (-not $stillListed -and -not $stillLinked) { Write-Ok "profile 无残留（bundles 与 node_modules 均干净）" }
 else { $fails++; Write-Fail ("仍有残留 listed=" + $stillListed + " linked=" + $stillLinked) }
-if (Test-Path -LiteralPath $SkillDst) { $fails++; Write-Fail ("skills 目录仍存在 " + $SkillDst) } else { Write-Ok "skills 目录无残留" }
+$leftSkills = @(Get-ChildItem -LiteralPath $SkillsDstRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $ownSkill.ContainsKey($_.Name) })
+if ($leftSkills.Count -gt 0) { $fails++; Write-Fail ("skills 目录仍有残留: " + (($leftSkills | ForEach-Object { $_.Name }) -join ", ")) } else { Write-Ok "skills 目录无残留" }
 
 Write-Step "5/6 清理自身生成物"
 $genPatch = Join-Path $Bundle "cordis.patch.yml"

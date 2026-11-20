@@ -42,7 +42,10 @@ team-link/                 # EIF 仓内路径（本插件不并入 dsh-vivado ki
     pc1_pc2_ping.ps1       # 对端探测（含 192.168.1.x 网段守卫，防连错机器）
     evidence_pull.ps1      # 走 MCP 拉对端证据并本地复核 SHA256
     apply-selftest.mjs     # 宿主半边离线自测（在临时目录里跑 apply()，不碰真 state/）
-  skills/prj-team-collab/SKILL.md   # 角色 / 发令回报格式 / 证据目录 / 硬件约定 / issue 回退
+  skills/
+    prj-team-collab/SKILL.md   # 角色 / 发令回报格式 / 证据目录 / 硬件约定 / issue 回退
+    team-link-setup/           # 换网段/装机的诊断与地址同步（scripts/tl-state.ps1, tl-sync.ps1）
+    team-link-ops/             # 值班与工作流（scripts/tl-watch.ps1）
   templates/
     PC2_上线清单.md        # PC2 上线 checklist（本插件最终交付物之一）
     AgentCard.template.json
@@ -494,3 +497,28 @@ GUI 侧：设置里应出现一级分区「PC 协作」（`settings.section`，i
 - **未定性**：rc5 里 `ctx.tools` 是否仍注入到本插件；或 `tools.register(definition)` 是否新增了形状要求（`browser-view` 内部要求 `output:{schema,render}`，但那可能是它自己的包装类而非平台契约）。宿主侧告警走 `ctx.logger`，本机拿不到宿主 console，**必须先有文件日志才能定性**。
 - **影响面**：只影响 `set-token` / `clear-token`。**token 文件在位即可正常协作**——把对端 token 直接放进 `state/peer-*.token`（交付说明里的「方式 B」），双向认证与证据搬运都不受影响。
 - **要修的话**：给宿主半区加 `logs/host-plugin.log` 文件日志 + 注册形状兼容（先按现有形状注册，捕获 `TypeError` 后带 `output:{schema,render}` 重试），一次宿主重启即可定性。
+
+## 12. 两个配套 skill（`team-link-setup` / `team-link-ops`）
+
+`install.ps1` 会遍历 `skills/` 下**每个带 SKILL.md 的子目录**并拷到 `<DshHome>\skills\`（不再是写死一个）；卸载时按 `state/skill-manifest.sha256` 里的 `<skill>/<相对路径>` 逐项清理。
+
+| skill | 什么时候用 | 给的命令 |
+|---|---|---|
+| `team-link-setup` | 换网段、换机器、第一次装、或「配置看着对但连不上」 | `scripts/tl-state.ps1`（只读诊断，直接说还缺哪几步）、`scripts/tl-sync.ps1 -Apply`（把地址同步到 profile 与 state/config.json 两处，带备份与回读校验） |
+| `team-link-ops` | 值班、等任务、发令回报、证据搬运、通道降级 | `scripts/tl-watch.ps1 -Json`（一次取数：本机双通道 + 对端身份 + 自上次新增任务；退出码 0=idle / 10=new-tasks / 2=degraded） |
+
+### 12.1 地址这件事只有一处权威
+
+| # | 位置 | 谁改 | 生效时机 |
+|---|---|---|---|
+| ① | profile `cordis.patch.yml` 的 `team-link` 块 `host:` | GUI 面板 / `tl-sync.ps1` | **宿主**下次启动 |
+| ② | `state/config.json` 的 `a2a.host`/`mcp.host` | 宿主 `apply()` 从 ① 物化 / `tl-sync.ps1` | 宿主启动后 |
+| ③ | LAN 服务的实际 bind | `tools/start-lan.ps1` 启动那一刻 | 服务启动时 |
+| ④ | 对端记录的你的地址 | 对端自己 | 对端重启后 |
+
+所以「只在 UI 里改 IP」只做了 ①：还要**重启宿主**（①→②）、**重起服务**（③）、**通知对端**（④）。这些步骤 `tl-state.ps1` 会逐条指出，不需要记。
+
+### 12.2 值班（当前只做「skill + 值班会话」这一档）
+
+A2A 是纯应答式、agent 也只在有 turn 时跑，所以「让对方一直盯」目前靠把值班状态钉进一次 prompt。口径见 `skills/team-link-ops/SKILL.md` §0（含退避间隔、退出条件、降级到 issue 的判据）。
+真正的事件驱动（A2A 到达即唤醒对端 agent）需要宿主侧注入 agent inbox，属下一轮再评估的改动。
