@@ -14,6 +14,10 @@ set out    [lindex $argv 2]
 set ltx    [lindex $argv 3]
 set pname  [lindex $argv 4]
 set trig   [lindex $argv 5]
+# 2026-11-20 修：Vivado 2023.1 里 TRIGGER_COMPARE_VALUE 必须带撇号，`eq1` 会报
+#   [Designutils 20-614] No apostrophe specified；正确写法是 `eq1'b1`。
+#   改成第 7 个可选参数（默认 1'b1），1 bit 探针直接用默认值即可。
+set trigval [expr {[llength $argv] > 6 ? [lindex $argv 6] : "1'b1"}]
 if {$url eq "" || $out eq "" || $ltx eq "" || $pname eq ""} {
     error "usage: -tclargs <url> <cable|-> <out_csv> <ltx> <probe_name> [trigger_probe]"
 }
@@ -53,7 +57,7 @@ foreach p [get_hw_probes -of_objects $ila] { puts "ILA_PROBE: $p" }
 if {$trig ne "" && $trig ne "-"} {
     set p [get_hw_probes -quiet $trig -of_objects $ila]
     if {[llength $p] == 1} {
-        set_property TRIGGER_COMPARE_VALUE eq1 $p
+        set_property TRIGGER_COMPARE_VALUE "eq$trigval" $p
         if {[catch {run_hw_ila $ila; wait_on_hw_ila -timeout 10 $ila} e]} {
             puts "ILA_TRIGGER_TIMEOUT: $e -> trigger_now"
             run_hw_ila -trigger_now $ila
