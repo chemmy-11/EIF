@@ -1,11 +1,13 @@
 ---
 name: team-link-ops
-description: team-link 的巡检与协作工作流。两种模式：①自动化触发（DSH 自动化任务定时唤醒，一次触发=一次巡检，无事立即结束）②常驻值班（人守着，自循环退避）。含发现（tl-watch）、回复（tl-say）、证据搬运、排他锁与游标幂等、故障四分类与 issue 降级。
+description: team-link 的巡检与协作工作流。三种模式：①自动化触发（PC2：DSH 自动化任务定时唤醒，一次触发=一次巡检，无事立即结束）②常驻值班（人守着，自循环退避）③长任务/goal 轮次开场清收件箱（PC1：不配自动化任务，利用 goal 已有轮次，每轮约 2 秒）。含发现（tl-watch）、回复（tl-say）、证据搬运、排他锁与游标幂等、故障四分类与 issue 降级。
 ---
 
 # team-link-ops
 
-## 0. 两种模式，先认清你在哪个
+## 0. 三种模式，先认清你在哪个
+
+**PC2 用 A（自动化任务）；PC1 用 C（goal 轮次开场），不要给 PC1 配自动化任务**（原因见 §0.3）。B 只在人守着屏幕时用。
 
 | | 模式 A：自动化触发（PC2 用这个） | 模式 B：常驻值班（人守着） |
 |---|---|---|
@@ -47,6 +49,24 @@ degraded 就 tl-state.ps1 定位，30 秒修不好转 issue 并停表；idle 就
 不要 sleep 占位刷屏；不要在 idle 时反复 ping 对端。
 ```
 
+## 0.3 模式 C：长任务 / goal 模式（PC1 用这个）
+
+**PC1 不要配自动化任务。** DSH 调度器的投递目标是「一个已存在的会话」（`~/.dsh/storages/schedule.json` 里 `target.kind` 只出现过 `session`），指向正在跑长任务的那个会话，等于每隔几分钟往任务中间插一条输入：上下文被打断、token 白烧、长任务容易跑偏。
+
+PC1 本来就有自动轮次——goal 模式的自动续轮。所以不缺调度器，缺的只是**每轮开场看一眼收件箱**：
+
+```
+本轮开始先跑（约 2 秒）：
+  powershell -NoProfile -File <TL>\skills\team-link-ops\scripts\tl-watch.ps1 -Bundle <TL> -NoAdvance
+  - idle      -> 不做任何事，继续原任务；
+  - degraded  -> 跑 tl-state.ps1 记一行结论，继续原任务（不要因为通道问题停表）；
+  - new-tasks -> 先处理（读 state\tasks\<id>.json 的 history[0]，用 tl-say.ps1 回 TEAM-REPORT），
+                 全部成功后再 tl-watch.ps1 -Advance，然后继续原任务。
+```
+
+代价约 2 秒/轮；收益是 PC2 的消息在这个轮次的边界被消化掉，且**不打断任何长任务**。
+
+已知边界（如实记录）：goal 处于 idle 时没有轮次，积压会停在那里——此时靠 PC2 转 issue 兜底（见 prj-team-collab §5）。这个分工是对的：**等着被派活的一方需要随时响应，派活的一方不需要**。
 ## 1. 三个动作，别再多
 
 | 动作 | 命令 | 说明 |
@@ -112,6 +132,7 @@ powershell -NoProfile -File "$TL\tools\evidence_pull.ps1" -Remote "evidence:repo
 ## 7. 不要做
 
 - 不要 sleep 或空转命令"占位等待"；模式 A 里连循环都不该有。
+- **不要把自动化任务指向正在跑长任务/goal 的会话**（会中途插话打断任务）；PC1 走模式 C。
 - 不要在 `idle` 时回复对端或 ping 对端（互相打扰会烧两边 token）。
 - 不要在处理成功前 `-Advance`（会静默丢消息）。
 - 不要清 `state/tasks/`（唯一可复核的往来记录）、不要覆盖对端证据目录。
