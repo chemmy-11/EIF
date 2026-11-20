@@ -3,8 +3,8 @@ alias: 结论_cross_dsh-vivado实战问题与改进
 type: 结论
 摘要: dsh-vivado（Vivado 预设 + vivado-mcp 32 工具 + 技能包）在 prj12 离线 P0 会话中的实测问题清单：进程启动层 6 条、会话/后台作业 3 条、MCP 覆盖度 6 条、技能与预设文本 3 条、仓库 CI 1 条；每条给命令/输出证据、影响与改进建议；另附本会话时间账
 created: 2026-10-25
-updated: 2026-10-25
-状态: 实测记录（2026-10-24 会话取证，2026-10-25 整理）；P0 三条 + 技能两条 + CI 一条已于 2026-10-25 落地（§9），vivado-mcp 侧建议仍待上游
+updated: 2026-10-28
+状态: 实测记录（2026-10-24 会话取证，2026-10-25 整理）；P0 三条 + 技能两条 + CI 一条已于 2026-10-25 落地（§9）；vivado-mcp 四项 P1 已于 2026-10-28 以补丁 0005–0009 落地并真机验证（§10）
 related: "[[结论_cross_dsh-vivado插件包分发_2026-10-24]] · [[操作文档/阶段三_prj12_双板互联开工草案_2026-10-24]] · [[规划_cross_短期推进计划_2026-10-24]]"
 ---
 
@@ -324,6 +324,7 @@ Hold   WHS = +0.004 ns   THS = 0.000 ns
 |---|---|
 | 2026-10-25 | 建文：按 5 类（启动层/会话作业/MCP 覆盖度/技能文本/CI）整理 16 条实测问题 + 13 条改进建议 + 时间账 |
 | 2026-10-25 | 落地 §6 里属于本包与仓库 CI 的 6 条（P0×3、技能×2、CI×1），并解除对第三方 shell 插件的依赖；新增 §9 落地记录 |
+| 2026-10-28 | P0-1/P0-2 逐条复现（§1/§2 命令）+ P1 四项落地（补丁 0005–0009，工具面仍 32）+ P2 技能/文档收口 + CI 第 5 项正向证据 + docs 镜像跟随 vault 2026-10-27 迁移；新增 §10（含 34 min 真机长跑：30m08s / exit 0 / WNS +0.032） |
 
 ---
 
@@ -389,3 +390,88 @@ Hold   WHS = +0.004 ns   THS = 0.000 ns
 - `2025.2+` 档依旧没有任何实测；本次只保证"两档纪律同步"。
 - 本包新增脚本的**脱离式构建只验证到 6 秒的小 Tcl**（真实 34 min 实现段未在本轮重跑）。
 - persona 只点名 `vivado-probe.ps1` / `vivado-run.ps1` 两个脚本；`tcl-check.ps1` 出现在技能 §4 与 `docs/tools.md` §1，**没有**写进 persona（想让它进 persona 需再改一版并再重启一次，收益不抵成本，故留作可选项）。
+
+---
+
+## 10. 2026-10-28 落地记录（P0 复核 + P1 四项 + P2 收口 + CI 全绿）
+
+> 原则同 §9：只写**已经改进并验证**的项，每条给 before/after 数字与证据路径。
+> 证据根目录 `D:\FPGA\.tmp\dsh-vivado-20261028\`：`before_*`（改前取证）、`p1-1/`、`p1-2/`、`p1-3/`、`p1-4/`、`p1-4b/`、`p1-1-real/`（34 min 真机）、`kit-lead/`（渲染+校验）。
+> 本轮代码/补丁落在 `D:\dsh-vivado` + `D:\vivado-mcp\site`；`D:\FPGA` 侧只动 `scripts/ci_check.py`（第 5 项正向证据）、`docs/` 镜像迁移、`AGENTS.md`/`PITFALLS.md` 与临时目录。
+
+### 10.1 先修环境：MCP server 起不来 ⇒ 预设 0 工具
+
+| 项 | 内容 |
+|---|---|
+| 现象 | `py D:\vivado-mcp\mcp_ctl.py list` → `ModuleNotFoundError: No module named 'pywintypes'`；MCP server 起不来 ⇒ 会话里一个 `mcp__vivado__*` 都没有 |
+| 根因 | `D:\vivado-mcp\venv\Lib\site-packages\_mcp_pilot_paths.pth` 仍指向 2026-10-24 已迁走的 `…\.mcp-pilot\site`（该目录已不存在）⇒ `mcp` 包导入 `mcp.os.win32.utilities` 时找不到 pywin32 |
+| 修法 | 备份 `.bak-20261028` 后把 `.pth` 改指 `D:\vivado-mcp\site`（+ `win32` / `win32\lib` / `pythonwin` / `pywin32_system32`） |
+| after | `mcp_ctl.py list` = **32 行**；`doctor.ps1` 的 `mcp-import` / `mcp-tools` 由 WARN/FAIL 转 PASS（12 PASS / 1 WARN / 0 FAIL） |
+| 边界 | 这是**运行实例的环境修复**，不是 kit 改动；`site` 里 9 个补丁文件的 sha256 未变 |
+
+### 10.2 P0-1 / P0-2 复核（按 §1/§2 的命令逐条复现 persona 断言）
+
+| persona 断言（§6.1 片段） | 复现方式 | 实测 |
+|---|---|---|
+| `& vivado.bat -version` 静默失败 | `$o = & '…\vivado.bat' -version 2>&1; $LASTEXITCODE` | **exit=1、输出 0 字节** |
+| `cmd /c "<整串>"` 静默失败 | `cmd /c "…\vivado.bat -version" \| Out-String` | **exit=1、输出 0 字节** |
+| Start-Process + 参数数组可用 | `Start-Process -FilePath <bat> -ArgumentList @('-mode','batch','-source',…) -Wait -RedirectStandardOutput <console>` | **EXIT=0、banner=yes、TCL_OK 8.5.14** |
+| 直调 tclsh85t 报缺 DLL | `…\bin\unwrapped\win64.o\tclsh85t.exe`（无 PATH/TCL_LIBRARY） | **exit=-1073741515（0xC0000135）** |
+| PATH+TCL_LIBRARY 配方可用 | `PATH+=<Vivado>\lib\win64.o`、`TCL_LIBRARY=<Vivado>\tps\tcl\tcl8.5` | **TCLSH_OK 8.5.14** |
+| 轻量 Tcl 语法院禁 | `powershell -File tools\tcl-check.ps1 -Path <prj12 scripts>` | **8/8 `complete=1`、TCLCHECK_RESULT=PASS、Tcl 8.5.14** |
+| 探活脚本 | `powershell -File tools\vivado-probe.ps1` | **PROBE_RESULT=OK**（banner=yes、TCL_OK=yes、8.5.14、2023.1） |
+| 脱离式长构建启动器 | `powershell -File tools\vivado-run.ps1 -Source hello.tcl -Detach` | **RUN_RESULT=LAUNCHED、RUN_LAUNCHER=wmi-com、13 s 内 `BUILD_EXIT=0`** |
+
+**本轮纠正/新增的机器事实（已同步进 persona 两档、技能 §7、`docs/architecture.md`、PITFALLS #77/#78）**：
+
+1. **WMI 的 CIM 路由当天失效、COM 路由可用**：`Invoke-CimMethod -ClassName Win32_Process -MethodName Create` 对任何命令行恒 `ReturnValue=8`（`Get-CimInstance` 查询正常 ⇒ 不是引号问题）；同日**老式 COM 路由** `([wmiclass]'Win32_Process').Create($cmd)` 返回 `RV=0`，且实测目标进程在 `KILL_ON_JOB_CLOSE` 的 Job Object 关闭后 **+5/+15/+30 s 仍存活**（`COM_RESULT=ESCAPED`，`job_com_escape_probe.py`）。⇒ 启动链定为 `popen → wmi-com → wmi-cim → schtasks`。
+2. **schtasks 不能当长构建出口**：默认计划任务带 `IdleSettings{Duration=PT10M, StopOnIdleEnd=true}`、无 `ExecutionTimeLimit` 覆盖；本轮 34 分钟实现段用它跑到 **9m20s 被静默中止**（无 rc 文件、日志停在 `place_design Phase 3.2`、没有 `Exiting Vivado` 行）。降为最后兜底。
+3. **MCP Python SDK 的 `stdio_client` 会给 server 建 `KILL_ON_JOB_CLOSE` 的 Job Object**（`mcp/os/win32/utilities.py`）：`DETACHED_PROCESS` 起的"脱离子进程"在 server 退出后 **1.8 s 即死**；必须先按 `QueryInformationJobObject(NULL)` 的 `LimitFlags & 0x2000` 判，再决定走哪条出口。
+
+### 10.3 P1：vivado-mcp 四项（补丁 0005–0009；工具面仍 32）
+
+| 项 | 改前 | 改后 | 证据 |
+|---|---|---|---|
+| P1-1 `run_tcl` 脚本文件脱离式 | 参数 5 个；会话内阻塞调用超时（5 s 探针）后**下一条命令直接被拒**"上一条仍在执行"；30 min 预算 < 34 min 实现 | 参数 **10 个**（`script_path`/`background`/`log_file`/`stdout_tail_bytes`/`job_id`）；脚本走独立进程、`job_id` 只读查询；默认路径逐字节不变 | `p1-1/`（2 min 140 s / 13 min 810 s / 34 min 见 §10.4） |
+| P1-2 `check_bitstream_readiness` | prj12（checkpoint 式流程）→ `BLOCK 未完成布线(Not started)`，而位流 `out/aurora_mem_bridge.bit` **10 303 552 B 已在盘**；run 名写错 → `[ERROR] [DEGRADED]` | 新 `dcp_path`/`run_name`；run 不存在 → **`N/A（不适用）`** + 原因 + 3 条替代；run 存在路径逐字节不变 | `p1-2/`（真机 44/44 断言 PASS） |
+| P1-3 `get_timing_report` | 7.8 MB 报告 → **204 664 B / 2 172 行**（540 条关键路径全打） | `include_paths=False` → **555 B / 12 行**；`max_paths=5` → 2 468 B + "还有 535 条未显示"；默认输出 sha256 与改前相同 | `p1-3/` |
+| P1-4 `xdc_lint` 良性族 | prj12 顶层 XDC → **109 条 MISSING_IOSTANDARD** 无分组（GT refclk T6/T5 + DDR4 107 脚） | 表头 `WARN (109 warnings: 109 known-benign)` + `阻断判定: 不阻断`；负向对照 `{led[0]}` → `阻断（1 条非良性）`；条数 109 == 109 | `p1-4/` |
+| P1-4b `xdc_auto_fix` | `dry_run=False` **真写 109 行 IOSTANDARD**（首行 `set_property IOSTANDARD LVCMOS33 [get_ports {gt_refclk_p}]`，坑 #20 反面） | `补丁 109→0 / 跳过 0→109`；`{led[0]}` 仍 1 条、真写仍正确 | `p1-4b/` |
+| P1-5 仓库 CI 第 5 项 | `[跳过] tclsh 不可用，跳过 Tcl 语法检查`（直到 commit `e6101c8` 才修） | **321 个 `.tcl` 全部用 Vivado 自带 `tclsh85t.exe`（Tcl 8.5.14）跑 `info complete`**；`ci_check.py` 新增 `[信息]` 行把解释器与数量打出来（正向证据不再无声） | `ci_after_ci_edit.txt` |
+
+### 10.4 P1 真机长跑：34 分钟实现段（§3.3 的核心诉求）
+
+| 项 | 实测 |
+|---|---|
+| 载体 | `run_tcl(script_path=impl_real.tcl, background=true, log_file=…)`：job `tcljob-20261028-180508-f7b470`，跑 `prj/project_12/scripts/pre_impl_debug.dcp`（产物全落 `.tmp`，prj12 的 RTL/位流/文档零改动） |
+| 启动 | 返回 **0.6 s**，`launcher=wmi-com`，pid 33336 |
+| 存活 | 客户端 A 与它的 MCP server 退出后 **+20 s / +40 s** 存活；此后每 2 min 用全新 server 按 `job_id` 查，**跨 11 min / 20.9 min / 31 min 三个原死亡点均未被杀**（对比：schtasks 版在同一条流上 9m20s 死） |
+| 结束 | +1861 s **finished / exit 0**（rc 文件内容 `0`）；收尾 `tasklist` 无 vivado |
+| 构建时长 | `REAL_IMPL_START 18:05:16` → `REAL_IMPL_OK 18:35:24` = **30m08s**，> `toolCallTimeoutMs`（30 min）⇒ 旧的阻塞式 `run_tcl` 必超时，新形态不受影响 |
+| 日志/产物 | log **227 243 B**；`IMPL_GATE: directive=ExtraTimingOpt WNS=0.032 WHS=0.004`（与 §3.4 的真实口径一致）；`rpt_impl_timing_summary.rpt` 7 801 099 B、`rpt_impl_util.rpt` 15 844 B |
+| 已知瑕疵 | `wmi-com` 路径下包装器的 `console` 重定向为空文件（0 B）——以 Vivado `-log` 为准；sidecar 的 `task_name` 字段在非 schtasks 路径下仍是空串占位（不影响状态查询） |
+
+### 10.5 P2：技能与文档（4 项）
+
+| 项 | 改前 | 改后 |
+|---|---|---|
+| 板卡不在场离线流程 | `vivado-workflow-discipline` §8 只有 4 条 bullet；`hw-ila-debug`/`hw-vio-debug` 不含任何"无板"指引 | §8 拆 5 子节（分层表 / 6 条 dry-run 约定 / 负向对照三列表 N1–N3=PASS/FAIL/FAIL / 4 组措辞表 / 替代路径）；两个 `hw-*` 技能各加 1 行指回 §8（官方方法步骤未动），并把 description 里的"已配置 32 工具"事实句改成条件句 |
+| 工具清单表 | `docs/tools.md` 只有上游 0.3.26 签名 | 按 P1 新参数更新；`run_tcl` 三形态表（内联 / `script_path` 脱离式 / `job_id` 查询）+ 启动链与 schtasks 陷阱；"按主形态计数、总数仍 32" 口径写明 |
+| 报告 vs 即时查询交叉核对 | 只在 §9 一条 bullet | 写进 §1 固定步骤第 5 步"数字必须双源"，带 prj12 真实反例（`-delay_type min_max -max_paths 1` = 0.004 vs 报告 Setup WNS +0.032） |
+| 门禁 | — | `gen_skills_manifest.py`（sha256 `c01a3a9b…`，8 技能）与 `--check`；`make_template.py --check`；两档 `render_patch.ps1` + `validate_patch.py` 均 PASS；`accept_all.py --only static` **9/9**，`[GUARD] live profile UNCHANGED` |
+
+### 10.6 CI 与门禁（本轮全绿）
+
+- **第 5 项**：从"永远 SKIP"变成真门禁（321 个 `.tcl`、Tcl 8.5.14）。
+- **镜像门禁**：vault 在 2026-10-27 做了文档治理迁移（`操作文档/` 历史件 → `操作文档/阶段一至阶段三/` 并批量改写路径型 wikilink），docs/ 滞后 ⇒ 改前 **68 篇未登记 + `agent.md` 镜像不一致**。本轮按 vault 结构把 `docs/` 跟随过去（**35 个文件 `git mv` + 33 篇内容按归一规则同步 + 索引/链接同步**），结果：`94 篇；归一后相等 86 篇；白名单豁免 8 篇；未登记 0 篇`。
+- `py scripts\ci_check.py` → **PASS（全部检查通过）**，2745 个已跟踪文件。
+- `doctor.ps1`（全量）→ **12 PASS / 1 WARN / 0 FAIL**；`mcp-patches` **10/10 内容标记**（本轮把 0005–0009 的探针加进去，之前只验 0001–0004 的 5 个）。
+
+### 10.7 仍未解决 / 未做（如实挂账）
+
+1. **§2.3 的外部 `^C` 归因仍未定**（两次：impl DRC 阶段 / xelab）。本轮新增一次"静默中止"已定因为 **schtasks 默认 `IdleSettings`**（不是 `^C`），但 2026-10-24 那两次仍无触发源证据。
+2. **`win_bash` 相关断言（§1.1 / §1.4）无法在本会话复现**：当前会话没有 `win_bash` 工具（第三方 shell 插件已禁用/不在），因此"`cmd //c vivado.bat` 会杀掉持久 bash"只能引用原记录，不能标注为本轮实测。
+3. **`xdc_auto_fix` 在 `dry_run=False` 且 0 补丁时表头仍印 `DRY-RUN(仅预览,未写盘)`**（工具层 0 补丁短路导致，`diagnostic_tools.py:776`）；"未写盘"已用 sha256 不变 / 无 `.bak` / 0 行 IOSTANDARD 三重证明，措辞属观感问题，未改（会牵动 0006 基线文件）。
+4. **2025.2+ 档仍无实测**：本轮只保证两档纪律同步 + 渲染/结构校验 PASS。
+5. **会话内 `stdout_tail_bytes` 的真机会话实测**只有函数级 + 离线断言，未在活会话里跑（避免多占一次 Vivado 全局串行）；`run_tcl` 新参数的"真机会话形态"仍以 §10.4 的脚本文件形态为主要证据。
+6. **`run_tcl` 的 `job_id` sidecar 里 `task_name` 字段**在非 schtasks 路径下为空串占位（不影响状态），属小瑕疵。

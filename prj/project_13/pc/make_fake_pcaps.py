@@ -6,7 +6,7 @@ N1 正常帧      cap == ip.len + 14            -> 审计应 PASS
 N2 截断帧      cap <  ip.len + 14（短 64 B）  -> 审计应 FAIL（判据1）
 N3 ARP 帧      以太类型 0x0806                -> 审计应 FAIL（判据3）
 
-输出目录由 --outdir 指定（默认 .tmp\dryrun-<today>），文件名 fake_*.pcap。
+输出目录由 --outdir 指定（默认 .tmp\\dryrun-<today>），文件名 fake_*.pcap。
 """
 import argparse
 import os

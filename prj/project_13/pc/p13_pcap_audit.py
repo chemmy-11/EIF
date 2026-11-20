@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """p13_pcap_audit.py — prj13 V4 字节级审计（classic pcap，无第三方依赖）
 

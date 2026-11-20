@@ -60,6 +60,9 @@ DOCS = ROOT / "docs"
 FAILS: list[str] = []
 SKIPS: list[str] = []
 HINTS: list[str] = []
+# 正向证据（2026-10-28 增补）：检查项「跑过且通过」不该是无声的——第 5 项曾长期
+# 因 tclsh 探不到而静默 SKIP，改成能探测后也要能一眼看到「用了哪个解释器、验了几个文件」。
+INFOS: list[str] = []
 
 
 def tracked_files() -> list[Path]:
@@ -98,8 +101,33 @@ SEG_HEAD = re.compile(r"^阶段[一二三四五](前置)?(之[一二三四五六
 M_FULL = re.compile(r"^M[1-4]_(prj12|GSnFPipe)_.+_\d{4}-\d{2}-\d{2}\.md$")
 
 
+NAMING_ALLOWLIST = ROOT / "scripts" / "naming_allowlist.json"
+
+
+def _load_naming_allowlist() -> set[str]:
+    """可选侧文件 scripts/naming_allowlist.json：{"entries": [{path, reason, since}]}。
+
+    只豁免**外部交付的冻结件**：内容已按 SHA256 冻结、且被多方按原名引用，
+    改名会破坏引用链与哈希台账。reason 为空 = 未登记（不生效）。
+    与 mirror_allowlist.json 同一纪律：白名单是例外，不是默认。
+    """
+    if not NAMING_ALLOWLIST.is_file():
+        return set()
+    try:
+        data = json.loads(NAMING_ALLOWLIST.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    out: set[str] = set()
+    for e in data.get("entries", []):
+        p = str(e.get("path") or "").replace("\\", "/")
+        if p and str(e.get("reason") or "").strip():
+            out.add(p)
+    return out
+
+
 def check_doc_names(files: list[Path]) -> None:
     bad = []
+    naming_exempt = _load_naming_allowlist()
     for f in files:
         rel = f.relative_to(ROOT).as_posix()
         # 规范只约束仓库根的 docs/ 文档中心；工程内部 docs/（PROGRESS.md 等）不受约束
@@ -107,6 +135,8 @@ def check_doc_names(files: list[Path]) -> None:
             continue
         if f.name in ("README.md", "agent.md"):
             continue  # 目录级索引与会话入口豁免
+        if rel in naming_exempt:
+            continue  # 外部交付冻结件（见 scripts/naming_allowlist.json，逐条带理由）
         if "对齐" in f.parent.name and re.match(r"^0[0-6]_", f.name):
             continue  # 对齐包子件（00~06 编号式，2026-10-26 终案目录级约定）
         name = f.name
@@ -261,6 +291,14 @@ def check_tcl(files: list[Path]) -> None:
         SKIPS.append(f"tclsh 不可用（PATH 与 Vivado 自带 tclsh 都没探到）：跳过 Tcl 语法检查{detail}")
         return
     bad = []
+    patchlevel = ""
+    try:
+        probe = subprocess.run([str(tclsh)], input="puts [info patchlevel]\n",
+                               capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", env=tcl_env, timeout=60)
+        patchlevel = (probe.stdout or "").strip().splitlines()[-1] if probe.stdout else ""
+    except Exception:  # noqa: BLE001 - 拿不到版本不影响语法门禁本身
+        patchlevel = ""
     for f in targets:
         script = f'if {{![info complete [read [open {{{f.as_posix()}}} r]]]}} {{exit 1}}'
         r = subprocess.run([str(tclsh)], input=script, capture_output=True, text=True,
@@ -269,6 +307,12 @@ def check_tcl(files: list[Path]) -> None:
             bad.append(f.relative_to(ROOT).as_posix())
     if bad:
         FAILS.append("Tcl 脚本不完整（引号/括号未闭合）:\n    " + "\n    ".join(bad))
+    else:
+        used = "Vivado 自带" if tclsh.parent.name.startswith("win64") else "PATH"
+        INFOS.append(
+            f"Tcl 语法：{len(targets)} 个 .tcl 全部通过 info complete"
+            f"（解释器 {used} {tclsh}，Tcl {patchlevel or '未知'}）"
+        )
 
 
 # ---------- 6. docs/README.md 索引与磁盘一致性 ----------
@@ -1002,6 +1046,8 @@ def main() -> int:
 
     for h in HINTS:
         print(f"  [提示] {h}")
+    for info in INFOS:
+        print(f"  [信息] {info}")
     for s in SKIPS:
         print(f"  [跳过] {s}")
     if FAILS:

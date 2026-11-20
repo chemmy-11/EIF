@@ -49,6 +49,42 @@
       "kind": "docs-only",
       "reason": "仓库侧原创件，vault 无对应文件：全库无同名文件、无同内容文件（按 `2026.1 工作交接`/`microblaze_0_local_memory` 全文检索只命中本 docs 文件与无关的 elab 日志）；vault 内同名阶段的文档是另一篇（`操作文档/阶段一_prj1_Vitis环境与MicroBlaze软核_2026-08-04.md`，已镜像且字节相等）。",
       "since": "2026-10-24"
+    },
+    {
+      "path": "proposals/M1_prj12_prj13_下一轮实施方案_2026-11-17.md",
+      "kind": "docs-only",
+      "reason": "A 组方案提案，2026-11-17 由 PC1 侧写入 EIF docs/ 供跨会话取用；vault 侧按三层分层不复制提案类子目录（对应内容以 vault 根的同名任务书为载体）。",
+      "since": "2026-11-20"
+    },
+    {
+      "path": "proposals/M1_prj12_prj13_实施方案_issue摘要_2026-11-17.md",
+      "kind": "docs-only",
+      "reason": "同上提案的 issue 摘要版，供投递交付仓；vault 侧不收录摘要件。",
+      "since": "2026-11-20"
+    },
+    {
+      "path": "proposals/README.md",
+      "kind": "docs-only",
+      "reason": "proposals/ 目录的组织说明（docs 侧分类目录自述）；vault 无此子目录，故无对应物。",
+      "since": "2026-11-20"
+    },
+    {
+      "path": "refs/J0_GPP2_线格式冻结验证报告_2026-11-16.md",
+      "kind": "docs-only",
+      "reason": "B 组 J0 交付件（2026-11-16，内容已按 SHA256 冻结并被 proposals/与任务书按原名引用）；vault 侧只保留入口与现行件，不复制外部交付冻结件。",
+      "since": "2026-11-20"
+    },
+    {
+      "path": "refs/protocol_v2_GPP2.md",
+      "kind": "docs-only",
+      "reason": "J0 GPP2/v1 线格式冻结文本（FROZEN v1.0，2026-11-16，SHA256 已随验证报告登记）；同属外部交付冻结件，vault 不复制。",
+      "since": "2026-11-20"
+    },
+    {
+      "path": "refs/README.md",
+      "kind": "docs-only",
+      "reason": "refs/ 目录的组织说明与冻结件哈希台账；vault 无此子目录。",
+      "since": "2026-11-20"
     }
   ],
   "updated_at": "2026-10-26"
