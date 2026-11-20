@@ -40,6 +40,18 @@
                        `scripts/render_agent_skills_block.py` 从 MANIFEST 渲染）与
                        `docs/agent.md` 脱敏镜像都必须与 MANIFEST 一致 —— 直接跑渲染器的
                        `--check`，rc≠0 即 FAIL（不复制渲染逻辑，避免两处实现漂移）。
+ 13. 证据目录规范      `prj/project_<N>/[out/]evidence_<YYYYMMDD|YYYY-MM-DD>_<topic>/` 须含
+                       `README.md` + `SHA256SUMS.txt`，且**清单与磁盘一致**（列了不存在 → FAIL；
+                       有文件没登记 → FAIL；README/SHA256SUMS 两个元文件两侧都不参与比对）。
+                       **向前强制**：只对目录名日期 ≥ 2026-11-19 的目录 FAIL，更早的只报 [提示]——
+                       规范化落地前的历史目录回溯补写等于篡改历史记录，只要求"可见可盘"。
+                       注：证据目录在 `.gitignore` 内，故本检查扫磁盘，远程 CI 上自然跳过（本地专用）。
+
+命名轴（检查 1）：
+  · 阶段轴（单板时代，封存）  `阶段[一二三四五](前置)?(之N)?`
+  · M 轴（导师方案里程碑）    `M[1-4]_(prj12|GSnFPipe)_*_日期.md`
+  · 组轴（2026-11-20 新增）   `(A[0-5]|B[0-4]|J[0-3])_*_日期.md`
+    导师把工作拆成 A 组（FPGA 工程侧）/ B 组（PP 软件侧）/ J 组（A↔B 接口与联调）。
 
 用法：py scripts/ci_check.py    （在仓库根目录运行）
 退出码：0 = 全过；1 = 有失败项
@@ -99,6 +111,11 @@ SEG_HEAD = re.compile(r"^阶段[一二三四五](前置)?(之[一二三四五六
 # M 轴（2026-10-26 终案）：GSnFPipe 时期 M<N>_prj标识_概要_日期，如 M1_prj12_xxx_2026-10-28。
 # 按全名匹配（head 只取到 "M1"，head 级检查永不过命——2026-10-26 DSH 复查 P0-1）
 M_FULL = re.compile(r"^M[1-4]_(prj12|GSnFPipe)_.+_\d{4}-\d{2}-\d{2}\.md$")
+# 组轴（2026-11-20 新增）：导师方案把工作拆成 A 组（FPGA 工程侧）/ B 组（PP 软件侧）/
+# J 组（A↔B 接口与联调），里程碑按组内序号走。落地件形如 `J0_GPP2_线格式冻结验证报告_2026-11-16.md`、
+# `B1_xxx_2026-11-16.md`、`A2_xxx_2026-11-19.md`。同样按全名匹配（避免 head 级过宽命中）。
+# 序号上界取各线已登记的里程碑数（A0–A5 / B0–B4 / J0–J3，见交付仓 issue #31 进度跟踪）。
+GROUP_FULL = re.compile(r"^(A[0-5]|B[0-4]|J[0-3])_.+_\d{4}-\d{2}-\d{2}\.md$")
 
 
 NAMING_ALLOWLIST = ROOT / "scripts" / "naming_allowlist.json"
@@ -144,7 +161,8 @@ def check_doc_names(files: list[Path]) -> None:
         ok = (
             " " not in name
             and re.search(r"_\d{4}-\d{2}-\d{2}\.md$", name) is not None
-            and (head in ALLOWED_HEAD or SEG_HEAD.match(head) is not None or M_FULL.match(name) is not None)
+            and (head in ALLOWED_HEAD or SEG_HEAD.match(head) is not None or M_FULL.match(name) is not None
+                 or GROUP_FULL.match(name) is not None)
         )
         if not ok:
             bad.append(str(f.relative_to(ROOT)).replace("\\", "/"))
@@ -1021,6 +1039,91 @@ def check_agent_skills_block() -> None:
     )
 
 
+# ---------- 13. 证据目录规范 ----------
+# 2026-11-20 新增。口径见 docs/README.md「证据目录规范」：
+#   prj/project_<N>/out/evidence_<YYYYMMDD|YYYY-MM-DD>_<topic>/ 必须含 README.md + SHA256SUMS.txt，
+#   且 SHA256SUMS 列出的路径必须存在、目录内文件必须全部被登记（清单与磁盘一致）。
+# 向前强制：只对「目录名日期 >= EVIDENCE_MIN_DATE」的目录 FAIL；更早的只报 [提示]。
+# 理由：现存 19 个历史证据目录里有一半是规范化之前建的，回溯补写等于篡改历史记录；
+# 规范化从落地日开始要求，历史件只求"可见、可盘"。
+EVIDENCE_MIN_DATE = (2026, 11, 19)
+EVIDENCE_NAME = re.compile(r"^evidence_(\d{4})-?(\d{2})-?(\d{2})")
+
+
+def check_evidence_dirs() -> None:
+    # 证据目录在 .gitignore 内（不入库），因此只能扫磁盘；远程 CI 上没有这些目录 → 自然跳过。
+    # 这也意味着本检查是「本地专用」，与检查 7–12 同类。
+    candidates: list[Path] = []
+    for base in sorted(ROOT.glob("prj/project_*")):
+        for sub in sorted(base.glob("*")):
+            if sub.is_dir() and EVIDENCE_NAME.match(sub.name):
+                candidates.append(sub)
+        out = base / "out"
+        if out.is_dir():
+            for sub in sorted(out.glob("*")):
+                if sub.is_dir() and EVIDENCE_NAME.match(sub.name):
+                    candidates.append(sub)
+    bad: list[str] = []
+    legacy: list[str] = []
+    ok = 0
+    for d in candidates:
+        m = EVIDENCE_NAME.match(d.name)
+        if not m:
+            continue
+        rel = d.relative_to(ROOT).as_posix()
+        ymd = tuple(int(x) for x in m.groups())
+        sums = d / "SHA256SUMS.txt"
+        readme = d / "README.md"
+        if ymd < EVIDENCE_MIN_DATE:
+            if not (sums.is_file() and readme.is_file()):
+                legacy.append(rel)
+            continue
+        problems: list[str] = []
+        if not readme.is_file():
+            problems.append("缺 README.md")
+        if not sums.is_file():
+            problems.append("缺 SHA256SUMS.txt")
+        else:
+            listed: set[str] = set()
+            for line in sums.read_text(encoding="utf-8", errors="replace").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split(None, 1)
+                if len(parts) != 2:
+                    problems.append(f"SHA256SUMS 行格式异常：{line[:60]}")
+                    continue
+                listed.add(parts[1].strip().lstrip("*").replace("\\", "/"))
+            # README.md / SHA256SUMS.txt 是元文件，两侧都不参与比对（老清单常把 README 也登记进去）
+            listed -= {"README.md", "SHA256SUMS.txt"}
+            actual = {
+                q.relative_to(d).as_posix()
+                for q in d.rglob("*")
+                if q.is_file() and q.name not in ("README.md", "SHA256SUMS.txt")
+            }
+            missing = sorted(listed - actual)
+            unlisted = sorted(actual - listed)
+            if missing:
+                problems.append("SHA256SUMS 列了不存在的文件：" + ", ".join(missing[:5]) + (" …" if len(missing) > 5 else ""))
+            if unlisted:
+                problems.append("未登记进 SHA256SUMS：" + ", ".join(unlisted[:5]) + (" …" if len(unlisted) > 5 else ""))
+        if problems:
+            bad.append(rel + "  → " + "；".join(problems))
+        else:
+            ok += 1
+    if ok:
+        INFOS.append(f"证据目录规范：{ok} 个目录合规（README + SHA256SUMS 且清单与磁盘一致）")
+    if legacy:
+        HINTS.append(
+            f"证据目录（{EVIDENCE_MIN_DATE[0]}-{EVIDENCE_MIN_DATE[1]:02d}-{EVIDENCE_MIN_DATE[2]:02d} 前，只报不拦）："
+            f"{len(legacy)} 个缺 README/SHA256SUMS —— " + ", ".join(legacy[:6]) + (" …" if len(legacy) > 6 else "")
+        )
+    if bad:
+        FAILS.append(
+            "证据目录不合规范（须含 README.md + SHA256SUMS.txt，且清单与磁盘一致）：\n    " + "\n    ".join(bad)
+        )
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):  # 中文 + → 在 GBK 管道下会 UnicodeEncodeError
         try:
@@ -1036,6 +1139,7 @@ def main() -> int:
     check_ps1_bom(files)
     check_tcl(files)
     check_docs_index()
+    check_evidence_dirs()
     # ---- 本地专用（vault 不存在时整段跳过）----
     check_skills_manifest()
     check_skills_references()
