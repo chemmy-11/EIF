@@ -24,7 +24,8 @@ param(
   [switch]$NoAdvance,
   [switch]$Lock,
   [int]$LockStaleMinutes = 10,
-  [switch]$Advance
+  [switch]$Advance,
+  [switch]$Quiet
 )
 $ErrorActionPreference = 'Stop'
 
@@ -56,7 +57,7 @@ if ($Lock) {
     $fs.Write($b, 0, $b.Length); $fs.Close()
     $lockHeld = $true
   } catch {
-    Write-Host 'FAIL 另一个巡检正在运行（lock 被占用），本次跳过，避免重复处理同一批任务'
+    if (-not $Quiet) { Write-Host 'FAIL 另一个巡检正在运行（lock 被占用），本次跳过，避免重复处理同一批任务' }
     if ($Json) { '{"verdict":"locked"}' }
     exit 11
   }
@@ -121,7 +122,9 @@ foreach ($t in ($newTasks | Select-Object -Last 5)) {
 $channelsOk = $a2aUp -and $mcpUp -and $peerTcp
 $verdict = if (-not $channelsOk) { "degraded" } elseif ($newTasks.Count -gt 0) { "new-tasks" } else { "idle" }
 
-if ($Json) {
+if ($Quiet) {
+  # 只留退出码、不输出任何字符：goal 每轮省 token
+} elseif ($Json) {
   ([pscustomobject]@{
     time = (Get-Date).ToString("s")
     role = [string]$cfg.role

@@ -20,21 +20,37 @@ description: team-link 的巡检与协作工作流（PC1 主导，两侧都用 g
 
 ## 0.1 主模式：goal 模式（两侧都走这个）
 
-DSH 的 goal 会**自动续轮**——这就是「时刻活跃」的来源，不需要调度器、也不需要常驻会话。每轮开场做一件事（约 2 秒）：
+DSH 的 goal 会**自动续轮**——这是「时刻活跃」的来源。但**每续一轮都要重载整段会话历史**，所以「用多密的轮次去等」直接决定 token 成本。
+
+### 每轮开场：先阻塞等，不要先轮询
 
 ```powershell
-powershell -NoProfile -File <TL>\skills\team-link-ops\scripts\tl-watch.ps1 -Bundle <TL> -NoAdvance
+# 一个 turn 覆盖最多 5 分钟的等待：等到了才醒，等不到就到点返回
+powershell -NoProfile -File <TL>\skills\team-link-ops\scripts\tl-wait.ps1 -Bundle <TL> -TimeoutSec 300 -Quiet
 ```
 
-| verdict | 做法 |
-|---|---|
-| `idle` | 不做任何事，继续本任务的实际工作 |
-| `degraded` | 跑 `tl-state.ps1` 记一行结论，继续工作（通道问题不停表） |
-| `new-tasks` | 先处理（读 `state\tasks\<id>.json` 的 `history[0]`，用 `tl-say.ps1` 回 TEAM-REPORT），**全部成功后** `tl-watch.ps1 -Advance`，再继续工作 |
+| 退出码 | 含义 | 本轮做什么 |
+|---|---|---|
+| `0` | 等到新任务 | 处理（读 `state\tasks\<id>.json` 的 `history[0]`）→ `tl-say.ps1` 回 TEAM-REPORT → **全部成功后** `tl-watch.ps1 -Advance` |
+| `3` | 超时仍无新任务 | 不做任何事，继续本任务；本任务已无可推进则收尾（见下方空转禁令） |
+| `2` | 本机通道断 | 跑 `tl-state.ps1` 定位；30 秒修不好转 issue |
+
+**成本对照（同样的等待，turn 数差 5–10 倍）**
+
+| 做法 | 每小时 turn 数 | 评价 |
+|---|---|---|
+| 每 1 分钟 `tl-watch` | ~60 | 最贵，不要这样 |
+| 每 2 分钟 `tl-watch` | ~30 | 仍贵 |
+| **`tl-wait` 阻塞 5 分钟** | **~12** | 推荐 |
+| `tl-wait` 阻塞 10 分钟 | ~6 | 更省，但响应上界也变成 10 分钟 |
+
+`tl-wait` 是**有界阻塞**（脚本内部轮询本地 `state\tasks\`），不是 agent 侧的 sleep 循环——它不占额外轮次，也不会推进游标。
+
+> 若上一轮已经处理完全部任务，本轮也可以直接跑一次 `tl-watch.ps1 -Quiet` 快速确认（约 2 秒），拿到退出码就走，不做任何输出。
 
 ### goal 不能空转（硬规则）
 
-连续 **3 轮** `idle` 且本任务已无其它可推进项，**不要再续轮**：
+连续 **3 轮**没有等到新任务（用 `tl-wait -TimeoutSec 300` 时约等于 **15 分钟**无消息），且本任务已无其它可推进项，**不要再续轮**：
 
 - PC1：把当前结论写进 issue，结束 goal 或转为等人工；
 - PC2：在 issue 留一句「待令中 + 末态」，结束 goal。
@@ -61,7 +77,8 @@ degraded 就 tl-state 定位；idle 就退避（10min 起，连续 3 轮 idle �
 
 | 动作 | 命令 | 说明 |
 |---|---|---|
-| **发现** | `tl-watch.ps1 -Lock -NoAdvance -Json` | 本机双通道 + 对端身份 + 自上次新增任务。退出码 `0=idle / 10=new-tasks / 2=degraded / 11=被锁挡住` |
+| **等**（首选） | `tl-wait.ps1 -TimeoutSec 300 -Quiet` | 有界阻塞，等到新任务才醒。退出码 `0=等到 / 3=超时 / 2=通道断` |
+| **发现**（快查） | `tl-watch.ps1 -NoAdvance -Quiet` | 立即返回，只给退出码。`0=idle / 10=new-tasks / 2=degraded / 11=被锁挡住` |
 | **回复** | `tl-say.ps1 -Text "TEAM-REPORT ..."` | 走 peer.a2aUrl + peer-a2a.token 发给对端；`0` 已送达、`2` 通道不可用、`5` 认证失败 |
 | **收尾** | `tl-watch.ps1 -Advance` | 只在**全部处理成功后**推进游标 |
 
