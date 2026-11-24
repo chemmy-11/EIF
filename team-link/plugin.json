@@ -1,7 +1,7 @@
 {
   "id": "dsh-vivado-team-link",
   "name": "dsh-vivado-team-link",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "kind": "optional-bundle-fragment",
   "parentBundle": "dsh-vivado@0.2.4",
   "installMode": "optional",
@@ -9,7 +9,7 @@
   "summary": "PC1<->PC2 协作层（A2A + MCP 双通道 + issue 回退），PC2 为同等权限组员。",
   "requires": {
     "node": ">=20",
-    "dsh": ">=0.2.2-rc.1",
+    "dsh": ">=0.2.2-rc.5",
     "powershell": ">=5.1"
   },
   "hostPlugin": {
@@ -28,6 +28,9 @@
       "TEAM_LINK_MCP_TOKEN",
       "TEAM_LINK_PEER_A2A_TOKEN",
       "TEAM_LINK_PEER_MCP_TOKEN"
+    ],
+    "inject": [
+      "tools"
     ]
   },
   "clientPlugin": {
@@ -68,7 +71,9 @@
       }
     ],
     "skills": [
-      "prj-team-collab"
+      "prj-team-collab",
+      "team-link-setup",
+      "team-link-ops"
     ],
     "scripts": [
       "tools/collab_status.ps1",

@@ -44,8 +44,8 @@ team-link/                 # EIF 仓内路径（本插件不并入 dsh-vivado ki
     apply-selftest.mjs     # 宿主半边离线自测（在临时目录里跑 apply()，不碰真 state/）
   skills/
     prj-team-collab/SKILL.md   # 角色 / 发令回报格式 / 证据目录 / 硬件约定 / issue 回退
-    team-link-setup/           # 换网段/装机的诊断与地址同步（scripts/tl-state.ps1, tl-sync.ps1）
-    team-link-ops/             # 值班与工作流（scripts/tl-watch.ps1）
+    team-link-setup/         # 装机与换网段（scripts/tl-state.ps1 诊断、tl-sync.ps1 同步地址）
+    team-link-ops/           # 工作流（scripts/tl-recv.ps1 原子收件、tl-say 回复、tl-watch/tl-wait 兼容保留）
   templates/
     PC2_上线清单.md        # PC2 上线 checklist（本插件最终交付物之一）
     AgentCard.template.json
@@ -425,6 +425,26 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
 
 ## 10. 版本
 
+
+0.3.3 —— **收件模型重做（「PC1 收不到 PC2 消息」的根治）**：
+
+- **新增 `skills/team-link-ops/scripts/tl-recv.ps1`**：一条命令完成「找新消息 → 打印正文 → 记 delivered」，
+  按 **task id 账本**（`state/ops-ledger.json`）记账而非文件修改时间，从结构上消除三类缺陷：
+  游标竞态（处理期间到达的消息被 `-Advance` 一起跳过）、看一眼即算已读、备份还原后历史消息整体复活。
+  退出码重排：**0=有消息（对端不通只加一行 WARN）**、3=无消息、2=无消息且本机服务没监听。
+  两态账本：`delivered` 超过 10 分钟未 `done` 会带「未确认完成」重报，agent 被打断不丢。
+- **宿主半边加收件箱桥**（`lib/index.js` 的 `startInboxBridge`）：把落盘的新任务推进 agent 收件箱
+  （`ctx.agents.list()` + `agent.inbox.prepend('next-step', …)`），使 agent **不必等轮次**即可被唤醒。
+  message 形状按候选依次试探、第一个不抛错的锁定；全部失败自我停用并记原因；`TEAM_LINK_NO_INBOX_BRIDGE=1` 可关。
+- **服务端**：任务落盘改**原子写**（tmp + rename，避免读方看到半截 JSON）；初始状态由 `completed` 改为
+  **`submitted`**（已收下、未处理），不再把「服务端回执」谎报成「已办」。
+- **安装器**：新增 `tools/version-check.ps1` 并在注册前预检——`dsh-mcp-client` 的精确钉版与 dsh 运行时不符时
+  **中止注册**并打印升级命令（不兼容的行在 nightly 上会让整个宿主起不来）。判据用卸载器 exe 的 `ProductVersion`。
+- **技能**：`team-link-ops` 重写——主流程改为 `tl-recv`；**删除「连续 3 轮没消息就收尾」**（它会让 agent 在
+  对端正常干活时主动停止收听）；补宿主 `pwsh` 超时契约、静默两分（通道问题 vs 正常工作）、PowerShell 变量名大小写陷阱。
+- 其余：`tl-watch` 摘要改取 `history[0]` 正文（不再显示无信息的 `[ack]`）；`tl-say` 措辞改为「已落盘（不代表对端 agent 已读）」；
+  `plugin.json` 的 `provides.skills` 补全为 3 个、`requires.dsh` 收紧为 `>=0.2.2-rc.5`。
+
 0.3.2 —— **工具修复（交付可见性）**：① `tools/start-lan.ps1` 修"启动后脚本不返回"—— 根因是 Windows `bInheritHandles=TRUE`，即使把 stdout/stderr 全重定向，子进程仍继承父进程 stdout 管道的写句柄，调用方读管道等 EOF 就永远等；唯一有效做法是"启动器本身不被句柄继承"（`Start-Process` **不带任何 `-Redirect*` 开关** → 走 ShellExecuteEx，重定向交给 `cmd /c start "" /b ... > log 2>&1`），实测三种重定向变体均 HUNG>15s、该方案 0.56s 返回；同时新增 `-PidFile`、`-Stop` 加 pid 复用安全阀、日志目录跟随 `cfg.logDir`。② `tools/pc1_pc2_ping.ps1 -UseMcp` 不再固定探 7310：端口优先级改为「显式 `-Port` > 目标 URL 的显式端口 > 该通道配置端口」，并修掉 `http://host/mcp` 的 `$uri.Port` 会返回 80（`IsDefaultPort=true`）被误当显式端口的老坑；打印里加"探测端口取自哪一项"便于对账。③ 同文件 `peer.name` 比较口径：卡片名是 `team-link-<role>`、配置只写角色名，字面比较必然误报 WARN（等于这条告警永远叫狼来了）→ 剥前缀后再比，真不一致仍 WARN。实测：本机卡片 + `peer.name=pc1` 不 WARN、改成 `pc9` 仍 WARN。
 0.3.1 —— **跨机可用 + 交付修复**：① A2A/MCP 服务端新增显式 LAN 开关（`--host <ip>` + `--allow-lan`，或 `TEAM_LINK_ALLOW_LAN=1`），默认仍只绑回环，`0.0.0.0` 与 `192.168.1.*` 一律拒绝（见 §5.1）；② `VERSION` 改为从 `package.json` 读（此前写死 `0.1.0`，AgentCard/initialize 的版本串与包版本对不上，跨机核对时误导）；③ 修 `client\a2a-selfloop.mjs` 在 Windows 上的退出竞态 —— 四项全 PASS 却因 `process.exit` 与 undici 句柄关闭撞车而 abort（`UV_HANDLE_CLOSING`，退出码变负），改为设 `exitCode` 让事件循环自然收尾 + unref 兜底，连跑 5/5 稳定 exit 0；④ **`.gitignore` 修 `state/` 误伤**：整目录忽略导致 `state\config.example.json` 从未入库、交付包缺它，干净安装会卡在 `install.ps1` 的 0/9 预检（PC2 实测踩到，现场重建才装上）—— 改为 `state/*` + 逐条 `!` 放行模板。
 0.3.0 —— **GUI 版**：新增 `lib/client.js`（手写客户端 bundle，零构建）。面板有两个入口、同一张表单：**设置里的一级分区**（`settings.section`，id `team-link`、order 20、label「PC 协作」，与「通用设置」「模型」「内置插件」同级，一次点击就到）与**插件页的行配置页**（keyed slot `plugins.row.config`，键 `dsh-vivado-team-link#team-link`）；一级分区拿不到宿主递来的 form，自己用 `ctx.configForms` 按 entry id 取。Config 里除 `fallback.mode` 外全部字段标 `.volatile()`（宿主只 serve volatile 字段），`apply()` 订阅 `loader/volatile-update` 在面板保存后立即重物化 `config.json`。面板能改角色/地址/端口/对端/回退/日志目录/授权根，**不收也不显示 token 值**。
@@ -505,7 +525,7 @@ GUI 侧：设置里应出现一级分区「PC 协作」（`settings.section`，i
 | skill | 什么时候用 | 给的命令 |
 |---|---|---|
 | `team-link-setup` | 换网段、换机器、第一次装、或「配置看着对但连不上」 | `scripts/tl-state.ps1`（只读诊断，直接说还缺哪几步）、`scripts/tl-sync.ps1 -Apply`（把地址同步到 profile 与 state/config.json 两处，带备份与回读校验） |
-| `team-link-ops` | 值班、等任务、发令回报、证据搬运、通道降级 | `scripts/tl-watch.ps1 -Json`（一次取数：本机双通道 + 对端身份 + 自上次新增任务；退出码 0=idle / 10=new-tasks / 2=degraded） |
+| `team-link-ops` | 收件、回复、等任务、通道降级 | `scripts/tl-recv.ps1 -TimeoutSec 240`（**原子收件**：一次调用完成「找新消息 → 打印正文 → 记 delivered」，退出码 0=有消息 / 3=无消息 / 2=服务没监听；另有 `-Done`/`-Fail`/`-Baseline`） |
 
 ### 12.1 地址这件事只有一处权威
 
@@ -518,15 +538,16 @@ GUI 侧：设置里应出现一级分区「PC 协作」（`settings.section`，i
 
 所以「只在 UI 里改 IP」只做了 ①：还要**重启宿主**（①→②）、**重起服务**（③）、**通知对端**（④）。这些步骤 `tl-state.ps1` 会逐条指出，不需要记。
 
-### 12.2 两侧分工：PC2 走自动化，PC1 走 goal 轮次
+### 12.2 两侧都用 goal 模式（DSH 自动化任务已弃用）
 
-| | PC2（等着被派活） | PC1（派活、跑长任务） |
+| | PC1（主导） | PC2（执行） |
 |---|---|---|
-| 靠什么产生 turn | **DSH 自动化任务**定时唤醒（1–3 min） | **goal 模式自带自动续轮** |
-| 每次做什么 | 一次巡检，`idle` 立即结束 | 每轮开场 `tl-watch -NoAdvance`（约 2 秒） |
-| 要不要额外配置 | 要（一条自动化任务） | **不要**（原因见下） |
+| 靠什么产生轮次 | goal 自动续轮 | goal 自动续轮 |
+| 每轮动作 | `tl-recv -TimeoutSec 240` → 有消息就处理并 `tl-say` 回复 → `tl-recv -Done` | 同左 |
+| 唤醒提前量 | 宿主半边 `inbox bridge` 把落盘消息推进 agent 收件箱（无需等轮次） | 同左 |
 
-**PC1 不配自动化任务**：调度器的投递目标是「一个已存在的会话」（`~/.dsh/storages/schedule.json` 里 `target.kind` 只出现过 `session`），指向正在跑长任务的会话等于每隔几分钟往任务中间插一条输入——上下文被打断、token 白烧、长任务易跑偏。
+**DSH 自动化任务已弃用**：实测不稳定（漏投、重复投递），且调度器的投递目标是「一个已存在的会话」
+（`~/.dsh/storages/schedule.json` 里 `target.kind` 只出现过 `session`），指向正在跑长任务的会话会中途插话。
+已配置的请到 GUI「自动化任务」停掉。
 
-两侧共用同一套幂等纪律：`-NoAdvance` 看、处理成功后 `-Advance` 才算读过；自动化侧另加 `-Lock` 排他锁。goal 处于 idle 时 PC1 没有轮次，积压会安全排队，急事由 PC2 转 issue 兜底。
-
+`maxGoalRounds` 建 goal 时给够；**不要因为「几轮没消息」就结束 goal 或置 `blocked`**（判据见 skill `team-link-ops` §3）。

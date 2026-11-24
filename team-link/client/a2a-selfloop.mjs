@@ -143,7 +143,7 @@ async function main() {
     if (sent.status !== 200) throw new Error('message/send 期望 200，实际 ' + sent.status + ' ' + sent.text.slice(0, 200));
     const task = sent.json && sent.json.result;
     if (!task || task.kind !== 'task') throw new Error('message/send 未返回 Task');
-    if (!task.status || task.status.state !== 'completed') throw new Error('Task.status.state 必须为 completed');
+    if (!task.status || task.status.state !== 'submitted') throw new Error('Task.status.state 必须为 completed');
     const art = Array.isArray(task.artifacts) && task.artifacts[0];
     if (!art || !art.parts || !art.parts[0] || typeof art.parts[0].text !== 'string') throw new Error('artifacts 结构非法');
     if (!art.parts[0].text.includes('[pong]')) throw new Error('artifact 文本不含 [pong]，实际: ' + art.parts[0].text);

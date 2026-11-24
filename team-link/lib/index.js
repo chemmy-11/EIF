@@ -794,6 +794,130 @@ function makeLogger(ctx) {
  * @param ctx - 插件上下文。
  * @param config - profile 里本行的 config 块（缺省时按默认值重建）。
  */
+/**
+ * 收件箱桥：把已落盘的新任务推进 agent 收件箱，使 agent 无需被轮询即可被唤醒。
+ *
+ * 为什么需要它：A2A 服务端只把消息写到 state/tasks，从「落盘」到「叫醒 agent」之间
+ * 原本没有任何环节——agent 只有在主动跑 tl-recv/tl-watch 时才看得见。goal 的自动续轮
+ * 也是靠同一条路（dsh-goal-round-driver 往 agent.inbox 投递）。
+ *
+ * 三条硬约束（与文件头一致）：
+ * 1. 绝不 throw：所有异常降级成日志，桥接失败只是回到「靠轮询」的旧行为。
+ * 2. 不猜 API：message 形状按候选依次试探，第一个不抛错的锁定下来；全失败就自我停用。
+ * 3. 按 task id 去重：同一条消息只投一次，不因重启/重复 tick 而反复唤醒 agent。
+ *
+ * @param ctx - 宿主上下文。
+ * @param log - 日志函数。
+ * @returns 清理函数（失败时返回 undefined）。
+ */
+function startInboxBridge(ctx, log) {
+  if (process.env.TEAM_LINK_NO_INBOX_BRIDGE === '1') {
+    log('info', 'inbox bridge 已按 TEAM_LINK_NO_INBOX_BRIDGE=1 关闭')
+    return undefined
+  }
+  // 不把 agents 写进 inject：缺失时插件仍要能起（降级为「只靠轮询」）。
+  const agents = (typeof ctx.get === 'function' ? ctx.get('agents') : undefined) ?? ctx.agents
+  if (!agents || typeof agents.list !== 'function') {
+    log('info', 'inbox bridge 未启动：宿主未提供 agents 服务（仍可用 tl-recv 轮询收件）')
+    return undefined
+  }
+
+  const tasksDir = join(STATE_DIR, 'tasks')
+  const bridgePath = join(STATE_DIR, 'inbox-bridge.json')
+  const ledger = readExistingConfig(bridgePath)
+  if (!ledger.pushed || typeof ledger.pushed !== 'object') ledger.pushed = {}
+  if (typeof ledger.disabledReason !== 'string') ledger.disabledReason = ''
+  let shapeIndex = -1
+
+  const persist = () => {
+    try { writeAtomic(bridgePath, `${JSON.stringify(ledger, null, 2)}\n`) } catch { /* 记账失败不影响投递 */ }
+  }
+
+  const pickTarget = () => {
+    let list = []
+    try { list = agents.list() ?? [] } catch { return undefined }
+    const roots = list.filter((a) => {
+      try { return (a?.session?.delegationDepth ?? 0) === 0 } catch { return false }
+    })
+    if (roots.length === 0) return undefined
+    const idle = roots.filter((a) => { try { return a.status === 'idle' } catch { return false } })
+    const pool = idle.length > 0 ? idle : roots
+    // 多个根会话时优先「最近活跃」的那个；拿不到就取第一个。
+    let best = pool[0]
+    let bestAt = -1
+    for (const a of pool) {
+      let t = 0
+      try { t = Number(a?.session?.updatedAt?.getTime?.() ?? a?.session?.updatedAt ?? 0) || 0 } catch { t = 0 }
+      if (t > bestAt) { bestAt = t; best = a }
+    }
+    return best
+  }
+
+  const buildCandidates = (text, id) => [
+    { id, content: [{ type: 'text', text }], source: { kind: 'user' } },
+    { id, content: [{ type: 'text', text }], source: { kind: 'plugin', plugin: name } },
+    { id, content: [{ type: 'text', text }], source: { kind: 'team-link' } },
+    { id, content: [{ type: 'text', text }] },
+  ]
+
+  const tick = () => {
+    try {
+      if (ledger.disabledReason) return
+      let files = []
+      try { files = readdirSync(tasksDir).filter((f) => f.endsWith('.json')) } catch { return }
+      const fresh = files.filter((f) => !ledger.pushed[f.slice(0, -5)])
+      if (fresh.length === 0) return
+      const agent = pickTarget()
+      if (agent === undefined) return
+      let budget = 5
+      for (const file of fresh.slice(0, budget)) {
+        const id = file.slice(0, -5)
+        let task
+        try { task = JSON.parse(readFileSync(join(tasksDir, file), 'utf8').replace(/^\uFEFF/, '')) } catch { continue }
+        const parts = Array.isArray(task?.history?.[0]?.parts) ? task.history[0].parts : []
+        const text = parts.map((p) => (typeof p?.text === 'string' ? p.text : '')).join('\n')
+        if (!text) continue
+        const head = `[team-link] 收到一条来自对端的消息 · task=${id.slice(0, 8)} · ${new Date().toISOString()}`
+        const tail = `\n\n处理完记得跑：tl-recv.ps1 -Done ${id}（成功）或 tl-recv.ps1 -Fail ${id} -FailNote \"原因\"`
+        const payload = `${head}\n\n${text.slice(0, 2000)}${tail}`
+        const candidates = buildCandidates(payload, `team-link-${id}`)
+        let delivered = false
+        for (let i = 0; i < candidates.length; i++) {
+          if (shapeIndex >= 0 && i !== shapeIndex) continue
+          try {
+            agent.inbox.prepend('next-step', candidates[i])
+            shapeIndex = i
+            delivered = true
+            break
+          } catch { /* 换下一个形状 */ }
+        }
+        if (!delivered) {
+          ledger.disabledReason = '所有 message 形状都被宿主拒绝；请用 tl-recv 轮询收件'
+          persist()
+          log('warn', `inbox bridge 自我停用：${ledger.disabledReason}`)
+          return
+        }
+        ledger.pushed[id] = { at: new Date().toISOString(), agentId: (() => { try { return String(agent.id) } catch { return '?' } })(), recipe: shapeIndex }
+        persist()
+        budget -= 1
+      }
+    } catch (error) {
+      log('warn', `inbox bridge tick 失败（已降级，继续跑）: ${error?.message ?? error}`)
+    }
+  }
+
+  let timer
+  try {
+    timer = setInterval(tick, 1500)
+    if (typeof timer?.unref === 'function') timer.unref()
+  } catch (error) {
+    log('warn', `inbox bridge 定时器启动失败（已降级）: ${error?.message ?? error}`)
+    return undefined
+  }
+  log('info', `inbox bridge 已启动（每 1.5s 扫描 ${tasksDir}，按 task id 去重）`)
+  return () => { try { clearInterval(timer) } catch { /* 忽略 */ } }
+}
+
 export function apply(ctx, config) {
   const log = makeLogger(ctx)
   const rawConfig = config ?? {}
@@ -847,6 +971,16 @@ export function apply(ctx, config) {
     })
 
   if (materialized !== undefined) {
+  // 5) 收件箱桥：把落盘的新消息推进 agent 收件箱（失败只降级，绝不影响启动）。
+  try {
+    const disposeBridge = startInboxBridge(ctx, log)
+    if (typeof disposeBridge === 'function' && typeof ctx.effect === 'function') {
+      try { ctx.effect(() => disposeBridge, 'team-link: inbox bridge') } catch { /* 交给进程生命周期 */ }
+    }
+  } catch (error) {
+    log('warn', `inbox bridge 启动失败（已降级为轮询收件）: ${error?.message ?? error}`)
+  }
+
     log('info', `已就绪：role=${materialized.role} roots=${materialized.roots} config=${slash(materialized.path)}`)
   }
 }

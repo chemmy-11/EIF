@@ -115,7 +115,13 @@ foreach ($t in ($newTasks | Select-Object -Last 5)) {
   $obj = Read-JsonSafe $t.FullName
   $state = if ($obj -and $obj.status) { [string]$obj.status.state } else { "?" }
   $reply = ""
-  try { if ($obj.artifacts) { $reply = [string]$obj.artifacts[0].parts[0].text } } catch { }
+  # 摘要取 history[0] 的正文（对端真正说的话）；artifacts[0] 只是固定的 [ack] 回执，显示它等于没显示。
+  try {
+    $parts = @($obj.history[0].parts)
+    $texts = @()
+    foreach ($p in $parts) { if ($p -and $p.text) { $texts += [string]$p.text } }
+    $reply = ($texts -join ' ')
+  } catch { $reply = '' }
   $brief += (($t.BaseName).Substring(0, [Math]::Min(8, $t.BaseName.Length)) + " state=" + $state + $(if ($reply) { " reply=" + $reply.Substring(0, [Math]::Min(60, $reply.Length)) } else { "" }))
 }
 

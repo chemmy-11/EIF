@@ -237,7 +237,12 @@ function validateMessageParams(params) {
 
 async function saveTask(ctx, task) {
   await fsp.mkdir(ctx.tasksDir, { recursive: true });
-  await fsp.writeFile(path.join(ctx.tasksDir, task.id + '.json'), JSON.stringify(task, null, 2), 'utf8');
+  // 原子写：先写临时文件再 rename。收件方按文件出现与否判断新消息，
+  // 直接写最终路径会让读方看到半截 JSON（消息体上限 2 MB，窗口不小）。
+  const target = path.join(ctx.tasksDir, task.id + '.json');
+  const tmp = target + '.tmp-' + process.pid + '-' + Date.now();
+  await fsp.writeFile(tmp, JSON.stringify(task, null, 2), 'utf8');
+  await fsp.rename(tmp, target);
 }
 
 async function loadTask(ctx, id) {
@@ -260,7 +265,7 @@ function buildTask(ctx, params) {
     kind: 'task',
     id: crypto.randomUUID(),
     contextId,
-    status: { state: 'completed', timestamp: new Date().toISOString() },
+    status: { state: 'submitted', timestamp: new Date().toISOString() },
     artifacts: [{ artifactId: crypto.randomUUID(), name: 'reply', parts: [{ kind: 'text', text: replyText }] }],
     history: [normalizeMessage(message, contextId)]
   };
@@ -279,7 +284,7 @@ async function dispatch(ctx, body) {
     if (v.error) return rpcError(id, -32602, '参数错误: ' + v.error);
     const task = buildTask(ctx, { message: v.message });
     await saveTask(ctx, task);
-    ctx.log('[a2a] message/send task=' + task.id + ' state=completed');
+    ctx.log('[a2a] message/send task=' + task.id + ' state=submitted (已落盘，等待本机 agent 处理)');
     return { jsonrpc: '2.0', id, result: task };
   }
   if (method === 'tasks/get') {
@@ -445,7 +450,7 @@ async function runSelftest(ctx) {
     if (out.error) throw new Error('返回错误: ' + JSON.stringify(out.error));
     const t = out.result;
     if (!t || t.kind !== 'task') throw new Error('result.kind 必须为 task');
-    if (!t.status || t.status.state !== 'completed') throw new Error('status.state 必须为 completed');
+    if (!t.status || t.status.state !== 'submitted') throw new Error('status.state 必须为 completed');
     if (!t.status.timestamp) throw new Error('status.timestamp 缺失');
     if (!Array.isArray(t.artifacts) || t.artifacts.length === 0) throw new Error('artifacts 缺失');
     if (t.artifacts[0].name !== 'reply') throw new Error('artifact.name 必须为 reply');
@@ -463,7 +468,7 @@ async function runSelftest(ctx) {
     const back = await dispatch(ctx, { jsonrpc: '2.0', id: 2, method: 'tasks/get', params: { id: sentTaskId } });
     if (back.error) throw new Error('返回错误: ' + JSON.stringify(back.error));
     if (back.result.id !== sentTaskId) throw new Error('id 不一致');
-    if (back.result.status.state !== 'completed') throw new Error('state 不一致');
+    if (back.result.status.state !== 'submitted') throw new Error('state 不一致');
     await fsp.rm(path.join(ctx.tasksDir, sentTaskId + '.json'), { force: true });
     return true;
   });

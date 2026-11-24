@@ -76,6 +76,6 @@ $reply = ""
 try { $reply = [string]$resp.result.artifacts[0].parts[0].text } catch { }
 if (-not $id) { Write-Host "FAIL 对端未返回 task（可能是认证明明通过但协议不符）"; exit 2 }
 
-Write-Host ("PASS 已送达 task=" + $id.Substring(0, [Math]::Min(8, $id.Length)) + " state=" + $state)
+Write-Host ("PASS 对端服务已落盘 task=" + $id.Substring(0, [Math]::Min(8, $id.Length)) + " state=" + $state + "（不代表对端 agent 已读）")
 if ($reply) { Write-Host ("     对端回执: " + $reply.Substring(0, [Math]::Min(160, $reply.Length))) }
 exit 0

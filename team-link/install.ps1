@@ -217,6 +217,24 @@ if ($SkipSkill) { Write-Warn2 "已跳过（-SkipSkill）" } else {
   Write-Ok ("共 " + $skillDirs.Count + " 个 skill / " + $skillManifest.Count + " 个文件，已记指纹")
 }
 
+Write-Step "6.5/9 版本兼容预检（不兼容会让宿主起不来）"
+$vcScript = Join-Path $Bundle "tools\version-check.ps1"
+if (Test-Path -LiteralPath $vcScript) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $vcScript -Profile $Profile -DshHome $DshHome 2>&1 | ForEach-Object { Write-Info ("  " + $_) }
+  $vcCode = $LASTEXITCODE
+  if ($vcCode -eq 1) {
+    Write-Fail "dsh-mcp-client 与当前 dsh 运行时不兼容：已中止注册（继续会让整个宿主起不来）"
+    Write-Info "按上面的命令升级 mcp-client，然后重跑 install.ps1。"
+    exit 1
+  } elseif ($vcCode -eq 3) {
+    Write-Warn2 "版本预检无法判定（见上），继续注册；若宿主起不来，先怀疑 mcp-team-link 这一行。"
+  } else {
+    Write-Ok "版本预检通过"
+  }
+} else {
+  Write-Warn2 "缺少 tools\version-check.ps1，跳过版本预检"
+}
+
 Write-Step "7/9 注册独立 bundle 到 profile "
 $pkgBackup = Join-Path $StateDir ("profile-package.json.bak-" + $Stamp)
 Copy-Item -LiteralPath $ProfilePkg -Destination $pkgBackup -Force
