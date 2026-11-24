@@ -5,6 +5,10 @@
 .DESCRIPTION
   走 config.json 里的 peer.a2aUrl + peer-a2a.token（出站 token）；可用 -Peer/-TokenFile 覆盖（自测时指向本机）。
   只发一段纯文本，打印对端回执的 task id 与回复文本。
+  正文用 -Text 直接给，或 -TextFile 指向一个 UTF-8 文件（长报告推荐，避开命令行长度限制）。
+  编码：**请求体按 UTF-8 字节发**。Windows PowerShell 5.1 的 Invoke-RestMethod 在 -Body 是字符串时
+  会用 ASCII 编码，中文会**每个字变成一个 ?**（2026-11-24 实测踩到，PC2 的中文 TEAM-REPORT 全成 ????），
+  所以这里显式 [Text.Encoding]::UTF8.GetBytes()。
   退出码：0=已送达并收到回复；2=通道不可用；5=认证失败(401)；6=参数错。
 .EXAMPLE
   powershell -NoProfile -File scripts\tl-say.ps1 -Text "TEAM-REPORT ..."
@@ -14,7 +18,8 @@
 #>
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory = $true)][string]$Text,
+  [string]$Text = '',
+  [string]$TextFile = '',
   [string]$Bundle = '',
   [string]$Peer = '',
   [string]$TokenFile = '',
@@ -23,7 +28,12 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 
-if ([string]::IsNullOrWhiteSpace($Text)) { Write-Host 'FAIL -Text 不能为空'; exit 6 }
+if (-not [string]::IsNullOrWhiteSpace($TextFile)) {
+  if (-not (Test-Path -LiteralPath $TextFile)) { Write-Host ('FAIL -TextFile 不存在: ' + $TextFile); exit 6 }
+  # 会写 BOM 的编辑器（记事本 / Set-Content -Encoding UTF8）要去掉，否则 BOM 会进正文。
+  $Text = ((Get-Content -Raw -Encoding UTF8 -LiteralPath $TextFile) -replace '^\uFEFF', '').TrimEnd()
+}
+if ([string]::IsNullOrWhiteSpace($Text)) { Write-Host 'FAIL -Text / -TextFile 必须给一个（正文不能为空）'; exit 6 }
 if ([string]::IsNullOrWhiteSpace($Bundle)) { $Bundle = Join-Path $DshHome 'bundles\dsh-vivado\optional\team-link' }
 $cfgPath = Join-Path $Bundle 'state\config.json'
 if (-not (Test-Path -LiteralPath $cfgPath)) { Write-Host ("FAIL 找不到 " + $cfgPath); exit 2 }
@@ -59,8 +69,12 @@ $payload = [ordered]@{
   }
 } | ConvertTo-Json -Depth 10 -Compress
 
+# 必须发字节：PS 5.1 的 Invoke-RestMethod 对字符串 body 按 ASCII 编码，中文会每个字变一个 "?"。
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$bodyBytes = $utf8.GetBytes($payload)
+
 try {
-  $resp = Invoke-RestMethod -Uri $endpoint -Method Post -ContentType "application/json" -Headers @{ Authorization = ("Bearer " + $token) } -Body $payload -TimeoutSec $TimeoutSec
+  $resp = Invoke-RestMethod -Uri $endpoint -Method Post -ContentType "application/json; charset=utf-8" -Headers @{ Authorization = ("Bearer " + $token) } -Body $bodyBytes -TimeoutSec $TimeoutSec
 } catch {
   $msg = $_.Exception.Message.Split([char]10)[0]
   if ($_.Exception.Response -and ([int]$_.Exception.Response.StatusCode -eq 401)) { Write-Host ("FAIL 401 认证失败：" + $msg); exit 5 }

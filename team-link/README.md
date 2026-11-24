@@ -426,6 +426,21 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
 ## 10. 版本
 
 
+0.3.6 —— **中文乱码根治（`tl-say` 请求体按 UTF-8 字节发）**：
+
+- **现象**：PC2 发来的中文 TEAM-REPORT 到 PC1 全变成 `????`——每个汉字一个 `?`（实测任务
+  `299bcda1` 落盘 166 个 `?`、0 个汉字；ASCII 内容完好，说明不是"读到了乱码"而是**写出去时就丢了**）。
+- **根因**：`tl-say.ps1` 把 JSON 字符串直接交给 `Invoke-RestMethod -Body`。**Windows PowerShell 5.1
+  在 Content-Type 不带 charset 时把字符串 body 按 ASCII 编码**，每个非 ASCII 字符替换成一个 `?`（不可逆）。
+  与 PC1/PC2、与桥、与服务端都无关；PC1 侧"看着正常"只是因为它的正文是纯 ASCII。
+- **修复**：`-Body` 改传 `[Text.Encoding]::UTF8.GetBytes($payload)`，Content-Type 显式
+  `application/json; charset=utf-8`。
+- **顺带**：新增 `-TextFile <path>`（UTF-8，自动去 BOM），长报告走文件、避开命令行长度限制；
+  `-Text` 不再是必填，两者给一个即可。
+- **验证**：本地回环抓包到字节层——修前 body 里是 `3f 3f 3f…`（`?`），修后是 `e4 b8 ad…`（UTF-8）；
+  再经真 A2A 服务端落盘 `state/tasks/<id>.json` 复核：20 个汉字、0 个 `?`。
+- **注意**：已经变成 `?` 的历史消息不可恢复；升级后新消息不再乱码，PC2 需升到 ≥ 0.3.6。
+
 0.3.5 —— **把 setup 的「起服务」并进 ops 开工流程（`tl-boot` 一条命令）**：
 
 - **问题**：DSH 重启后 LAN 服务不自启，而「加载了 team-link-ops 技能」并不包含「起服务」这一步——
