@@ -816,7 +816,17 @@ function startInboxBridge(ctx, log) {
     return undefined
   }
   // 不把 agents 写进 inject：缺失时插件仍要能起（降级为「只靠轮询」）。
-  const agents = (typeof ctx.get === 'function' ? ctx.get('agents') : undefined) ?? ctx.agents
+  // 诊断日志：宿主内部日志抓不到，落到文件才能在重启后确认桥接是否真的在跑。
+  const diagPath = join(STATE_DIR, 'inbox-bridge.log')
+  const diag = (line) => {
+    try {
+      if (existsSync(diagPath) && statSync(diagPath).size > 262144) writeFileSync(diagPath, '', 'utf8')
+      writeFileSync(diagPath, `${new Date().toISOString()} ${line}\n`, { encoding: 'utf8', flag: 'a' })
+    } catch { /* 诊断写不进去也不能影响主流程 */ }
+  }
+  // 服务取法：优先用注入作用域里的 ctx.agents（cordis 正规写法），退回到 ctx.get。
+  const agents = ctx?.agents ?? (typeof ctx.get === 'function' ? ctx.get('agents') : undefined)
+  diag(`start: agents=${agents === undefined ? 'undefined' : typeof agents} list=${agents && typeof agents.list === 'function' ? 'yes' : 'no'}`)
   if (!agents || typeof agents.list !== 'function') {
     log('info', 'inbox bridge 未启动：宿主未提供 agents 服务（仍可用 tl-recv 轮询收件）')
     return undefined
@@ -868,6 +878,12 @@ function startInboxBridge(ctx, log) {
       const fresh = files.filter((f) => !ledger.pushed[f.slice(0, -5)])
       if (fresh.length === 0) return
       const agent = pickTarget()
+      if (agent === undefined) {
+        let n = -1
+        try { n = (agents.list() ?? []).length } catch { n = -2 }
+        diag(`tick: 有 ${fresh.length} 条待投，但找不到目标 agent（agents.list()=${n}）`)
+        return
+      }
       if (agent === undefined) return
       let budget = 5
       for (const file of fresh.slice(0, budget)) {
@@ -892,11 +908,13 @@ function startInboxBridge(ctx, log) {
           } catch { /* 换下一个形状 */ }
         }
         if (!delivered) {
+          diag('disabled: 所有 message 形状都被宿主拒绝')
           ledger.disabledReason = '所有 message 形状都被宿主拒绝；请用 tl-recv 轮询收件'
           persist()
           log('warn', `inbox bridge 自我停用：${ledger.disabledReason}`)
           return
         }
+        diag(`pushed: ${id} -> agent=${(() => { try { return String(agent.id) } catch { return '?' } })()} recipe=${shapeIndex}`)
         ledger.pushed[id] = { at: new Date().toISOString(), agentId: (() => { try { return String(agent.id) } catch { return '?' } })(), recipe: shapeIndex }
         persist()
         budget -= 1
@@ -972,13 +990,27 @@ export function apply(ctx, config) {
 
   if (materialized !== undefined) {
   // 5) 收件箱桥：把落盘的新消息推进 agent 收件箱（失败只降级，绝不影响启动）。
+  //    agents 是可选服务：用 ctx.inject 的临时作用域取（cordis 正规写法），拿不到就退回轮询。
+  const wireBridge = (bridgeCtx) => {
+    try {
+      const disposeBridge = startInboxBridge(bridgeCtx, log)
+      if (typeof disposeBridge === 'function' && typeof bridgeCtx.effect === 'function') {
+        try { bridgeCtx.effect(() => disposeBridge, 'team-link: inbox bridge') } catch { /* 交给进程生命周期 */ }
+      }
+    } catch (error) {
+      log('warn', `inbox bridge 启动失败（已降级为轮询收件）: ${error?.message ?? error}`)
+    }
+  }
   try {
-    const disposeBridge = startInboxBridge(ctx, log)
-    if (typeof disposeBridge === 'function' && typeof ctx.effect === 'function') {
-      try { ctx.effect(() => disposeBridge, 'team-link: inbox bridge') } catch { /* 交给进程生命周期 */ }
+    if (typeof ctx.inject === 'function') {
+      ctx.inject(['agents'], (bridgeCtx) => {
+        try { wireBridge(bridgeCtx ?? ctx) } catch (error) { log('warn', `inject 回调失败: ${error?.message ?? error}`) }
+      })
+    } else {
+      wireBridge(ctx)
     }
   } catch (error) {
-    log('warn', `inbox bridge 启动失败（已降级为轮询收件）: ${error?.message ?? error}`)
+    log('warn', `inbox bridge 接线失败（已降级为轮询收件）: ${error?.message ?? error}`)
   }
 
     log('info', `已就绪：role=${materialized.role} roots=${materialized.roots} config=${slash(materialized.path)}`)
