@@ -64,6 +64,7 @@ console.log('B. lib/index.js 收件箱桥（真实 apply + 伪 agents）')
 function makeBundle(taskId, text) {
   const root = mkdtempSync(join(tmpdir(), 'tl-bridge-'))
   cpSync(join(REPO, 'lib'), join(root, 'lib'), { recursive: true })
+  cpSync(join(REPO, 'package.json'), join(root, 'package.json'))
   mkdirSync(join(root, 'state', 'tasks'), { recursive: true })
   writeFileSync(
     join(root, 'state', 'tasks', `${taskId}.json`),
@@ -122,6 +123,7 @@ async function runBridge({ pinSessionId, agents }) {
   const r = await runBridge({ agents })
   check('无钉选 -> 投最近活跃 session-RECENT', r.agentId === 'session-RECENT', `实际=${r.agentId}`)
   check('无钉选 -> 日志记 pin: none', /pin: 未设置/.test(r.diag), r.diag.trim().split('\n').pop())
+  check('启动诊断带版本号（判据：重启有没有加载到新版）', /start: v=0\.3\.4 /.test(r.diag), r.diag.split('\n')[0])
 }
 
 // ② 有钉选：钉的是「旧」会话，仍应投它（这正是修复点）。

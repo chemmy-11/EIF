@@ -441,7 +441,9 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
   `DSH_SESSION_ID` 同值），坏文件一律当「没钉选」，绝不抛错。
 - **技能**：`team-link-setup` §0.1 与 `team-link-ops` §1.1 都把「加载即钉选」写成第一动作；
   `tl-state.ps1` 只读回显当前钉选；故障表补「消息投进别的会话 → 在本会话重钉」。
-- **自测**：`tools/pin-selftest.mjs`（14 项）——纯函数 8 项 + 真桥 6 项（把 `lib/` 拷到临时目录、
+- **可判定「重启有没有加载到新版」**：桥首行诊断改为 `start: v=<version> agents=… list=…`
+  （宿主只在启动时加载插件代码，版本号让「改完没重启」不再靠猜）。
+- **自测**：`tools/pin-selftest.mjs`（15 项）——纯函数 8 项 + 真桥 7 项（把 `lib/` 拷到临时目录、
   import 真的 `apply()`、用伪 agents 跑 tick），覆盖无钉选/命中/失效回退三条路径。
 
 0.3.3 —— **收件模型重做（「PC1 收不到 PC2 消息」的根治）**：

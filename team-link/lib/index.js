@@ -37,6 +37,20 @@ const BUNDLE_DIR = resolvePath(dirname(fileURLToPath(import.meta.url)), '..')
 /** 运行期状态目录：config.json 与四个 token 文件的默认落点。 */
 const STATE_DIR = join(BUNDLE_DIR, 'state')
 
+/**
+ * 本包版本，只用于诊断日志。
+ *
+ * 为什么要读：宿主是**启动时**加载插件代码的，改了 lib/ 不重启就还是旧逻辑。
+ * 桥的首行诊断里带上版本号，运维（和下一步的钉选验证）才能一眼判断「这次重启
+ * 到底有没有加载到新版」，而不是拿旧行为当新行为的证据。
+ */
+let PLUGIN_VERSION = 'unknown'
+try {
+  PLUGIN_VERSION = String(JSON.parse(readFileSync(join(BUNDLE_DIR, 'package.json'), 'utf8')).version ?? 'unknown')
+} catch {
+  PLUGIN_VERSION = 'unknown'
+}
+
 /** Loader 侧插件标识（与 plugin.json 的 id 一致，便于日志对齐）。 */
 export const name = 'dsh-vivado-team-link'
 
@@ -827,7 +841,7 @@ function startInboxBridge(ctx, log) {
   }
   // 服务取法：优先用注入作用域里的 ctx.agents（cordis 正规写法），退回到 ctx.get。
   const agents = ctx?.agents ?? (typeof ctx.get === 'function' ? ctx.get('agents') : undefined)
-  diag(`start: agents=${agents === undefined ? 'undefined' : typeof agents} list=${agents && typeof agents.list === 'function' ? 'yes' : 'no'}`)
+  diag(`start: v=${PLUGIN_VERSION} agents=${agents === undefined ? 'undefined' : typeof agents} list=${agents && typeof agents.list === 'function' ? 'yes' : 'no'}`)
   if (!agents || typeof agents.list !== 'function') {
     log('info', 'inbox bridge 未启动：宿主未提供 agents 服务（仍可用 tl-recv 轮询收件）')
     return undefined
