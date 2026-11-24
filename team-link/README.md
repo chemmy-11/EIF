@@ -426,6 +426,24 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
 ## 10. 版本
 
 
+0.3.4 —— **投送会话钉选（「消息投进了别的会话」的根治）**：
+
+- **问题**：收件箱桥按「最近活跃的根会话」挑投递目标。PC1 同时开着几个会话时，对端消息会投给
+  「刚说过话」的那个，在等消息的任务会话反而收不到（2026-11-24 实测：PC2 的 TEAM-REPORT 投进
+  `session-3960517d`，`session-20c4d817` 收不到）。
+- **新增 `skills/team-link-ops/scripts/tl-pin.ps1`**：把当前会话（`$env:DSH_SESSION_ID`，宿主已注入）
+  写进 `state/pinned-session.json`，幂等；`-Show` / `-Clear` / `-SessionId` / `-Json` 齐备，
+  退出码 0=已钉 / 3=未钉 / 4=拿不到会话 id / 1=写盘失败。
+- **桥改为钉选优先**（`lib/index.js` 的 `pickTarget`）：有钉选只投钉选会话（`pin: hit`）；
+  钉选会话不在 `agents.list()` 里才回退最近活跃（`pin: miss`）；没钉选记 `pin: none`。
+  三种状态各只记一行，诊断日志 `state/inbox-bridge.log` 可复核投递理由。
+- **新增 `lib/pin.js`**：钉选文件的读写与匹配做成纯函数（匹配键 `agent.id`，实测与
+  `DSH_SESSION_ID` 同值），坏文件一律当「没钉选」，绝不抛错。
+- **技能**：`team-link-setup` §0.1 与 `team-link-ops` §1.1 都把「加载即钉选」写成第一动作；
+  `tl-state.ps1` 只读回显当前钉选；故障表补「消息投进别的会话 → 在本会话重钉」。
+- **自测**：`tools/pin-selftest.mjs`（14 项）——纯函数 8 项 + 真桥 6 项（把 `lib/` 拷到临时目录、
+  import 真的 `apply()`、用伪 agents 跑 tick），覆盖无钉选/命中/失效回退三条路径。
+
 0.3.3 —— **收件模型重做（「PC1 收不到 PC2 消息」的根治）**：
 
 - **新增 `skills/team-link-ops/scripts/tl-recv.ps1`**：一条命令完成「找新消息 → 打印正文 → 记 delivered」，

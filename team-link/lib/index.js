@@ -1,4 +1,4 @@
-﻿/**
+/**
  * dsh-vivado-team-link — 宿主插件半边（host plugin half）。
  *
  * 这个文件把「本插件的配置」变成「服务端能读的东西」：
@@ -30,6 +30,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync,
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { findPinnedAgent, readPin } from './pin.js'
 
 /** 本插件根目录（= lib/ 的上一级）。部署时是 copy 出来的 bundle，开发时是仓内 optional/team-link。 */
 const BUNDLE_DIR = resolvePath(dirname(fileURLToPath(import.meta.url)), '..')
@@ -843,6 +844,10 @@ function startInboxBridge(ctx, log) {
     try { writeAtomic(bridgePath, `${JSON.stringify(ledger, null, 2)}\n`) } catch { /* 记账失败不影响投递 */ }
   }
 
+  // 钉选会话：tl-pin.ps1 在技能加载时把「当前会话」写进 state/pinned-session.json。
+  // 有钉选就只投它；钉选的会话关掉了才回退「最近活跃」。pinNote 只用来给诊断日志去重。
+  let pinNote = ''
+
   const pickTarget = () => {
     let list = []
     try { list = agents.list() ?? [] } catch { return undefined }
@@ -850,6 +855,27 @@ function startInboxBridge(ctx, log) {
       try { return (a?.session?.delegationDepth ?? 0) === 0 } catch { return false }
     })
     if (roots.length === 0) return undefined
+
+    const pin = readPin(STATE_DIR)
+    if (pin !== undefined) {
+      const pinned = findPinnedAgent(roots, pin)
+      if (pinned !== undefined) {
+        if (pinNote !== `hit:${pin.sessionId}`) {
+          pinNote = `hit:${pin.sessionId}`
+          diag(`pin: hit ${pin.sessionId}（source=${pin.source ?? '?'} at=${pin.at ?? '?'}）`)
+        }
+        return pinned
+      }
+      // 钉选的会话已经不在列表里（关了 / 会话换了）：回退旧逻辑，并把重钉的提示写进日志。
+      if (pinNote !== `miss:${pin.sessionId}`) {
+        pinNote = `miss:${pin.sessionId}`
+        diag(`pin: miss ${pin.sessionId}（该会话不在 agents.list 里，回退最近活跃；在该会话重跑 tl-pin.ps1 可重钉）`)
+      }
+    } else if (pinNote !== 'none') {
+      pinNote = 'none'
+      diag('pin: 未设置（按最近活跃的根会话投递；技能加载后跑 tl-pin.ps1 可锁定本会话）')
+    }
+
     const idle = roots.filter((a) => { try { return a.status === 'idle' } catch { return false } })
     const pool = idle.length > 0 ? idle : roots
     // 多个根会话时优先「最近活跃」的那个；拿不到就取第一个。

@@ -1,7 +1,7 @@
 ---
 name: team-link-ops
 description: team-link 的协作工作流（PC1 主导，两侧都用 goal 模式）。收件箱桥会把对端消息自动推进本会话（不用轮询）；收到后处理、用 tl-say 回 TEAM-REPORT、再 tl-recv -Done。含角色权威边界、桥故障判据与轮询兜底、静默与通道故障的区分、goal 续轮与 blocked 纪律、证据搬运与 issue 降级。
-skill-version: 2026-11-24b
+skill-version: 2026-11-24c
 ---
 
 # team-link-ops
@@ -22,6 +22,21 @@ skill-version: 2026-11-24b
 认为 PC1 判错时用证据 `hand_back`，不自行改判。
 
 ## 1. 主路径：消息会自己找上门（不要写轮询循环）
+
+### 1.1 开工第一件事：把自己钉成投送目标
+
+桥默认投给**最近活跃的根会话**。同时开着几个会话时，对端消息会跳进「刚说过话」的那个，
+在等消息的会话反而收不到（2026-11-24 实测：PC2 的消息投进了别的会话）。所以加载本技能后，
+先在**本会话**里钉一次：
+
+```powershell
+powershell -NoProfile -File <TL>\skills\team-link-ops\scripts\tl-pin.ps1 -Bundle <TL> -Source skill-ops
+```
+
+- 期望 `PASS 已锁定投送会话 <session-id>`；脚本自己读 `$env:DSH_SESSION_ID`，不用手填。
+- 钉选的会话关掉后，桥自动回退到「最近活跃」，不会把消息卡死。
+- 换会话干活就在新会话重跑一次；`-Show` 查看当前钉选，`-Clear` 清除。
+- 判据：`state\inbox-bridge.log` 里 `pin: hit session-...` = 桥认了这次钉选；`pin: miss ...` = 钉的会话不在了。
 
 宿主半边的**收件箱桥**每 1.5 秒扫描 `state/tasks/`，把新任务按 task id 去重后推进 agent 收件箱。
 所以对端消息会**自动出现在你的输入里**，长得像这样：
@@ -129,6 +144,7 @@ powershell -NoProfile -File <TL>\tools\evidence_pull.ps1 -Remote "evidence:repor
 | 面板改了没反应 | `state/config.json` host ≠ 面板值 | 重启宿主 |
 | 回复 401 | `tl-say` 退出码 5 | 对端的 `state/peer-a2a.token` 不是你当前 token |
 | 桥不投递 | `state/inbox-bridge.json` 的 `disabledReason` 非空 | 退回 §2 轮询兜底，并把该字段发给 PC1 |
+| 消息投进了别的会话（不是本会话） | `tl-pin.ps1 -Show` 的 sessionId ≠ 本会话，或日志里 `pin: miss` | 在本会话重钉：`tl-pin.ps1 -Bundle <TL> -Source skill-ops` |
 
 ## 9. 写 PowerShell 的两个坑（本仓库真踩过）
 

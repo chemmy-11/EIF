@@ -153,6 +153,16 @@ if ($cfg -and $cfg.peer.a2aUrl) {
   Write-Warn2 'config.json 里 peer.a2aUrl 为空：对端未配置'
 }
 
+# 投送会话钉选（只读回显）：桥优先投给钉选的会话；没钉就投「最近活跃的根会话」。
+$pinPath = Join-Path (Join-Path $Bundle 'state') 'pinned-session.json'
+$pinObj = $null
+if (Test-Path -LiteralPath $pinPath) { $pinObj = Read-Json $pinPath }
+if ($pinObj -and -not [string]::IsNullOrWhiteSpace([string]$pinObj.sessionId)) {
+  Write-Ok ('投送会话已钉选 ' + [string]$pinObj.sessionId + '（source=' + [string]$pinObj.source + ' at=' + [string]$pinObj.at + '）')
+} else {
+  Write-Warn2 '投送会话未钉选：桥按「最近活跃的根会话」投递，多开会话时可能投给别的会话 → 在本会话跑 tl-pin.ps1'
+}
+
 Write-Host ''
 Write-Host '==== 结论：还缺哪几步 ====' -ForegroundColor Cyan
 $need = @()
