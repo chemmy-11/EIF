@@ -426,6 +426,21 @@ powershell -NoProfile -File tools\collab_status.ps1          # 通道断开时�
 ## 10. 版本
 
 
+0.3.5 —— **把 setup 的「起服务」并进 ops 开工流程（`tl-boot` 一条命令）**：
+
+- **问题**：DSH 重启后 LAN 服务不自启，而「加载了 team-link-ops 技能」并不包含「起服务」这一步——
+  它只写在 team-link-setup 里。交接 prompt 一漏，就出现「两边都以为通道好、其实本机没监听」，
+  对端发来的消息全部没人接（2026-11-24 实测：PC1 重启 DSH 后未恢复 start-lan）。
+- **新增 `skills/team-link-ops/scripts/tl-boot.ps1`**：一条命令四步——① `config.json` 的 host vs 当前 WLAN
+  ② 没监听/绑错地址就 `start-lan -Stop` 再起、等 ≤15s 复验 ③ 本机 AgentCard 200 + 对端 `pc1_pc2_ping`
+  ④ `tl-pin` 钉选本会话。**幂等**：已监听直接跳过，不打断正在跑的任务。
+  退出码 `0`=就绪 / `2`=服务没起 / `3`=钉选失败 / `4`=地址或配置不一致（属 setup）；
+  开关 `-CheckOnly` / `-NoPin` / `-Force` / `-SkipPeer`。
+- **技能**：`team-link-ops` §1.1 重写为「开工 / 重启后先跑 tl-boot」，§8 故障表把「本机通道 DOWN」
+  指向它；`team-link-setup` 顶部加一句「日常开工不需要本技能，只有 tl-boot exit 4 才进来」。
+- **职责边界不变**：改地址/改端口仍是 setup 的 `tl-sync.ps1 -Apply`；tl-boot 只按**现有配置**把服务拉起来，
+  遇到地址不一致不改配置、直接报 ④。
+
 0.3.4 —— **投送会话钉选（「消息投进了别的会话」的根治）**：
 
 - **问题**：收件箱桥按「最近活跃的根会话」挑投递目标。PC1 同时开着几个会话时，对端消息会投给

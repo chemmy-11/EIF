@@ -1,7 +1,7 @@
 ---
 name: team-link-ops
-description: team-link 的协作工作流（PC1 主导，两侧都用 goal 模式）。收件箱桥会把对端消息自动推进本会话（不用轮询）；收到后处理、用 tl-say 回 TEAM-REPORT、再 tl-recv -Done。含角色权威边界、桥故障判据与轮询兜底、静默与通道故障的区分、goal 续轮与 blocked 纪律、证据搬运与 issue 降级。
-skill-version: 2026-11-24c
+description: team-link 的协作工作流（PC1 主导，两侧都用 goal 模式）。开工/重启后第一条命令 tl-boot：起 LAN 服务（DSH 重启后不自启）+ 自检 + 钉选投送会话，一条命令四步；收件箱桥把对端消息自动推进本会话（不用轮询），收到后处理、tl-say 回 TEAM-REPORT、再 tl-recv -Done。含角色权威边界、桥故障判据与轮询兜底、静默与通道故障的区分、goal 续轮与 blocked 纪律、证据搬运与 issue 降级。
+skill-version: 2026-11-24d
 ---
 
 # team-link-ops
@@ -23,20 +23,38 @@ skill-version: 2026-11-24c
 
 ## 1. 主路径：消息会自己找上门（不要写轮询循环）
 
-### 1.1 开工第一件事：把自己钉成投送目标
+### 1.1 开工 / 重启后第一件事：`tl-boot`（起服务 + 自检 + 钉选）
 
-桥默认投给**最近活跃的根会话**。同时开着几个会话时，对端消息会跳进「刚说过话」的那个，
-在等消息的会话反而收不到（2026-11-24 实测：PC2 的消息投进了别的会话）。所以加载本技能后，
-先在**本会话**里钉一次：
+DSH 重启后 **LAN 服务不会自启**（服务是脱离宿主的长驻进程）。「加载了本技能」不等于「通道是通的」——
+这一条以前只写在 `team-link-setup` 里，交接时一漏就出现「两边都以为通道好，其实本机没监听，
+对端发什么都收不到」。所以现在把 setup 的关键一步并进 ops 开工流程：**一条命令跑完**。
 
 ```powershell
-powershell -NoProfile -File <TL>\skills\team-link-ops\scripts\tl-pin.ps1 -Bundle <TL> -Source skill-ops
+powershell -NoProfile -File <TL>\skills\team-link-ops\scripts\tl-boot.ps1 -Bundle <TL>
 ```
 
-- 期望 `PASS 已锁定投送会话 <session-id>`；脚本自己读 `$env:DSH_SESSION_ID`，不用手填。
-- 钉选的会话关掉后，桥自动回退到「最近活跃」，不会把消息卡死。
-- 换会话干活就在新会话重跑一次；`-Show` 查看当前钉选，`-Clear` 清除。
-- 判据：`state\inbox-bridge.log` 里 `pin: hit session-...` = 桥认了这次钉选；`pin: miss ...` = 钉的会话不在了。
+幂等：已监听就跳过启动，不打断正在跑的任务。四步，退出码就是结论：
+
+| 步骤 | 做什么 | 判据 |
+|---|---|---|
+| 1/4 地址 | `config.json` 的 host vs 当前 WLAN | 不一致 → **exit 4**，转 team-link-setup 的 `tl-sync.ps1 -Apply` |
+| 2/4 服务 | 没监听 / 绑错地址就 `start-lan.ps1 -Stop` 再起，等 ≤15s | `PASS a2a/mcp 已监听 <ip>:<port>` |
+| 3/4 探测 | 本机 AgentCard 200 + 对端 `pc1_pc2_ping.ps1` | 对端不可达只 WARN，不算本机故障 |
+| 4/4 钉选 | `tl-pin.ps1` 把**本会话**锁成投送目标 | `PASS 已锁定投送会话 <session-id>` |
+
+退出码：`0` 就绪 / `2` 服务没起来 / `3` 通道好但钉选失败 / `4` 地址或配置不一致（属 setup）。
+常用开关：`-CheckOnly` 只看不修、`-NoPin` 不动投送目标、`-Force` 已在监听也重启服务（换网段后 bind 变了）、
+`-SkipPeer` 跳过对端探测。
+
+**钉选（4/4）为什么必须有**：桥默认投给「最近活跃的根会话」，多开会话时消息会跳进刚说过话的那个，
+在等消息的会话反而收不到（2026-11-24 实测：PC2 的 TEAM-REPORT 投进了别的会话）。`tl-pin.ps1` 把
+`$env:DSH_SESSION_ID` 写进 `state/pinned-session.json`；换会话干活就在新会话重跑一次
+（`-Show` 查看、`-Clear` 清除）。钉选的会话关掉后桥自动回退「最近活跃」，不会卡死。
+判据：`state\inbox-bridge.log` 里 `pin: hit session-...`。
+
+**什么时候才需要用 `team-link-setup`**：只有 `tl-boot` 报 exit 4（换网段、地址/端口要改、配置被改坏）时。
+那是 setup 的职责（`tl-state.ps1` 只读定位 → `tl-sync.ps1 -Apply` 写配置 → 重启宿主 + 重起服务）；
+日常开工**不需要**加载 setup 技能。
 
 宿主半边的**收件箱桥**每 1.5 秒扫描 `state/tasks/`，把新任务按 task id 去重后推进 agent 收件箱。
 所以对端消息会**自动出现在你的输入里**，长得像这样：
@@ -139,7 +157,7 @@ powershell -NoProfile -File <TL>\tools\evidence_pull.ps1 -Remote "evidence:repor
 
 | 症状 | 一行判据 | 修法 |
 |---|---|---|
-| 本机通道 DOWN | `Get-NetTCPConnection -LocalPort 7310,18790 -State Listen` 为空 | `tools\start-lan.ps1`（重启后不自启）|
+| 本机通道 DOWN（最常见：**刚重启过 DSH**） | `Get-NetTCPConnection -LocalPort 7310,18790 -State Listen` 为空 | 跑 `tl-boot.ps1`（§1.1；服务不自启，一条命令起服务+自检+钉选）|
 | bind 不对 | 监听地址 ≠ 当前 WLAN 地址 | `start-lan.ps1 -Stop` → `start-lan.ps1`（详见 team-link-setup）|
 | 面板改了没反应 | `state/config.json` host ≠ 面板值 | 重启宿主 |
 | 回复 401 | `tl-say` 退出码 5 | 对端的 `state/peer-a2a.token` 不是你当前 token |
