@@ -123,6 +123,17 @@ function Get-ServiceUp([int]$Port) {
   return ($l.Count -gt 0)
 }
 
+# 把用户给的 id 解析成真实任务 id：允许唯一前缀。
+# 桥接消息头部只显示 8 位前缀，直接拿去做 -Done 会记错键，这里兜住。
+function Resolve-TaskId([string]$Given) {
+  if ([string]::IsNullOrWhiteSpace($Given)) { return '' }
+  if (Test-Path -LiteralPath (Join-Path $tasksDir ($Given + '.json'))) { return $Given }
+  $hits = @(Get-ChildItem -LiteralPath $tasksDir -File -Filter ($Given + '*.json') -ErrorAction SilentlyContinue)
+  if ($hits.Count -eq 1) { return $hits[0].BaseName }
+  if ($hits.Count -gt 1) { return '@ambiguous' }
+  return $Given
+}
+
 function Format-Body([string]$Body, [int]$Max) {
   if ($Body.Length -le $Max) { return $Body }
   return $Body.Substring(0, $Max) + [Environment]::NewLine + ("…(正文已截断，原长 " + $Body.Length + " 字符)")
@@ -152,9 +163,11 @@ if ($Baseline) {
 
 # ---------- 标记完成 / 失败 ----------
 if ($Done -or $Fail) {
-  $id = $Done
+  $rawId = $Done
   $state = "done"
-  if (-not $id) { $id = $Fail; $state = "done" }
+  if (-not $rawId) { $rawId = $Fail; $state = "done" }
+  $id = Resolve-TaskId $rawId
+  if ($id -eq "@ambiguous") { Write-Host ("FAIL id 前缀 " + $rawId + " 匹配到多条任务，请给更长的 id"); exit 6 }
   $map = Get-ConsumerMap $ledger $Consumer
   $prev = $null
   if ($map) { $p = $map.PSObject.Properties[$id]; if ($p) { $prev = $p.Value } }
