@@ -1,280 +1,57 @@
-# EIF — 面向边缘多节点协作的 FPGA 高速互联网络平台
-
-> **EIF = Edge Interconnect Fabric（边缘互联网络）** —— 原仓库名 `FPGA_Project`，2026-10-17 更名（旧链接由 GitHub 自动重定向）。
-
-[![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat)](scripts/)
-[![FPGA](https://img.shields.io/badge/FPGA-XCKU060-0b7285?style=flat)](prj/)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat)](LICENSE)
-[![CI](https://github.com/chemmy-11/EIF/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/EIF/actions/workflows/ci.yml)
-
-基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
-
-- **端点接入**：PC / 树莓派等标准以太网设备，经板载千兆 RJ45 网口接入
-- **板间干线**：Aurora 64b/66b 协议跑 10G 光纤（SFP+ 光口），多板互联时作为高速骨干
-- **板内转发**：数据可直通转发，也可整帧写入 DDR4 缓存后按需读出（大容量排队，拥塞调度的基础）
-
-目标场景是边缘侧多节点协作推理：多块板子组成交换网络，承载节点间的大块数据（如模型分片、会话记录）传输。
-
-> 面向协作者：工程规范（事实源优先级、CDC/ILA/XDC 约定、调试方法论、坑账本）见 [`AGENTS.md`](AGENTS.md)。本 README 是入门第一份文档。
-> **仓库分工（2026-10-26 起）**：本仓库（EIF）= **工程源码 / 历史仓**（Vivado 工程、验证资产、工程规范），**不是**最终交付物；GSnFPipe FPGA+PP 联合实验的 **A/B 协同与最终交付**在私有仓 [chemmy-11/GSnFPipe-FPGA-PP](https://github.com/chemmy-11/GSnFPipe-FPGA-PP)——issue 即共享任务清单（里程碑 M1–M4），贡献规则见其 [CONTRIBUTING.md](https://github.com/chemmy-11/GSnFPipe-FPGA-PP/blob/main/CONTRIBUTING.md)。
-
-**目录**：[系统定位](#系统定位) · [硬件平台](#硬件平台) · [工程血缘](#工程血缘) · [工程一览](#工程一览) · [内存进环路](#内存进环路) · [快速开始](#快速开始) · [仓库结构](#仓库结构) · [关键文档](#关键文档) · [持续集成（CI）](#持续集成ci) · [提交文档](#提交文档) · [开发约定](#开发约定)
-
-## 系统定位
-
-本平台在实验室 AI Infra 系统中位于**互联层**——向上承接中心算力的推理流量，向下连接边缘执行端，负责节点之间的数据搬运：
-
-![AI-Infra 系统拓扑：FPGA 交换核心位于互联层](docs/images/topology-ai-infra.png)
-
-图中「**互联层 · FPGA 交换核心**」即本仓库。当前已完成**单板交换中心**（物理/链路/网络层：10G 过纤、误码 0E0、UDP 回环四包链）、**DDR4 整帧缓存队列**（路线 A：按地址随机读 + 1466B 帧 82.67k fps 零丢帧）与**软核 + AXI DMA 数据面**（路线 B：读写两侧均已换 DMA，2026-10-19 收口）；**下一步主线是 prj12 双板互联**（GSnFPipe FPGA+PP 联合实验 M1/M2 数据面，工程在本仓库推进，A/B 协同与交付见开头「仓库分工」）；**多端点**接入与**优先级队列 / 反压 / 纳秒时间戳**是后续目标。
-
-## 硬件平台
-
-| 项 | 事实 |
-|---|---|
-| FPGA | Kintex UltraScale `xcku060-ffva1156-2-i` |
-| 系统时钟 | 100 MHz 差分（AK17/AK16）；复位按键 AC34（低有效） |
-| 网口 | 双千兆 RGMII（YT8531 PHY），默认 GE1：PC `192.168.1.102` ↔ 板 `192.168.1.10` |
-| 光口 | FMC 四 SFP+ 笼（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8），参考钟 156.25 MHz |
-| 调试 | Digilent USB-JTAG 烧录；FT2232H 串口（COM7 @9600） |
-| 环境 | Vivado 2023.1；Python 3.10+（Windows 控制台需设 `PYTHONUTF8=1`） |
-
-## 工程血缘
-
-每个新工程只复用**已上板验证通过**的前序部件，官方例程永远是最高事实基准。箭头表示文件与验证资产的继承关系：
-
-```
-正点原子 KU060 官方例程库（本仓库全部工程的事实基准）
-│
-├─[例程39章 以太网UDP]──► project_6   千兆以太网 UDP 协议栈
-│        │               ARP / ICMP / UDP 收发回显，ping 0% 丢包
-│        │               ✅ 上板验证 2026-09-04
-│        │               （含 rgmii_rx_fix2：千兆 RGMII 接收采样时序修复）
-│        ▼
-│    project_7   SFP 光口承载以太网（内环验证）
-│        │       ⏸ 已封存 —— 端点接入统一改用 RJ45 网口后，此路线不再需要
-│        │
-│        │       帧缓冲泵 frame_fifo_pump 在本工程诞生：
-│        │       整帧缓存 + 跨时钟域搬运，此后成为所有数据通路的标配部件
-│        ▼
-├─[Aurora 64b/66b 例程]─┬► aurora_64b66b_loop_ex   官方例程留档 ⏸
-│  （时钟/复位/QPLL      └► project_3   Aurora 64b/66b 链路层（GT 内环）
-│   支撑逻辑随工程走）         channel_up / 零误码 ✅ 2026-08-31
-│                                   │
-│                                   ▼
-│                             project_8   Aurora-UDP 桥接
-│                             以太网帧穿过 Aurora 64b/66b 编解码后原样返回，
-│                             payload 逐字节一致 ✅ 2026-09-18
-│                             （= 例程39章协议栈 + Aurora例程支撑逻辑
-│                                + project_7 的帧缓冲泵，三者首次合体）
-│                                   │
-│                                   ▼
-│                             project_9   真实光纤链路验证
-│                             两个 SFP+ 光口 A↔B 用光纤对接，数据渡光纤往返，
-│                             10MB 文件 100% 到达 + SHA256 完全一致 ✅ 2026-09-21
-│                                   │
-│                                   └─fork──► project_10   DDR4 帧队列（路线 A 已收口）
-│                                                 "内存进环路"：以太网帧写入 DDR4
-│                                                 再按帧读出，为大容量排队打地基；
-│                                                 复用 project_9 全套数据通路
-│                                                 ✅ W3 内存插入上板全过（2026-10-06）
-│                                                 ✅ W4 两级内存全环路 J4 全过（2026-10-07）
-│                                                 ✅ W5 按地址随机读 J5 全过（2026-10-08）
-│                                                 ✅ 速率线速化：1466B 帧 82.67k fps
-│                                                    零丢帧 ≈969 Mbps（2026-10-09）
-│                                                 ✅ 路线 A（W0–W6）收口（2026-10-09）
-│                                                 ▲
-├─[MIG 例程]──► project_4   MIG DDR4 读写校准 ────┘
-│               ✅ DDR4 校准上板通过（2026-10-06，MIG JTAG 报告全绿）
-│
-└─[MicroBlaze 例程]──► project_1   MicroBlaze 软核最小系统 ✅ 2026-08-11
-                       跑通 FPGA 内软核 + Vitis 软件开发流；
-                       将来作为控制面（状态上报 / 队列配置）回归 project_10
-```
+# EIF
 
-**图例**：✅ 已上板验证闭环 · ⏸ 封存（保留入库，不再推进）· 🔄 进行中
+**面向双机流水线训练实验的 FPGA 互联原型**
 
-图外挂起支线：project_2（8b/10b 编解码练手，仅起步即跳过——物理层信号质量已由 IBERT 眼图实验覆盖，2026-08-27）；串口调试桥（在 `prj/aurora_64b66b_loop_ex/` 例程目录内，上位机验证资料未收到）。
+EIF（Edge Interconnect Fabric）是 GSnFPipe 联合实验的 FPGA 侧工程。两台计算机分别运行模型的一部分，前向计算的中间结果和反向计算的梯度需要在两台主机之间传递。EIF 提供这条硬件数据通道，负责以太网接入、板间光纤传输、DDR4 帧缓存和板卡控制。
 
-### 数据环路长什么样（project_8 为例）
+## 已验证的成果
 
-血缘图是"谁继承了谁"，这张图标的是"**数据怎么走**"——上面 project_8 那一格的内部结构（图中 GT 为芯片内部串行环回；project_9 把它替换成**真实光纤 A↔B**，其余通路原样保留）：
+| 实板验证 | 结果 |
+| --- | --- |
+| **双向连续传输** | 在两块 FPGA 和两台 PC 组成的通路上，每个方向分别连续传输 **10,486,476 字节有效数据（超过 10 MiB）**，零丢包、零重复，逐字节核对通过。 |
+| **多种包长与并发收发** | 覆盖 **26–1472 字节**的六种 UDP 载荷长度。每个长度在两个方向各测 20 帧。100 字节报文每向复测五轮，另有同时双向发送的抓包。 |
+| **网口出口故障修复** | 板间已收到数据、接收端 PC 却抓不到转发包。结合片上波形与主机抓包，将故障定位到以太网封装，补齐前导码、帧校验序列并改正目的 MAC。修复后双向各 3 帧复测通过。 |
 
-![Aurora-UDP 数据级桥架构与数据流拓扑](docs/images/aurora-udp-datapath.png)
+记录：[双向传输与多尺寸实测](https://github.com/chemmy-11/EIF/issues/14#issuecomment-7100415390) · [网口封装修复与上板复测](prj/project_13/docs/M1_prj13_P2双板透传晚窗签收报告_2026-11-20.md)
 
-要点：数据在 **两个时钟域**之间往返（网口侧 125 MHz / 光口侧 151.5 MHz），靠**帧缓冲泵 + 异步 FIFO** 完成跨时钟域搬运；协议栈与 Aurora 均为官方例程原样复用，**本工程新增的只有打包/解包与双帧泵**。
+## 系统架构
 
-## 工程一览
+~~~mermaid
+flowchart LR
+    H1["计算主机 1"] <-->|千兆以太网| F1["FPGA 1<br/>转发与 DDR4 缓存"]
+    F1 <-->|10 Gb/s 光链路| F2["FPGA 2<br/>转发与 DDR4 缓存"]
+    F2 <-->|千兆以太网| H2["计算主机 2"]
+~~~
 
-| 目录 | 内容 | 验证判据（怎么算"过"） | 状态 |
-|---|---|---|---|
-| `prj/project_1/` | MicroBlaze 软核最小系统 | 串口打印 Hello World | ✅ 2026-08-11 |
-| `prj/project_3/` | Aurora 64b/66b IP 配置定版 | GT 内环 channel_up、零误码 | ✅ 2026-08-31 |
-| `prj/project_4/` | MIG DDR4 读写校准 | DDR4 上电校准（MIG JTAG 报告）+ 集成位流全链写读对账 | ✅ 2026-10-06（例程自带比对测试有自身缺陷，内存正确性以集成位流判据为准） |
-| `prj/project_6/` | 千兆以太网 UDP 协议栈 | ping 0% 丢包、UDP 回显逐字节一致、Wireshark 抓包核对 | ✅ 2026-09-04 |
-| `prj/project_8/` | Aurora-UDP 桥接 | PC 发 UDP → 穿 Aurora 编解码往返 → payload 逐字节一致 | ✅ 2026-09-18 |
-| `prj/project_9/` | 真实光纤链路全链路 | 光口 A↔B 对接，10MB 文件 100% 到达 + SHA256 一致 | ✅ 2026-09-21 |
-| `prj/project_10/` | DDR4 帧队列（内存进环路） | W3 内存插入 → W4 两级全环路（10MB 100%+SHA、双桥对账闭合）→ **W5 按地址随机读**（导师原话四环节板卡证据）→ **速率线速化**（1466B 82.67k fps 零丢帧 ≈969 Mbps）→ W6 可观测性收口；J1–J6+J3′ 全过 | ✅ 路线 A 收口（2026-10-09）；路线 B 迁至 `project_11` |
-| `prj/project_11/` | 路线 B：MicroBlaze 软核控制面 + AXI DMA 数据面（fork prj10） | B0–B5 / R1–R4 全部完成：软核控制下随机读写（导师四环节）、四档逐字节、10MB 全量校验、两级缓存计数对账全部通过（板上 13 项）；速率 1466B ≈2000 帧/秒（可编程优先，不追线速） | ✅ 路线 B 收口（2026-10-19） |
-| `prj/project_2/` | 8b/10b 编解码练手（仅起步即跳过，物理层由 IBERT 实验覆盖） | — | ⏸ 封存 |
-| `prj/project_7/` | SFP 光口以太网前端 | — | ⏸ 封存 |
-| `prj/aurora_64b66b_loop_ex/` | Aurora 官方例程 + 串口调试桥 | 例程内环已验证；串口桥验证未完成 | ⏸ 留档 |
-| `prj/ibert_ultrascale_gth_0/` | IBERT 物理层实验 | 10G PRBS 过纤零误码 + 眼图 | ✅ 2026-08-27 |
-| `prj/0DMA_uart2ddr/` | MicroBlaze+MIG+DMA+UART 参考设计（Vivado 2019.2） | **未验证**，仅作参考骨架 | 🗄️ 归档 |
+两块 Kintex UltraScale KU060 通过 SFP+ 光纤运行 Aurora 64B/66B，板间光段配置为 10 Gb/s，两端主机从千兆以太网接入。训练进程运行在主机上，FPGA 负责搬运与缓存数据。
 
-**状态图例**：✅ 已上板验证闭环 · 🔄 进行中 · ⏸ 封存（保留入库，不再推进）· 🗄️ 归档（仅作参考）
+- **以太网转发**　解析 IPv4 报文，按目的地址转发。跨板保留 IP 包，由接收板重建面向本地网卡的以太网帧。[转发与封装 RTL](prj/project_13/rtl/p2/)
+- **缓存与数据搬运**　用异步 FIFO 在不同时钟域间交接数据，以整帧为单位在 DDR4 中写入和读出。MicroBlaze 软核处理配置与状态，AXI DMA 参与内存搬运。[帧缓存接口](prj/project_13/rtl/frame_mem_if.v) · [内存桥 RTL](prj/project_13/rtl/axi4_master_bridge.v) · [软核固件](prj/project_13/sw/src_j3/main.c)
+- **实板调试**　用带序号的 UDP 测试帧把主机抓包、片上逻辑分析仪（ILA）和串口计数对在同一轮测试上，可以逐段判断帧在哪一步失去进展。[发包与抓包工具](prj/project_13/pc/) · [双板接线与验证操作单](prj/project_13/docs/M1_prj13_双板恢复与A1收口操作单_2026-11-23.md)
 
-> 📄 上表各工程"**大致怎么做的**"（为什么做这一步、分几步实现、判据细节、期间踩过的坑）另见补充说明：**[docs/导览_cross_已完成工作说明_2026-10-22.md](docs/导览_cross_已完成工作说明_2026-10-22.md)**。
-> 分工是：**本 README 讲"是什么、在哪、怎么跑"**，补充说明讲"**当时是怎么做出来的**"。
+## 接下来验证什么
 
-## 内存进环路
+上面的数据来自普通 UDP 测试报文。接下来继续补齐掉链恢复和异常上报，再把训练软件接入同一条数据通道，建立端到端性能基线。联合实验的目标是让 FPGA 按设定的时窗暂存和发送数据，比较不同发送策略对计算等待和单步训练时间的影响。[当前实板验证进展](https://github.com/chemmy-11/EIF/issues/15)
 
-把 DDR4 读写纳入数据环路：以太网帧先写入板载内存，再按帧号读出——为大容量排队与拥塞调度打地基。整件事的**分岔口只有一处：数据怎么进出 DDR**，据此分两步走（导师 2026-09-30 定案）。
+## 阅读与复现
 
-### 路线 A · 自写硬件模块直连内存（本期交付）
+| 想看什么 | 入口 |
+| --- | --- |
+| FPGA 的完整数据流 | [顶层 RTL](prj/project_13/rtl/aurora_mem_bridge.v) |
+| 不接板先看一次仿真 | [帧缓存测试平台](prj/project_13/sim/p2/tb_p2_frame_buf.v) |
+| 双板如何接线、烧录和验收 | [双板操作单](prj/project_13/docs/M1_prj13_双板恢复与A1收口操作单_2026-11-23.md) |
+| 早期硬件实验和调试记录 | [文档索引](docs/README.md) · [已完成工作导览](docs/导览_cross_已完成工作说明_2026-10-22.md) |
 
-![路线 A：自写内存桥直连 DDR4，DDR4 位于数据环路中心](docs/images/ddr-route-a.png)
+在 Windows 的英文路径下打开仓库，用 Vivado 2023.1 运行帧缓存仿真。将 `$VivadoBin` 改为本机 Vivado 的 `bin` 目录。
 
-图中**绿色 = 已有模块（判据全过、零改动）**，**粉色 = 本次新增**。四个内存动作按入向/出向各一组：① 写·槽号＝帧计数 ② 读·槽号＝选择器（出向为 ③④）。上方 AXI4 512 bit @ 300 MHz 连到 MIG 控制器与 DDR4 4 GB；右侧为**板内渡光两次**（笼 A → 笼 B → 回显 → 笼 A）。
+~~~powershell
+$VivadoBin = 'D:\Xilinx\Vivado\2023.1\bin'
+powershell -NoProfile -ExecutionPolicy Bypass -File prj/project_13/sim/p2/run_p2_sim.ps1 `
+  -VivadoBin $VivadoBin -Only framebuf -TempDir "$PWD\.tmp\sim"
+~~~
 
-**当前状态**：**路线 A 已于 2026-10-09 收口（W0–W6 全过）**——两级内存全环路 + 按地址随机读（导师原话四环节板卡证据）+ 1466B 帧 82.67k fps 零丢帧（≈969 Mbps 线速）+ 可观测性收口；判据 J1–J6 + J3′ 全部上板通过。复现步骤见 [docs/复现/复现_prj10_指南_2026-10-09.md](docs/复现/复现_prj10_指南_2026-10-09.md)。
+通过时输出 `P2_FRAMEBUF_TB: PASS=5 FAIL=0`，包括逐字节读回和队列满时整帧丢弃。安装 Python 3 后，可用 `py -3 scripts/ci_check.py` 检查仓库链接与脚本。工程开发约定见 [AGENTS.md](AGENTS.md)。
 
-### 路线 B · 软核 + DMA 控制（后继，不推翻 A）
+## 许可
 
-![路线 B：MicroBlaze + AXI DMA + SmartConnect 承担数据搬运](docs/images/ddr-route-b.png)
-
-与路线 A 的差别只在**数据面换一层、控制面加一个**：MicroBlaze 经 AXI4-Lite 只下发参数（DMA 源/目的地址＝槽号、长度）、读回状态，**不进入数据通路**；搬运交给 AXI DMA，路由交给 SmartConnect。启动条件是**路线 A 的功能判据全部通过**（已于 2026-10-09 满足），两条路线的接口按"可替换"预留，**第二步不返工**。
-
-**当前状态（2026-10-19）**：**路线 B 已收口**——B0 断点核查/脚手架 → B1 软核控制面 → B2 软核验证 → B3 读路径换 DMA（R1）→ **R2 写路径换 DMA（2026-10-19）**：板上全流程判据 **13 项全部通过**（四档逐字节 / 10MB 全量校验 / 随机读写 + 负向 / 两级缓存计数对账）；**R3 速率**：1466B 帧可持续约 **2000 帧/秒**（约 23 Mbps），临界约 2500 帧/秒（可编程优先，不追线速）；**R4**：复现指南 + 探针清单 + 归档索引收口。C 程序已可按帧/槽配置读写位置、顺序与限速；任意 DDR 地址通用读写属下一步扩展。复现见 [docs/复现/复现_prj11_指南_2026-10-19.md](docs/复现/复现_prj11_指南_2026-10-19.md)，发布页见 [Release](https://github.com/chemmy-11/EIF/releases/tag/prj11-routeB-closed-2026-10-19)。
-
-## 快速开始
-
-以 project_9 为例复现三层验证。所需就三样：**一块 KU060 板 + 一根网线 + 一根 SFP 光纤**（把光口 A、B 对接）。三层判据依次证明"链路在 → 通路通 → 数据对"：
-
-```powershell
-# 1) 烧录位流（断电后位流易失，需重烧；脚本幂等）
-& 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source D:\FPGA\prj\project_9\scripts\program_board.tcl
-
-# 2) 链路层：板上 T23 LED 常亮 = Aurora 双通道链路建立（channel_up 硬门控）
-
-# 3) 网络层：ping 板卡
-ping 192.168.1.10 -n 20          # 判据：0% 丢包、全部 <1ms
-
-# 4) 数据层：UDP 回显校验（先关掉占用 1234 端口的程序）
-$env:PYTHONUTF8 = 1              # Windows 控制台必设，否则中文输出崩
-cd D:\FPGA\prj\project_9
-python scripts\udp_verify.py     # 判据：回显一致 12/12
-```
-
-大文件完整性验证（数据真实穿过光纤往返）：`python scripts\json_storm.py <任意文件> --out recv.bin`，比对重组文件与源文件 SHA256。
-
-各工程 `scripts\` 下均有 `create_project / build / program` 幂等脚本，可在纯 ASCII 路径下一键重建工程。
-
-## 配套工具：vivado-mcp
-
-[`vivado-mcp/`](vivado-mcp/) 把 Vivado 的常用操作封装成 **32 个工具**（读工程 / 查时序 / 审约束 / 看波形 / 跑综合实现 / 抓 ILA），供 AI 客户端直接调用，不必在 GUI 里逐步点。随仓库提供源码副本，**不含任何本机专有配置**，可在任意机器复现。
-
-> **来源**：上游项目 **[mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp)** v0.3.26（Apache-2.0）。
-> 与上游**逐字节比对：52 个文件完全相同、0 个修改**，仅做目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 本目录平铺入包内）。
-> 上游以 **Vivado 2019** 为基准，本项目运行于 **Vivado 2023.1**——离线工具实测可用；已知差异见 [工具说明](vivado-mcp/README.md)。
-
-```powershell
-$env:PYTHONPATH = "D:\FPGA\vivado-mcp"
-python -m vivado_mcp doctor     # 只读诊断：能否找到 Vivado、依赖是否齐全
-python -m vivado_mcp install    # 可选：注入 Vivado_init.tcl，让 GUI 启动的 Vivado 也能被接管（自动备份）
-python -m vivado_mcp            # 启动 MCP server（stdio）
-```
-
-其中 `parse_xpr` / `parse_bit_header` / `parse_ltx` / `xdc_lint` 属**离线工具**，不启动 Vivado 即可用。
-安装与工具清单详见 [`vivado-mcp/README.md`](vivado-mcp/README.md)。
-
-> ⚠️ **两条硬约束**：① 工具**安装路径必须纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；
-> ② Vivado 会话与综合/实现/仿真**全局串行**，同一时刻只让一个客户端占用。**烧板永远归人**。
-
-## 仓库结构
-
-```
-prj/                    全部工程集中于此（2026-10-01 归类；本地路径同为 D:\FPGA\prj\）
-  ├─ project_N/              各 Vivado 工程（rtl / sim / scripts / xdc / docs）
-  ├─ project_11/             路线 B：MicroBlaze 软核 + AXI DMA（当前主线）
-  ├─ ibert_ultrascale_gth_0/ IBERT 眼图实验工程
-  ├─ aurora_64b66b_loop_ex/  Aurora 官方例程留档（内含串口调试桥）
-  └─ 0DMA_uart2ddr/          MicroBlaze+DDR4+DMA 参考设计（未验证，仅作骨架）
-test/                   上板前的独立小试验工程（led 闪烁 / project_1 最小系统试水），非主线资产
-docs/                   文档中心：实操单、实施单、测试报告、调试记录（脱敏快照）
-docs/images/            本 README 引用的拓扑图
-vivado-mcp/             配套工具：让 AI 直接操作 Vivado 的 MCP 服务（见下节）
-AGENTS.md               工程规范：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本
-LICENSE                 MIT（覆盖作者原创部分）
-THIRD_PARTY.md          第三方组件与素材声明（含 AMD/Xilinx 版权素材，不适用 MIT）
-KU_IO.xdc               官方板卡引脚约束（事实基准）
-scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）+ ci_check.py（仓库体检）
-.github/workflows/      CI：文档规范 / 相对链接 / 脚本语法自动检查
-```
-
-## 持续集成（CI）
-
-每次 push / PR 自动跑一轮**仓库体检**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml) → [`scripts/ci_check.py`](scripts/ci_check.py)），**不依赖 Vivado**，秒级完成：
-
-| 检查项 | 判据 |
-|---|---|
-| **文档命名规范** | `docs/` 下 Markdown 须为 `[阶段]_prj标识_概要_YYYY-MM-DD.md`（禁空格；`README.md`/`agent.md` 豁免；工程内部 docs/ 不受约束） |
-| **相对链接可解析** | 全仓库 Markdown 的相对链接与图片必须指向真实存在的文件（防断链） |
-| **Python 语法** | 仓库内全部 `.py` 可编译 |
-| **`.ps1` 编码** | 含非 ASCII 的 PowerShell 脚本必须带 UTF-8 BOM（PS 5.1 老坑，见 AGENTS.md 坑账本 #17/#18） |
-| **Tcl 语法完整性** | 全部 `.tcl` 引号/括号闭合（`info complete`） |
-| **docs 索引一致性** | `docs/README.md` 的全量索引与 docs/ 磁盘实际文件一致（2026-10-17 起） |
-
-本地随时跑：
-
-```powershell
-py scripts\ci_check.py      # 退出码 0 = 全过（Git Bash 里勿用 python 别名，坑账本 #45）
-```
-
-各检查防什么、失败怎么定位、新增文件自检清单，见 [AGENTS.md §十二「CI 与远程仓库规范」](AGENTS.md#十二ci-与远程仓库规范)。
-
-## 关键文档
-
-| 文档 | 是什么 |
-|---|---|
-| [AGENTS.md](AGENTS.md) | **工程规范权威版**：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本（§九）、**当前工程状态（§十）**、CI 规范（§十二）——文件头有 30 秒目录导航 |
-| [docs/README.md](docs/README.md) | **文档中心索引**：docs/ 全部 75 篇文档的目录 + 命名规范（CI 保证索引与磁盘一致） |
-| [AGENTS.md §十 当前工程状态](AGENTS.md#十当前工程状态一屏速览内部详表见本节附录) | **现在做到哪、下一步是什么**（一屏速览） |
-| [GSnFPipe-FPGA-PP](https://github.com/chemmy-11/GSnFPipe-FPGA-PP)（私有） | **A/B 协同与最终交付仓（2026-10-26 起）**：issue 共享任务清单（M1–M4 里程碑）、导师三份指导与 B 组 v1.1、`protocol_v1` 冻结接口、实验包与 M1–M4 签收记录；工程源码仍在本仓库，贡献规则见其 `CONTRIBUTING.md` |
-| [docs/调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md](docs/调试记录/阶段三_prj11_R2写侧S2MM换层_2026-10-17.md) | **路线 B 收口记录（2026-10-19）**：B0–B5 / R1–R4 全过程、板上 13 项判据、R3 速率量化与重审；§十九–§二十二 为收口结论 |
-| [docs/操作文档/阶段三_prj11_路线B剩余工作清单_2026-10-16.md](docs/操作文档/阶段一至阶段三/阶段三_prj11_路线B剩余工作清单_2026-10-16.md) | 路线 B 剩余工作清单：**2026-10-19 全部结项**（R1–R4 完成、D1/K2 结项、D2 放弃；§八 收尾记录） |
-| [docs/复现/复现_prj11_指南_2026-10-19.md](docs/复现/复现_prj11_指南_2026-10-19.md) | **路线 B 复现指南**：产物核对 → 烧录 → 体检 → 板上判据一键 → 四档/10MB/J3 → 速率量化 → ILA → 归档核对 |
-| [prj11 路线 B 收口 Release](https://github.com/chemmy-11/EIF/releases/tag/prj11-routeB-closed-2026-10-19) | **2026-10-19 发布页**：验收产物、板上判据、速率与复现入口 |
-| [docs/追踪_cross_短期待办_2026-10-10.md](docs/追踪_cross_短期待办_2026-10-10.md) | 短期待办任务清单 |
-| [docs/规划_cross_长期路线图_2026-09-04.md](docs/规划_cross_长期路线图_2026-09-04.md) | 长期路线图（v4.5 · 架构定版，含决策记录） |
-
-## 提交文档
-
-往 `docs/` 提交文档的三条规则（全文见 [AGENTS.md §八](AGENTS.md#八git-与文档规范)）：
-
-1. **脱敏**：`docs/` 是 vault（Obsidian 知识库，`C:\Users\15266\Desktop\毕设\`）的**脱敏快照**——用户名→`***`，人名→`前辈`，入库前必须过一遍；vault 为权威版本，工程内只放快照。
-2. **命名**：`[阶段]_prj标识_概要_YYYY-MM-DD.md`，禁空格；重命名文件要在 frontmatter 加 `alias: 旧名` 保旧链接可达。CI 第 1 项会拦不合规命名。
-3. **镜像与索引**：`docs/` 增删文件后同步更新 [docs/README.md](docs/README.md) 的全量索引（CI 第 6 项会拦漂移）；操作类入 `操作文档/`、记录类入 `调试记录/`（按主导内容归类）。
-
-## 开发约定
-
-1. **官方例程 > 已上板验证的工程 > 板卡手册 > AI 生成内容**——冲突时按此优先级裁决。
-2. **官方文件不改动原件**：修复一律走"同名模块顶替"或"派生新文件"。
-3. **结论必须有判据**：每个"通过"都要落到可复现的证据（计数器对账 / 哈希比对 / 抓包），不接受"看起来能跑"。
-4. Vivado 相关路径全 ASCII（中文路径有 GBK 编码实坑）。
-5. 文档命名：`[阶段]_prj标识_概要_YYYY-MM-DD.md`（例：`阶段二之八_prj8_数据级桥上板验证单_2026-09-10.md`），详见 [`docs/README.md`](docs/README.md)。
-
----
-
-*各工程详细验证过程与排障记录见 [`docs/`](docs/)；已完成工作的实现路径见 [补充说明](docs/导览_cross_已完成工作说明_2026-10-22.md)；工程状态以本文件与 git log 为准。*
-
----
-
-**许可**：本仓库**作者原创部分**（自研 RTL、脚本、文档、评测与工具链封装）采用 **[MIT License](LICENSE)**，**仅供学习研究使用**。
-**例外**（详见 [`THIRD_PARTY.md`](THIRD_PARTY.md)，第三方与版权素材声明）：
-
-- **坑账本全文**：`PITFALLS.md`（#1–#68；索引见 `AGENTS.md §九`）
-- **AMD / Xilinx 版权素材**——`prj/aurora_64b66b_loop_ex/`、`prj/ibert_ultrascale_gth_0/`、各工程的官方例程移植件与 IP 生成物、`KU_IO.xdc` 等：**不适用** MIT，权利归 AMD/Xilinx，仅供学习研究；
-- [`vivado-mcp/`](vivado-mcp/)——第三方项目，遵循其上游 Apache-2.0（全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE)）；
-- **Vivado 许可文件**——`*.lic` 已被 `.gitignore` 排除，不入库不分发；本仓库不复制、不传播任何 AMD/Xilinx 工具授权；
-- `prj/0DMA_uart2ddr/`——来源未考证的参考设计，**不主张权利、不授予许可**。
+作者原创部分采用 [MIT License](LICENSE)。第三方代码、官方例程及 IP 生成物的权利归属见 [第三方声明](THIRD_PARTY.md)。
