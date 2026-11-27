@@ -31,7 +31,7 @@ flowchart LR
 
 ## 接下来验证什么
 
-上面的数据来自普通 UDP 测试报文。接下来继续补齐掉链恢复和异常上报，再把训练软件接入同一条数据通道，建立端到端性能基线。联合实验的目标是让 FPGA 按设定的时窗暂存和发送数据，比较不同发送策略对计算等待和单步训练时间的影响。[当前实板验证进展](https://github.com/chemmy-11/EIF/issues/15)
+A1 已于 11 月 27 日正式签收；闪断和掉电后通过人工成对重烧恢复，自主恢复未通过，保留 `need_reburn=Y`。A2 双向 GPP2/v1 最小承载集通过 6/6，固定 Tensor 经双 FPGA 重组尚未测试，仍待正式签收。后续按 A2 → J1/J2 → A3 推进。[A1 验收](https://github.com/chemmy-11/GSnFPipe-FPGA-PP/issues/14) · [A2 判据](https://github.com/chemmy-11/GSnFPipe-FPGA-PP/issues/10) · [V4 工件](https://github.com/chemmy-11/EIF/issues/20) · [当前入口](docs/README.md#当前执行入口)
 
 ## 阅读与复现
 
@@ -40,7 +40,7 @@ flowchart LR
 | FPGA 的完整数据流 | [顶层 RTL](prj/project_13/rtl/aurora_mem_bridge.v) |
 | 不接板先看一次仿真 | [帧缓存测试平台](prj/project_13/sim/p2/tb_p2_frame_buf.v) |
 | 双板如何接线、烧录和验收 | [双板操作单](prj/project_13/docs/M1_prj13_双板恢复与A1收口操作单_2026-11-23.md) |
-| 早期硬件实验和调试记录 | [文档索引](docs/README.md) · [已完成工作导览](docs/导览_cross_已完成工作说明_2026-10-22.md) |
+| 早期硬件实验和调试记录 | [文档索引](docs/README.md) · [已完成工作导览](docs/导览_cross_已完成工作说明_2026-11-27.md) |
 
 在 Windows 的英文路径下打开仓库，用 Vivado 2023.1 运行帧缓存仿真。将 `$VivadoBin` 改为本机 Vivado 的 `bin` 目录。
 
