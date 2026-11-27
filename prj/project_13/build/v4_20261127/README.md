@@ -28,11 +28,13 @@ Expand-Archive -LiteralPath $Zip -DestinationPath $FreshRoot
 $env:P13_ROOT = (Resolve-Path (Join-Path $FreshRoot 'prj/project_13')).Path
 $env:P13_BOARD = 'A'
 $env:P12_PLACE_DIRECTIVE = 'ExtraPostPlacementOpt'
-$env:P13_SKIP_ILA8 = '0'
-$env:P13_SKIP_ILA9 = '0'
-$env:R3C_LITE_ILA = '0'
-$env:R3C_LITE_ILA5 = '0'
-Remove-Item Env:P13_PRE_HOOK -ErrorAction SilentlyContinue
+$clear = @(
+    'R3C_LITE_ILA', 'R3C_LITE_ILA5', 'R3C_SKIP_ILA4', 'P12_SKIP_ILA6',
+    'P13_SKIP_ILA7', 'P13_SKIP_ILA7_TXD', 'P13_SKIP_ILA8', 'P13_SKIP_ILA9', 'P13_PRE_HOOK'
+)
+foreach ($name in $clear) {
+    Remove-Item -LiteralPath ('Env:'+$name) -ErrorAction SilentlyContinue
+}
 $s = Join-Path $env:P13_ROOT 'scripts'
 & $Vivado -mode batch -source "$s/create_project.tcl" -notrace -log "$FreshRoot/create.log"
 # 确认退出 0 和 CREATE_DONE

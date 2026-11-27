@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 4131,
-      "sha256": "a78c947e172668d5bbaba627bfaeddc586b9e6abdb0be205592e3f8f95910fe1"
+      "bytes": 4305,
+      "sha256": "a3fc78d82ac1b6b4ef5decd8a2149878ca5f119a5f1b2359cecaa867ca1dec08"
     },
     {
       "path": "prj/project_10/prj_uiclk/ip/ddr4_0/ddr4_0.xci",
