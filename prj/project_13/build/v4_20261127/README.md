@@ -1,11 +1,11 @@
 # prj13 V4 双机构建输入
 
-本包仅用于 B1 正式 V4 重建，A/B 两侧使用同一份 ZIP。基线为 EIF `dbe1526c16b19b01716c0dba48b2857332f84a5d`，附同一份 144 位 ILA 补丁、实现检查和可重定位建工程入口。配对 bit/LTX 在两端各自构建完成后交付。
+本包仅用于 B1 正式 V4 重建，A/B 两侧使用同一份 ZIP。基线为 EIF `dbe1526c16b19b01716c0dba48b2857332f84a5d`，附同一份 144 位 ILA 补丁、实现检查和可重定位建工程入口。两端各构建本端上板位流，分别归档 bit/LTX 和审查记录。
 
 | 构建机器 | 构建角色 | 实现起跑策略 | 出件后上板端 |
 | --- | --- | --- | --- |
-| PC2 | 软 A，`P13_BOARD=A`，无 `BOARD_B` | `ExtraPostPlacementOpt` | PC1 物理板 B |
-| PC1 | 软 B，`P13_BOARD=B`，有 `BOARD_B` | `ExtraTimingOpt` | PC2 物理板 A |
+| PC1（物理板 B） | 软 A，`P13_BOARD=A`，无 `BOARD_B` | `ExtraPostPlacementOpt` | PC1 物理板 B |
+| PC2（物理板 A） | 软 B，`P13_BOARD=B`，有 `BOARD_B` | `ExtraTimingOpt` | PC2 物理板 A |
 
 ## 取件与验件
 
@@ -22,12 +22,26 @@ Expand-Archive -LiteralPath $Zip -DestinationPath $FreshRoot
 
 ## 离线构建命令
 
-在本机已核验的 PowerShell 会话运行，`$Vivado` 为 Vivado 2023.1 的可执行入口，`$FreshRoot` 为刚验的解包根。下方配置适用于 PC2。PC1 将角色及 place 策略改为上一表中的 B 对应值。三段依序执行，每段保留独立日志和退出码；先确认 `CREATE_DONE`，再确认综合及本轮 DCP，最后实现。
+在本机已核验的 PowerShell 会话运行，`$Vivado` 为 Vivado 2023.1 的可执行入口，`$FreshRoot` 为刚验的解包根。按本机物理板选择角色与实现策略，再执行共用命令。三段依序执行，每段保留独立日志和退出码；先确认 `CREATE_DONE`，再确认综合及本轮 DCP，最后实现。
+
+PC1（物理板 B）的配置
+
+```powershell
+$env:P13_BOARD = 'A'
+$env:P12_PLACE_DIRECTIVE = 'ExtraPostPlacementOpt'
+```
+
+PC2（物理板 A）的配置
+
+```powershell
+$env:P13_BOARD = 'B'
+$env:P12_PLACE_DIRECTIVE = 'ExtraTimingOpt'
+```
+
+两端共用命令
 
 ```powershell
 $env:P13_ROOT = (Resolve-Path (Join-Path $FreshRoot 'prj/project_13')).Path
-$env:P13_BOARD = 'A'
-$env:P12_PLACE_DIRECTIVE = 'ExtraPostPlacementOpt'
 $clear = @(
     'R3C_LITE_ILA', 'R3C_LITE_ILA5', 'R3C_SKIP_ILA4', 'P12_SKIP_ILA6',
     'P13_SKIP_ILA7', 'P13_SKIP_ILA7_TXD', 'P13_SKIP_ILA8', 'P13_SKIP_ILA9', 'P13_PRE_HOOK'
@@ -43,11 +57,11 @@ $s = Join-Path $env:P13_ROOT 'scripts'
 & $Vivado -mode batch -source "$s/iso/b1_impl.tcl" -notrace -log "$FreshRoot/impl.log"
 ```
 
-DSH 会话可用 dsh-vivado 的 Vivado 预设和本机已验证的异步 Tcl 后台入口，显式传入同样的环境和脚本路径，每段验证完再启动下段。建工程阶段导入 XCI、生成 MicroBlaze BD 和 IP；空工程预验失败时保留日志，由 PC1 处理工程依赖或接手这一侧。
+DSH 会话可用 dsh-vivado 的 Vivado 预设和本机已验证的异步 Tcl 后台入口，显式传入同样的环境和脚本路径，每段验证完再启动下段。建工程阶段导入 XCI、生成 MicroBlaze BD 和 IP；空工程预验失败的一端保存日志，并在 EIF #18 登记依赖和阻塞。
 
 ## PC2 回执与成品交接
 
-- 开工回执含 ZIP SHA-256、清单通过、工作目录、版本和 SW/IP build、器件与 top、BUILD A、确认无旧检查点，以及 `CREATE_DONE` 和实际 IP 列表。
+- 开工回执含 ZIP SHA-256、清单通过、工作目录、版本和 SW/IP build、器件与 top、BUILD B（物理板 A）、确认无旧检查点，以及 `CREATE_DONE` 和实际 IP 列表。
 - 验收先查综合和实现的实际角色、网表来源和 144 位探针。两端逐核对 `name/width/bit_offset` 与采样域。确认只删 GMII ILA 的 `ep_ok`，保留十类 32 bit、旧 D-fix 探针和原生域 ILA6。保持同版 CDC 报告并逐条比对旧候选。越域探针路径消失，新增同方向路径须审查；登记 setup/hold/pulse 各自的裕量和失败端点。
-- PC2 把新软 A bit/LTX、日志、时序/CDC/DRC/check_timing、探针表和 SHA 清单交给 PC1。PC1 提供新软 B 对应材料，并在 EIF 发布成对工件 + 共用 ELF/回退入口。PC2 从正式配对发布实取软 B bit/LTX/ELF 验哈希回执。PC1 实取验软 A。上板按 A2 #10 走复链、校准、`mode=1`、双向正例、G4/T7/分类 DROP。
+- PC1 提交本端软 A，PC2 提交本端软 B。两侧各提交 bit/LTX、日志、时序/CDC/DRC/check_timing、探针表和 SHA 清单。EIF 集中发布配对工件、共用 ELF 和回退入口，两侧逐项校验各自上板文件的哈希后按 A2 #10 换件和复验。
 
