@@ -12,6 +12,9 @@
 # 用法: create_project.tcl 之后执行(或由其 source); 幂等(先删旧 BD)
 # =============================================================================
 set P D:/FPGA/prj/project_13
+if {[info exists ::env(P13_ROOT)] && $::env(P13_ROOT) ne ""} {
+    set P [file normalize $::env(P13_ROOT)]
+}
 
 if {[llength [get_projects -quiet]] == 0} {
     open_project $P/vivado/prj13.xpr

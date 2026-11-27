@@ -13,6 +13,14 @@
 set P    D:/FPGA/prj/project_13
 set P9   D:/FPGA/prj/project_9
 set P10  D:/FPGA/prj/project_10
+if {[info exists ::env(P13_ROOT)] && $::env(P13_ROOT) ne ""} {
+    set P [file normalize $::env(P13_ROOT)]
+    set P9 [file normalize [file join $P .. project_9]]
+    set P10 [file normalize [file join $P .. project_10]]
+    if {[file exists [file join $P vivado prj13.xpr]]} {
+        error "V4_INIT: use a fresh isolated project directory"
+    }
+}
 set part_name xcku060-ffva1156-2-i
 
 create_project prj13 $P/vivado -part $part_name -force

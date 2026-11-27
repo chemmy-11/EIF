@@ -8,7 +8,7 @@
 #   位宽与采样域仍严格按 EIF #18：4×32 基础 + 16 入口丢弃 + 十类×32（eth 域），
 #   3×16 + 32（user 域）。
 # 探针位序（= LTX 位序）：
-#   u_ila_8  @gmii_rx_clk 145b : ep_ok(1) rx_frames(32) relay(32) local(32) arp(32) rx_drop16(16)
+#   u_ila_8  @gmii_rx_clk 144b : rx_frames(32) relay(32) local(32) arp(32) rx_drop16(16)
 #   u_ila_9  @gmii_rx_clk  96b : vlan(32) ipv6(32) ethertype(32)
 #   u_ila_10 @gmii_rx_clk  96b : broadcast(32) multicast(32) unknown_dst(32)
 #   u_ila_11 @gmii_rx_clk 128b : oversize(32) bad_csum(32) truncated(32) mac(32)
@@ -53,7 +53,6 @@ if {[info exists ::env(P13_SKIP_ILA8)] && $::env(P13_SKIP_ILA8) eq "1"} {
     # ---- 核 1：基础计数 + 入口丢弃 ----
     b1_mk_ila u_ila_8 $ec
     set a {}
-    lappend a [one_net dbg_b1_ep_ok]
     foreach t {dbg_b1_rx_frames dbg_b1_relay dbg_b1_local dbg_b1_arp} {
         foreach n [bus_nets $t 32] { lappend a $n }
     }
