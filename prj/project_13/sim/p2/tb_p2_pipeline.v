@@ -358,6 +358,7 @@ module tb_p2_pipeline;
     integer   out_frames;
     integer   out_bytes;        // 输出**总字节数**：DROP 帧必须一个字节都不外泄
     integer   last_out_len;
+    reg       cap_in_frame;     // 帧内标志（帧界用"首字节 + eop"判定，见下方说明）
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -366,18 +367,27 @@ module tb_p2_pipeline;
             out_bytes      <= 0;
             last_out_len   <= 0;
             rw_len_err_cnt <= 0;
+            cap_in_frame   <= 1'b0;
         end else begin
             if (rw_len_err) rw_len_err_cnt <= rw_len_err_cnt + 1;
             if (rw_m_valid && rw_m_ready) begin
                 out_bytes <= out_bytes + 1;
-                if (rw_m_sop) begin
-                    cap_len  <= 1;
-                    cap_out[0] <= rw_m_data;
+                // ★2026-11-27 契约变更（D1 之后）：eth_rewrap 出口 =
+                //   8 B 前导/SFD + [MAC 头 + IP + 补零] + 4 B FCS，
+                //   而 m_sop 落在 MAC 头首字节（前导之后，eth_rewrap.v:116）。
+                //   若仍用 sop 复位捕获，前导 8 B 会被后续覆盖并丢出计数
+                //   （实测 cap_len 恒比真帧少 8：1472 B 包读到 1490 而非 1498）。
+                //   故帧界改用"帧内首个字节 + eop"，cap_len = 线上真实帧长。
+                if (!cap_in_frame) begin
+                    cap_in_frame <= 1'b1;
+                    cap_len      <= 1;
+                    cap_out[0]   <= rw_m_data;
                 end else begin
                     cap_out[cap_len] <= rw_m_data;
-                    cap_len <= cap_len + 1;
+                    cap_len          <= cap_len + 1;
                 end
                 if (rw_m_eop) begin
+                    cap_in_frame <= 1'b0;
                     out_frames   <= out_frames + 1;
                     last_out_len <= cap_len + 1;
                 end
@@ -748,27 +758,68 @@ module tb_p2_pipeline;
         end
     endtask
 
-    // 期望输出帧（rewrap 形态）
+    //---------------------------------------------------------------------
+    // CRC-32 参考模型（CRC-32/ISO-HDLC，反射式）
+    //   与 tb_p2_relay_top.v:406-417 的 ref_crc **逐行相同**（该 TB 的 I06/I07
+    //   已按同一 RTL 通过）；契约与 rtl/arp/crc32_d8.v 一致：
+    //   poly 0xEDB88320 / init 0xFFFFFFFF / 末取反，
+    //   FCS 字节序 = crc[7:0], crc[15:8], crc[23:16], crc[31:24]
+    //---------------------------------------------------------------------
+    function [31:0] ref_crc;
+        input [31:0] c;
+        input [7:0]  b;
+        integer    k;
+        reg [31:0] x;
+        begin
+            x = c ^ {24'd0, b};
+            for (k = 0; k < 8; k = k + 1)
+                x = x[0] ? ((x >> 1) ^ 32'hEDB88320) : (x >> 1);
+            ref_crc = x;
+        end
+    endfunction
+
+    //---------------------------------------------------------------------
+    // 期望输出帧（rewrap 形态，★2026-11-27 按 D1 之后真实线上字节契约重写）
+    //   旧版只造 [14 B MAC][IP][补零到 MIN_FRAME]，漏了 D1 修复新增的
+    //   8 B 前导/SFD 与 4 B FCS，exp_frame_len 恒比实测少 12
+    //   （修前实测 [DET] 1490/1486、64/60、1498/1494、66/62）。
+    //   现按 rtl/p2/eth_rewrap.v 的出口契约生成：
+    //     [0..6] 7×0x55   [7] 0xD5(SFD)
+    //     [8..] MAC 头(dst=DST_MAC=PEER_PC_MAC, src=BOARD_MAC, 0x0800) + IP + 补零
+    //     末 4 B FCS，覆盖「MAC 头 + IP + 补零」（不含前导/SFD，不含 FCS 自身）
+    //   总长 = 8 + max(14 + total_len, MIN_FRAME) + 4  (== tot_len + 12)
+    //---------------------------------------------------------------------
     task build_expected;
         input integer total_len;
-        integer i, plen;
+        integer i, plen, flen;
+        reg [31:0] crc;
         begin
-            exp_frame[0]  = PEER_PC_MAC[47:40]; exp_frame[1]  = PEER_PC_MAC[39:32];
-            exp_frame[2]  = PEER_PC_MAC[31:24]; exp_frame[3]  = PEER_PC_MAC[23:16];
-            exp_frame[4]  = PEER_PC_MAC[15:8];  exp_frame[5]  = PEER_PC_MAC[7:0];
-            exp_frame[6]  = BOARD_MAC[47:40];   exp_frame[7]  = BOARD_MAC[39:32];
-            exp_frame[8]  = BOARD_MAC[31:24];   exp_frame[9]  = BOARD_MAC[23:16];
-            exp_frame[10] = BOARD_MAC[15:8];    exp_frame[11] = BOARD_MAC[7:0];
-            exp_frame[12] = 8'h08;
-            exp_frame[13] = 8'h00;
-            for (i = 0; i < total_len; i = i + 1) exp_frame[14 + i] = frm[14 + i];
+            for (i = 0; i < 7; i = i + 1) exp_frame[i] = 8'h55;
+            exp_frame[7] = 8'hD5;
+            exp_frame[8]  = PEER_PC_MAC[47:40]; exp_frame[9]  = PEER_PC_MAC[39:32];
+            exp_frame[10] = PEER_PC_MAC[31:24]; exp_frame[11] = PEER_PC_MAC[23:16];
+            exp_frame[12] = PEER_PC_MAC[15:8];  exp_frame[13] = PEER_PC_MAC[7:0];
+            exp_frame[14] = BOARD_MAC[47:40];   exp_frame[15] = BOARD_MAC[39:32];
+            exp_frame[16] = BOARD_MAC[31:24];   exp_frame[17] = BOARD_MAC[23:16];
+            exp_frame[18] = BOARD_MAC[15:8];    exp_frame[19] = BOARD_MAC[7:0];
+            exp_frame[20] = 8'h08;
+            exp_frame[21] = 8'h00;
+            for (i = 0; i < total_len; i = i + 1) exp_frame[22 + i] = frm[14 + i];
             plen = 14 + total_len;
             if (plen < MIN_FRAME) begin
-                for (i = plen; i < MIN_FRAME; i = i + 1) exp_frame[i] = 8'h00;
-                exp_frame_len = MIN_FRAME;
+                for (i = plen; i < MIN_FRAME; i = i + 1) exp_frame[8 + i] = 8'h00;
+                flen = MIN_FRAME;
             end else begin
-                exp_frame_len = plen;
+                flen = plen;
             end
+            crc = 32'hFFFFFFFF;
+            for (i = 0; i < flen; i = i + 1) crc = ref_crc(crc, exp_frame[8 + i]);
+            crc = ~crc;
+            exp_frame[8 + flen]     = crc[7:0];
+            exp_frame[8 + flen + 1] = crc[15:8];
+            exp_frame[8 + flen + 2] = crc[23:16];
+            exp_frame[8 + flen + 3] = crc[31:24];
+            exp_frame_len = 8 + flen + 4;
         end
     endtask
 
@@ -996,7 +1047,7 @@ module tb_p2_pipeline;
         run_frame;
         drain;
         chk_all("C02_tiny_pad_26_to_60", 3'd2, 4'd0, 1'b1, 1'b1);
-        req(cap_len == 60, "C02 output frame len == 60");
+        req(cap_len == 72, "C02 output frame len == 72 (8 preamble + 60 + 4 FCS)");
         req(rw_len_err_cnt == 0, "C02 no len_err");
 
         //=====================================================================

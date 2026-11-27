@@ -138,6 +138,33 @@ wire [31:0]   p2_st_drop_broadcast, p2_st_drop_multicast, p2_st_drop_unknown_dst
 wire [31:0]   p2_st_drop_oversize, p2_st_drop_bad_csum, p2_st_drop_truncated;
 wire [31:0]   p2_st_drop_mac;
 wire [31:0]   p2_st_aur_frames, p2_st_aur_drop, p2_st_lan_frames, p2_st_aur_bad_v4;
+
+//*******************************************************************
+// ★B2 (2026-11-27) 入口缓冲丢弃触发件：暂停控制 + 观测（全部 eth_rxc 域）
+//   用途：解锁 A1-6「缓冲丢弃」实板项（EIF #18）。诊断件专属，正式 V4 分支不含。
+//   暂停源：vio_p2_pause（1 bit 输出，JTAG；IP 由 scripts/iso/b2_pre_hook.tcl 建）
+//   全部观测点都带 mark_debug，便于 scripts/iso/b2_ila_ext.tcl 的 connect_debug_port
+//   按名引用（综合若不带 mark_debug 会把这些"只喂调试"的网优化掉）。
+//*******************************************************************
+wire          dbg_p2_pause_req;                 // ← VIO 输出探针（异步）
+wire          dbg_p2_pause;                     // 同步+锁存后的暂停态
+wire [1:0]    dbg_p2_bank_busy;                 // 入口 RAM 两槽占用
+wire          dbg_p2_rx_sop, dbg_p2_rx_eop, dbg_p2_rx_drop_pulse;
+wire          dbg_p2_rxbf_vld, dbg_p2_buf_rd_ready, dbg_p2_ext_s_ready;
+
+(* mark_debug = "true" *) wire        dbg_b2_pause      = dbg_p2_pause;
+(* mark_debug = "true" *) wire [1:0]  dbg_b2_bank_busy  = dbg_p2_bank_busy;
+(* mark_debug = "true" *) wire        dbg_b2_rx_sop     = dbg_p2_rx_sop;
+(* mark_debug = "true" *) wire        dbg_b2_rx_eop     = dbg_p2_rx_eop;
+(* mark_debug = "true" *) wire        dbg_b2_rx_drop    = dbg_p2_rx_drop_pulse;
+(* mark_debug = "true" *) wire        dbg_b2_rxbf_vld   = dbg_p2_rxbf_vld;
+(* mark_debug = "true" *) wire        dbg_b2_buf_rdy    = dbg_p2_buf_rd_ready;
+(* mark_debug = "true" *) wire        dbg_b2_ext_rdy    = dbg_p2_ext_s_ready;
+(* mark_debug = "true" *) wire        dbg_b2_ep_ok      = ~aurora_rst;   // 1 = 同一未复位区间
+(* mark_debug = "true" *) wire [15:0] dbg_b2_rx_drop16  = p2_st_rx_drop[15:0];
+(* mark_debug = "true" *) wire [15:0] dbg_b2_relay16    = p2_st_relay[15:0];
+(* mark_debug = "true" *) wire        dbg_b2_relay_en   = p2_relay_tx_en;
+(* mark_debug = "true" *) wire [7:0]  dbg_b2_relay_data = p2_relay_txd;
 reg           stack_takeover = 1'b0;      // 本地栈应答接管 RGMII TX（帧级）
 reg           stack_tx_en_d  = 1'b0;
 // ---- W5 命令通道：应答帧注入（同域 mux，见文件头 7）----
@@ -339,6 +366,20 @@ vio_link_health u_vio_link (
     .probe_in2  (dbg_link_armed_ui),
     .probe_in3  (dbg_link_down_ui),
     .probe_in4  (dbg_link_lost_sticky_ui)
+);
+
+// ★B2 (2026-11-27) 暂停控制 VIO：0 个输入 / 1 个输出（1 bit）。
+//   为什么不复用上面的 vio_link_health：那个核的 5 个输入探针顺序已被
+//   scripts/read_link_health.tcl 硬绑定，改配置要重新生成 IP，风险大于收益。
+//   ★时钟域：**init_clk（100 MHz，自由运行）**，不是 ui_clk。
+//     理由（实测）：本核最初挂 ui_clk（= mmcm_clkout0，300 MHz），而该域正是
+//     全设计时序最紧的域；把它移出 300 MHz 域是为了不再给它添负载。
+//     暂停请求本来就经 p2_relay_top 内部 2FF 同步进 eth_rxc 域，源域自由选择；
+//     选 init_clk 的额外好处是**GE1 未插线时 gmii_rx_clk 不跑也能读 VIO**，
+//     这正是"暂停诊断件"最需要的工作条件。
+vio_p2_pause u_vio_pause (
+    .clk        (ui_clk),
+    .probe_out0 (dbg_p2_pause_req)
 );
 
 // ---- 内存桥 ↔ MIG 的 AXI4（37 信号）----
@@ -951,7 +992,17 @@ p2_relay_top #(
     .st_aur_frames    (p2_st_aur_frames),
     .st_aur_drop      (p2_st_aur_drop  ),
     .st_lan_frames    (p2_st_lan_frames),
-    .st_aur_bad_v4    (p2_st_aur_bad_v4)
+    .st_aur_bad_v4    (p2_st_aur_bad_v4),
+    // ---- ★B2 诊断端口 ----
+    .dbg_pause_req     (dbg_p2_pause_req),
+    .dbg_pause         (dbg_p2_pause),
+    .dbg_bank_busy     (dbg_p2_bank_busy),
+    .dbg_rx_sop_pulse  (dbg_p2_rx_sop),
+    .dbg_rx_eop_pulse  (dbg_p2_rx_eop),
+    .dbg_rx_drop_pulse (dbg_p2_rx_drop_pulse),
+    .dbg_rxbf_vld      (dbg_p2_rxbf_vld),
+    .dbg_buf_rd_ready  (dbg_p2_buf_rd_ready),
+    .dbg_ext_s_ready   (dbg_p2_ext_s_ready)
 );
 
 //*******************************************************************

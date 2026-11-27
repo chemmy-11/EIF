@@ -55,13 +55,21 @@ function Fail([string] $msg, [int] $code) {
 }
 
 # ---- testbench table ----------------------------------------------------
+# ★2026-11-27: eth_rewrap 自 cbfd304 (D1 修复) 起例化 rtl/arp/crc32_d8.v 生成 FCS，
+#   但本 runner 的 unit/relay 源列表一直没跟着补 —— D1 之后该 runner 的 xelab
+#   会直接报 `Module <crc32_d8> not found ... u_fcs_crc`（本轮实测）。
+#   这里把 crc32_d8.v 补进两个用到 eth_rewrap 的 TB。
+$rtlArp   = Join-Path (Split-Path -Parent $rtlDir) 'arp'
+$crc32Src = Join-Path $rtlArp 'crc32_d8.v'
+
 $rtl_unit = @('ipv4_packet_extract.v', 'eth_rewrap.v', 'local_steer.v')
-$tb_unit  = @() ; foreach ($f in $rtl_unit) { $tb_unit += (Join-Path $rtlDir $f) }
+$tb_unit  = @($crc32Src)
+foreach ($f in $rtl_unit) { $tb_unit += (Join-Path $rtlDir $f) }
 $tb_unit += (Join-Path $scriptDir 'tb_p2_pipeline.v')
 
 $tb_fbuf  = @((Join-Path $rtlDir 'p2_frame_buf.v'), (Join-Path $scriptDir 'tb_p2_frame_buf.v'))
 
-$tb_relay = @()
+$tb_relay = @($crc32Src)
 foreach ($f in $rtl_unit) { $tb_relay += (Join-Path $rtlDir $f) }
 $tb_relay += (Join-Path $rtlDir 'p2_frame_buf.v')
 $tb_relay += (Join-Path $rtlDir 'p2_relay_top.v')
@@ -73,7 +81,7 @@ $tbs = @(
     @{ key='framebuf'; top='tb_p2_frame_buf'; snap='p2_sim_fbuf';
        srcs=$tb_fbuf;  verdict='P2_FRAMEBUF_TB: PASS='; min=5;  label='framebuf' },
     @{ key='relay';    top='tb_p2_relay_top'; snap='p2_sim_relay';
-       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=13; label='relay' }
+       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=16; label='relay' }
 )
 
 Write-Head 'prj13 P2 xsim runner (unit + framebuf + relay)'
@@ -153,7 +161,12 @@ foreach ($tb in $tbs) {
     }
 
     # -- xelab --
-    & (Join-Path $VivadoBin 'xelab.bat') '-debug' 'typical' $tb.top '-s' $tb.snap *> $xelabLog
+    # ★2026-11-27: rtl/arp/crc32_d8.v 是官方正点原子文件（AGENTS.md §二：官方 RTL
+    #   保持原样），它没有 `timescale，而 eth_rewrap / p2_relay_top 都有 => xelab 报
+    #   [XSIM 43-4099] "Module crc32_d8 doesn't have a timescale but at least one
+    #   module in design has a timescale"。用 xelab 自带的 --timescale 补默认值解决，
+    #   不动官方 RTL（xvlog 的 -help 里没有这一项，--timescale 属于 xelab）。
+    & (Join-Path $VivadoBin 'xelab.bat') '-debug' 'typical' '--timescale' '1ns/1ps' $tb.top '-s' $tb.snap *> $xelabLog
     $rc = $LASTEXITCODE
     Write-Host ('  xelab exit = ' + $rc)
     if ($rc -ne 0) {

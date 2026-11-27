@@ -11,6 +11,13 @@
 # 产物: scripts/pre_impl_debug.dcp（实现走 build_impl.tcl）
 # =============================================================================
 set proj  D:/FPGA/prj/project_13
+# ★2026-11-27 隔离构建（B2/B1）：P13_ROOT 覆盖工程与产物根。
+#   默认不设 => 行为与旧版逐位相同（主工程 D:/FPGA/prj/project_13）。
+#   隔离用法：在独立 worktree 的副本上设 P13_ROOT=<worktree>/prj/project_13，
+#   于是 open_project 打开的是 worktree 里的 prj13.xpr，$PPRDIR/../rtl 也就解析到
+#   worktree 的 rtl —— 真正的"隔离工程"，主工程零改动。
+if {[info exists ::env(P13_ROOT)] && $::env(P13_ROOT) ne ""} { set proj $::env(P13_ROOT) }
+puts "P13_ROOT: $proj"
 file mkdir $proj/out
 
 open_project $proj/vivado/prj13.xpr
@@ -89,6 +96,13 @@ if {[llength [get_ips -quiet vio_link_health]] == 0} {
     puts "CREATE_IP: vio_link_health 已存在，复用"
 }
 update_compile_order -fileset sources_1
+
+# ---- ★2026-11-27 变体预钩子（必须在综合前）：建变体专用 VIO / IP ----
+if {[info exists ::env(P13_PRE_HOOK)] && $::env(P13_PRE_HOOK) ne ""} {
+    puts "P13_PRE_HOOK: $::env(P13_PRE_HOOK)"
+    source $::env(P13_PRE_HOOK)
+}
+
 # ---- ddr4_0 产物：create_project 已在 No_Buffer 配置下 generate_target all ----
 #   仅当 synth 产物缺失时才重建（实测 2026-10-24: 重建路径偶发
 #   [Common 17-233] slave interpreter 初始化失败 / [IP_Flow 19-1747] 交付文件失败，
@@ -587,6 +601,14 @@ if {[info exists ::env(P13_SKIP_ILA7_TXD)] && $::env(P13_SKIP_ILA7_TXD) eq "1"} 
 }
 
 
+
+# ---- ★2026-11-27 变体 ILA 钩子：在 write_checkpoint 前追加减法核 ----
+#   放在这里而不是文件内联，是为了让诊断分支（B2）/ 正式件（B1）各自的探针
+#   定义独立成文件，互不污染，也不需要改本脚本的既有 ILA0/3/5/6/7 编排。
+if {[info exists ::env(P13_ILA_EXTRA)] && $::env(P13_ILA_EXTRA) ne ""} {
+    puts "P13_ILA_EXTRA: $::env(P13_ILA_EXTRA)"
+    source $::env(P13_ILA_EXTRA)
+}
 
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp
 close_design

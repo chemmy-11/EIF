@@ -71,7 +71,29 @@ parameter [47:0] PC_MAC    = 48'h00_00_00_00_00_00,   // ★2026-11-20 D1 修复
     output wire [7:0]  lan_data,
     output wire        lan_en,
     // Aurora 域统计
-    output wire [31:0] st_aur_frames, st_aur_drop, st_lan_frames, st_aur_bad_v4
+    output wire [31:0] st_aur_frames, st_aur_drop, st_lan_frames, st_aur_bad_v4,
+    //=====================================================================
+    // ★B2 入口缓冲暂停诊断（2026-11-27；全部 eth_clk / gmii_rx_clk 域）
+    //---------------------------------------------------------------------
+    // 为什么**不**用提取器 m_ready 做暂停：m_valid 是"状态机停在 S_SEND"的组合
+    //   输出，拉低 m_ready 只让字节原地停住，下游仍按保持的 valid/EOP 逐拍消费
+    //   ⇒ 重复转发/重复计数（EIF #18 明确列为陷阱）。
+    // 本实现的暂停点选在**入口 RAM 与提取器之间**，两个信号同时门控：
+    //   · u_rxbuf.rd_ready <- ext_s_ready & ~pause  （RAM 不推进，帧留在 bank）
+    //   · u_ext.s_valid    <- rxbf_vld    & ~pause  （提取器看不到新字节）
+    // 只停消费、不停生产：上游 al_dv 照常写入，两个 bank 先后占满，第三帧在写侧
+    //   被整帧拒收并计入 o_wr_drop_cnt（p2_frame_buf 既有语义，不改）。
+    // 默认 pause=0 时两路门控恒等透传，与生产版本逐位等价。
+    //=====================================================================
+    input  wire        dbg_pause_req,     // 暂停请求（异步，VIO 输出探针）
+    output wire        dbg_pause,         // 同步+边沿锁存后的暂停态（0 = 生产语义）
+    output wire [1:0]  dbg_bank_busy,     // 入口 RAM 两槽占用 {bank1,bank0}
+    output wire        dbg_rx_sop_pulse,  // 入口帧边界：帧首字节（写侧 al_dv 上升）
+    output wire        dbg_rx_eop_pulse,  // 入口帧边界：帧尾字节（写侧 al_dv 下降）
+    output wire        dbg_rx_drop_pulse, // 入口整帧拒收脉冲（o_wr_drop_cnt 变化，1 拍）
+    output wire        dbg_rxbf_vld,      // 入口 RAM 读侧 valid（原始）
+    output wire        dbg_buf_rd_ready,  // 门控后送 RAM 的 rd_ready
+    output wire        dbg_ext_s_ready    // 提取器原始 s_ready（未门控）
 );
 
     //=====================================================================
@@ -132,6 +154,42 @@ parameter [47:0] PC_MAC    = 48'h00_00_00_00_00_00,   // ★2026-11-20 D1 修复
         end
     end
 
+    //---------------------------------------------------------------------
+    // ★B2 暂停控制：异步请求 -> 2FF 同步（异步复位清 0）-> 稳态后上升沿置位 /
+    //   请求撤低清除。
+    //   为什么还要 pause_mask：复位会把同步器本身清 0，若请求此时仍为高，
+    //   同步后天然产生一次 0->1 的"假上升沿"，会把刚复位的设计又停住。
+    //   pause_mask 在复位释放后屏蔽前 15 拍，只有**稳态之后**的真实上升沿才置位
+    //   => 语义确定：复位后一律恢复默认（解除），要再暂停必须重新 0->1。
+    //---------------------------------------------------------------------
+    reg  [3:0] pause_mask;
+    reg pause_s1, pause_s2, pause_s2_d;
+    reg pause_q;
+    always @(posedge eth_clk or negedge eth_rst_n) begin
+        if (!eth_rst_n) begin
+            pause_mask <= 4'd0;
+            pause_s1 <= 1'b0; pause_s2 <= 1'b0; pause_s2_d <= 1'b0; pause_q <= 1'b0;
+        end else begin
+            if (!(&pause_mask)) pause_mask <= pause_mask + 4'd1;
+            pause_s1   <= dbg_pause_req;
+            pause_s2   <= pause_s1;
+            pause_s2_d <= pause_s2;
+            if (!pause_s2)                           pause_q <= 1'b0;  // 请求撤低 => 解除
+            else if (!pause_s2_d && (&pause_mask))    pause_q <= 1'b1;  // 稳态上升沿 => 暂停
+        end
+    end
+    wire pause = pause_q;
+    assign dbg_pause = pause;
+
+    // 入口帧边界（写侧 al_dv 的上升/下降沿，恰好 1 拍）
+    reg al_dv_d;
+    always @(posedge eth_clk or negedge eth_rst_n) begin
+        if (!eth_rst_n) al_dv_d <= 1'b0;
+        else            al_dv_d <= al_dv;
+    end
+    assign dbg_rx_sop_pulse =  al_dv & ~al_dv_d;
+    assign dbg_rx_eop_pulse = ~al_dv &  al_dv_d;
+
     wire [7:0]  rxbf_data;
     wire        rxbf_vld, rxbf_sop, rxbf_eop, rxbf_rdy;
     wire [15:0] rxbf_wr_cnt, rxbf_drop_cnt, rxbf_rd_cnt;
@@ -160,6 +218,24 @@ parameter [47:0] PC_MAC    = 48'h00_00_00_00_00_00,   // ★2026-11-20 D1 修复
     // 一帧在缓冲侧完成（判决/ARP 计数的事件边界；不受上游丢帧影响）
     wire rx_frm_done = rxbf_vld & rxbf_rdy & rxbf_eop;
 
+    // ★B2：入口 RAM 与提取器之间的暂停门控（见端口注释）
+    //   ext_s_ready 是提取器的真实反压（S_VRD/S_SEND 期间为 0）；
+    //   暂停时把它和 s_valid 一起压 0，RAM 与提取器**同拍**停住，字节原地保持。
+    wire ext_s_ready;
+    assign rxbf_rdy         = ext_s_ready & ~pause;
+    assign dbg_buf_rd_ready = rxbf_rdy;
+    assign dbg_ext_s_ready  = ext_s_ready;
+    assign dbg_rxbf_vld     = rxbf_vld;
+    assign dbg_bank_busy    = rxbf_busy;
+
+    // 入口整帧拒收脉冲：p2_frame_buf 只在帧尾把 o_wr_drop_cnt +1，故计数变化即事件
+    reg [15:0] rxbf_drop_d;
+    always @(posedge eth_clk or negedge eth_rst_n) begin
+        if (!eth_rst_n) rxbf_drop_d <= 16'd0;
+        else            rxbf_drop_d <= rxbf_drop_cnt;
+    end
+    assign dbg_rx_drop_pulse = (rxbf_drop_cnt != rxbf_drop_d);
+
     // 提取器输出（IP 字节流 + 元数据）
     wire [7:0]  ex_data;
     wire        ex_vld, ex_rdy, ex_sop, ex_eop;
@@ -179,8 +255,8 @@ parameter [47:0] PC_MAC    = 48'h00_00_00_00_00_00,   // ★2026-11-20 D1 修复
     ) u_ext (
         .clk           (eth_clk),
         .rst_n         (eth_rst_n),
-        .s_valid       (rxbf_vld),
-        .s_ready       (rxbf_rdy),
+        .s_valid       (rxbf_vld & ~pause),
+        .s_ready       (ext_s_ready),
         .s_data        (rxbf_data),
         .s_sop         (rxbf_sop),
         .s_eop         (rxbf_eop),

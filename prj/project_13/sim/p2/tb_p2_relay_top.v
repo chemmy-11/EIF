@@ -80,9 +80,19 @@ module tb_p2_relay_top;
 
     wire [31:0] st_aur_frames, st_aur_drop, st_lan_frames, st_aur_bad_v4;
 
+    //=========================================================================
+    // ★B2 诊断端口（2026-11-27）：入口缓冲暂停控制 + 观测
+    //=========================================================================
+    reg        pause_req;                    // 暂停请求（异步，对应板上 VIO 输出探针）
+    wire       dbg_pause;                    // 同步+锁存后的暂停态
+    wire [1:0] dbg_bank_busy;                // 入口 RAM 两槽占用
+    wire       dbg_rx_sop_pulse, dbg_rx_eop_pulse, dbg_rx_drop_pulse;
+    wire       dbg_rxbf_vld, dbg_buf_rd_ready, dbg_ext_s_ready;
+
     p2_relay_top #(
         .BOARD_MAC    (BOARD_MAC),
         .PEER_MAC     (PEER_MAC),
+        .PC_MAC       (PC1_MAC),          // ★D-fix：出口 dst = 本板直连 PC 的网卡 MAC
         .BOARD_IP     (BOARD_IP),
         .PEER_IP      (PEER_IP),
         .PC_IP        (PC1_IP),
@@ -118,7 +128,17 @@ module tb_p2_relay_top;
         .st_aur_frames (st_aur_frames),
         .st_aur_drop   (st_aur_drop),
         .st_lan_frames (st_lan_frames),
-        .st_aur_bad_v4 (st_aur_bad_v4)
+        .st_aur_bad_v4 (st_aur_bad_v4),
+        // ---- ★B2 诊断 ----
+        .dbg_pause_req     (pause_req),
+        .dbg_pause         (dbg_pause),
+        .dbg_bank_busy     (dbg_bank_busy),
+        .dbg_rx_sop_pulse  (dbg_rx_sop_pulse),
+        .dbg_rx_eop_pulse  (dbg_rx_eop_pulse),
+        .dbg_rx_drop_pulse (dbg_rx_drop_pulse),
+        .dbg_rxbf_vld      (dbg_rxbf_vld),
+        .dbg_buf_rd_ready  (dbg_buf_rd_ready),
+        .dbg_ext_s_ready   (dbg_ext_s_ready)
     );
 
     //=========================================================================
@@ -379,28 +399,65 @@ module tb_p2_relay_top;
     endtask
 
     //---------------------------------------------------------------------
-    // 期望 lan 帧：14 B 头(dst=PEER_MAC, src=BOARD_MAC, 0x0800) + IP + 补零
+    // 独立 CRC-32 参考（CRC-32/ISO-HDLC，反射式）
+    //   与 rtl/arp/crc32_d8.v 的契约一致；同一实现已用于 sim/tb_eth_rewrap_fcs.sv:63-67，
+    //   该 TB :142-143 明确 FCS 字节序 = crc[7:0], crc[15:8], crc[23:16], crc[31:24]。
+    //---------------------------------------------------------------------
+    function [31:0] ref_crc;
+        input [31:0] c;
+        input [7:0]  b;
+        integer    k;
+        reg [31:0] x;
+        begin
+            x = c ^ {24'd0, b};
+            for (k = 0; k < 8; k = k + 1)
+                x = x[0] ? ((x >> 1) ^ 32'hEDB88320) : (x >> 1);
+            ref_crc = x;
+        end
+    endfunction
+
+    //---------------------------------------------------------------------
+    // 期望 lan 帧（★2026-11-27 按 D-fix 之后**真实线上字节契约**重写）
+    //---------------------------------------------------------------------
+    // 旧版只造「14 B MAC 头 + IP(+补零)」，漏了 D1 修复新增的 8 B 前导/SFD 与
+    // 4 B FCS，于是期望长度恒比实测少 12（实测 [DET] len=1498 exp=1486 /
+    // len=72 exp=60）。现按 rtl/p2/eth_rewrap.v 的出口契约生成：
+    //   [0..6] 7×0x55   [7] 0xD5(SFD)
+    //   [8..]  MAC 头(dst=PC_MAC, src=BOARD_MAC, 0x0800) + IP 包 + 补零到 60
+    //   末 4 B FCS，覆盖「MAC 头 + IP + 补零」（不含前导/SFD、不含 FCS 自身）
+    // 总长 = 8 + max(14 + total_len, 60) + 4
     //---------------------------------------------------------------------
     task build_exp_lan;
         input integer total_len;       // IP 包字节数（wb[0..total_len-1]）
-        integer i, plen;
+        integer    i, plen, flen;
+        reg [31:0] crc;
         begin
-            exp_lan[0] = PEER_MAC[47:40]; exp_lan[1] = PEER_MAC[39:32];
-            exp_lan[2] = PEER_MAC[31:24]; exp_lan[3] = PEER_MAC[23:16];
-            exp_lan[4] = PEER_MAC[15:8];  exp_lan[5] = PEER_MAC[7:0];
-            exp_lan[6] = BOARD_MAC[47:40]; exp_lan[7] = BOARD_MAC[39:32];
-            exp_lan[8] = BOARD_MAC[31:24]; exp_lan[9] = BOARD_MAC[23:16];
-            exp_lan[10] = BOARD_MAC[15:8]; exp_lan[11] = BOARD_MAC[7:0];
-            exp_lan[12] = 8'h08;
-            exp_lan[13] = 8'h00;
-            for (i = 0; i < total_len; i = i + 1) exp_lan[14 + i] = wb[i];
+            for (i = 0; i < 7; i = i + 1) exp_lan[i] = 8'h55;
+            exp_lan[7] = 8'hD5;
+            exp_lan[8]  = PC1_MAC[47:40];   exp_lan[9]  = PC1_MAC[39:32];
+            exp_lan[10] = PC1_MAC[31:24];   exp_lan[11] = PC1_MAC[23:16];
+            exp_lan[12] = PC1_MAC[15:8];    exp_lan[13] = PC1_MAC[7:0];
+            exp_lan[14] = BOARD_MAC[47:40]; exp_lan[15] = BOARD_MAC[39:32];
+            exp_lan[16] = BOARD_MAC[31:24]; exp_lan[17] = BOARD_MAC[23:16];
+            exp_lan[18] = BOARD_MAC[15:8];  exp_lan[19] = BOARD_MAC[7:0];
+            exp_lan[20] = 8'h08;
+            exp_lan[21] = 8'h00;
+            for (i = 0; i < total_len; i = i + 1) exp_lan[22 + i] = wb[i];
             plen = 14 + total_len;
             if (plen < 60) begin
-                for (i = plen; i < 60; i = i + 1) exp_lan[i] = 8'h00;
-                exp_lan_len = 60;
+                for (i = plen; i < 60; i = i + 1) exp_lan[8 + i] = 8'h00;
+                flen = 60;
             end else begin
-                exp_lan_len = plen;
+                flen = plen;
             end
+            crc = 32'hFFFFFFFF;
+            for (i = 0; i < flen; i = i + 1) crc = ref_crc(crc, exp_lan[8 + i]);
+            crc = ~crc;
+            exp_lan[8 + flen]     = crc[7:0];
+            exp_lan[8 + flen + 1] = crc[15:8];
+            exp_lan[8 + flen + 2] = crc[23:16];
+            exp_lan[8 + flen + 3] = crc[31:24];
+            exp_lan_len = 8 + flen + 4;
         end
     endtask
 
@@ -502,6 +559,18 @@ module tb_p2_relay_top;
     reg [7:0] seq3 [0:1023];
     // I10 专用：3 × 1486 B 的期望内容存档（3*1486 = 4458）
     reg [7:0] seq10 [0:8191];
+    // ★B2 专用：I16 的 A/B 两帧存档（2 × 114 B）
+    reg [7:0] seqb [0:2047];
+
+    //=========================================================================
+    // ★B2 事件脉冲计数（1 拍宽的脉冲靠计数器取证，不能只靠某一拍采样）
+    //=========================================================================
+    integer rxdrop_pulses, rxsop_pulses, rxseop_pulses;
+    always @(posedge eth_clk) begin
+        if (dbg_rx_drop_pulse === 1'b1) rxdrop_pulses = rxdrop_pulses + 1;
+        if (dbg_rx_sop_pulse  === 1'b1) rxsop_pulses  = rxsop_pulses  + 1;
+        if (dbg_rx_eop_pulse  === 1'b1) rxseop_pulses = rxseop_pulses + 1;
+    end
 
     initial begin
         //---------------------------------------------------------------------
@@ -510,6 +579,8 @@ module tb_p2_relay_top;
         eth_rst_n = 1'b0; aur_rst_n = 1'b0;
         rx_dv = 1'b0; rx_data = 8'd0;
         aur_en = 1'b0; aur_data = 8'd0;
+        pause_req = 1'b0;                       // ★B2：默认不暂停（= 生产语义）
+        rxdrop_pulses = 0; rxsop_pulses = 0; rxseop_pulses = 0;
         r_total = 0; r_len = 0; r_frames = 0; r_in_frame = 1'b0;
         l_total = 0; l_len = 0; l_frames = 0; l_in_frame = 1'b0;
         pass_cnt = 0; fail_cnt = 0; chk_fail = 1'b0;
@@ -839,7 +910,9 @@ module tb_p2_relay_top;
 
         req(l_frames == base_l + 1, "I06 exactly one lan frame");
         chk_lan_frame(base_l);
-        req(l_frame_len[base_l] == 1486, "I06 lan total len == 1486");
+        // ★2026-11-27: 期望按线上契约 = 8(前导/SFD) + 1486(头+IP) + 4(FCS)
+        req(l_frame_len[base_l] == 1498, "I06 lan total len == 1498 (8 preamble + 1486 + 4 FCS)");
+        req(exp_lan_len == 1498, "I06 reference-model len == 1498");
         m_aurf = m_aurf + 1; m_lanf = m_lanf + 1;
         chk_cnts;
         end_case("I06_rewrap_aur_1472");
@@ -858,7 +931,9 @@ module tb_p2_relay_top;
 
         req(l_frames == base_l + 1, "I07 exactly one lan frame");
         chk_lan_frame(base_l);
-        req(l_frame_len[base_l] == 60, "I07 lan total len == 60");
+        // ★2026-11-27: 期望按线上契约 = 8(前导/SFD) + 60(头+IP+补零) + 4(FCS)
+        req(l_frame_len[base_l] == 72, "I07 lan total len == 72 (8 preamble + 60 + 4 FCS)");
+        req(exp_lan_len == 72, "I07 reference-model len == 72");
         m_aurf = m_aurf + 1; m_lanf = m_lanf + 1;
         chk_cnts;
         end_case("I07_rewrap_aur_26_pad");
@@ -905,6 +980,199 @@ module tb_p2_relay_top;
         req(st_drop_ipv6 == 0,  "I08 no ipv6 drops ever");
         req(st_aur_bad_v4 == 0, "I08 aur frames all IPv4");
         end_case("I08_counters_clean");
+
+        //=====================================================================
+        // ★B2-1  I16_pause_entry_drop
+        //---------------------------------------------------------------------
+        // 判据（逐条对应 EIF #18「B2 离线出件判据」）：
+        //   ① 同一未复位区间，从**两个空槽**出发，暂停消费后送 3 帧
+        //   ② 第 1、2 帧各占一槽：dbg_bank_busy 依次 2'b01 -> 2'b11（两槽占满）
+        //   ③ 第 3 帧在入口被整帧拒收：dbg_rx_drop_pulse 出现且恰好 1 次，
+        //      st_rx_drop[15:0] 模差 == +1，两槽占用不变、没有拿到槽
+        //   ④ 解除暂停后：前两帧**按序**逐字节正确，Δrelay == 2
+        //   ⑤ 第 3 帧无任何输出（relay 字节数不增）
+        //   ⑥ 随后再送一帧新 ID 的正常帧仍正确转发（恢复正例）
+        // 为什么第三帧才触发：u_rxbuf 是 2 bank 乒乓（各 2048 B），暂停时读侧
+        //   不推进 => 前两帧各占一槽，第三帧 wr_start 时 bank_free=0 =>
+        //   wr_dropping => 帧尾只把 o_wr_drop_cnt +1，整帧丢弃、绝不留半帧。
+        //=====================================================================
+        wait_eth(600);                            // 让上一批彻底排空
+        base_r  = r_frames;
+        d_drop0 = st_rx_drop;
+        j = rxdrop_pulses;
+        t = rxsop_pulses;
+
+        // 帧 A（新 run ID 0x0300）与帧 B（0x0301）内容各存一份，供解除暂停后逐字节对账
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd100, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h0300);
+        for (i = 34; i < 14 + 100; i = i + 1) wb[i] = (i * 5 + 1) & 8'hFF;
+        for (i = 0; i < 14 + 100; i = i + 1) seqb[i] = wb[i];
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd100, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h0301);
+        for (i = 34; i < 14 + 100; i = i + 1) wb[i] = (i * 5 + 47) & 8'hFF;
+        for (i = 0; i < 14 + 100; i = i + 1) seqb[114 + i] = wb[i];
+
+        pause_req = 1'b1;                         // ---- 进入暂停 ----
+        wait_eth(20);
+        req(dbg_pause === 1'b1, "I16 pause asserted after request");
+        req(dbg_bank_busy === 2'b00, "I16 both banks empty at trigger point");
+
+        for (i = 0; i < 14 + 100; i = i + 1) wb[i] = seqb[i];         // 帧 A
+        rx_frame(14 + 100, 1);
+        wait_eth(60);
+        // 注意：bank_busy 的**位序**取决于 wr_bank 的奇偶（当前用哪个 bank），
+        //   本用例只要求"恰好一个槽被占"，所以按 01/10 两种合法形态判。
+        req((dbg_bank_busy === 2'b01) || (dbg_bank_busy === 2'b10),
+            "I16 frame A occupies exactly one bank");
+
+        for (i = 0; i < 14 + 100; i = i + 1) wb[i] = seqb[114 + i];   // 帧 B
+        rx_frame(14 + 100, 1);
+        wait_eth(60);
+        req(dbg_bank_busy === 2'b11, "I16 frames A+B fill both banks");
+
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);                     // 帧 C
+        ip_hdr_at(14, 4'd5, 16'd100, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h0302);
+        for (i = 34; i < 14 + 100; i = i + 1) wb[i] = (i * 5 + 82) & 8'hFF;
+        rx_frame(14 + 100, 1);
+        wait_eth(60);
+        req(dbg_bank_busy === 2'b11, "I16 third frame got NO bank");
+        req((rxdrop_pulses - j) == 1, "I16 exactly one entry reject pulse");
+        req((rxsop_pulses - t) == 3, "I16 three frame starts reached the entry RAM");
+        req(((st_rx_drop - d_drop0) & 32'hFFFF) == 32'd1,
+            "I16 st_rx_drop[15:0] mod-diff == +1 in the same reset epoch");
+        req(r_frames == base_r, "I16 paused interval produced NO relay frame");
+        $display("  [INFO] I16: bank_busy=%b pulses=%0d drop_moddiff=%0d", dbg_bank_busy,
+                 rxdrop_pulses - j, (st_rx_drop - d_drop0) & 32'hFFFF);
+
+        pause_req = 1'b0;                         // ---- 解除暂停 ----
+        wait_eth(20);
+        req(dbg_pause === 1'b0, "I16 pause released by deasserting request");
+        wait_eth(20 * (14 + 100) + 4000);
+
+        req(r_frames == base_r + 2, "I16 exactly 2 frames drained after release");
+        req(st_relay == m_relay + 2, "I16 st_relay delta == 2 (third frame silent)");
+        for (j = 0; j < 2; j = j + 1) begin
+            ok4 = 1'b1;
+            if (r_frame_len[base_r + j] != 100) begin
+                ok4 = 1'b0;
+                $display("  [DET] I16 frame%0d len=%0d exp=100", j, r_frame_len[base_r + j]);
+            end
+            for (i = 0; i < 100; i = i + 1) begin
+                if (rc[r_off(base_r + j) + i] !== seqb[j*114 + 14 + i]) begin
+                    if (ok4) $display("  [DET] I16 frame%0d byte[%0d]=%02h exp=%02h",
+                                      j, i, rc[r_off(base_r + j) + i], seqb[j*114 + 14 + i]);
+                    ok4 = 1'b0;
+                end
+            end
+            req(ok4, "I16 drained frame byte-identical and in order");
+        end
+
+        // ---- 恢复正例：新 run ID 的一帧仍正常转发 ----
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd100, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h0303);
+        for (i = 34; i < 14 + 100; i = i + 1) wb[i] = (i * 3 + 7) & 8'hFF;
+        base_l = r_frames;
+        rx_frame(14 + 100, 1);
+        wait_eth(14 * (14 + 100) + 2000);
+        req(r_frames == base_l + 1, "I16 recovery frame relayed");
+        chk_relay_bytes(base_l, 14, 100);
+
+        m_rx     = m_rx + 3;                      // A/B/D 被读出；C 未写出
+        m_relay  = m_relay + 3;
+        m_rxdrop = m_rxdrop + 1;
+        chk_cnts;
+        end_case("I16_pause_entry_drop");
+
+        //=====================================================================
+        // ★B2-2  I17_pause_off_equivalence
+        //   目的：证明 pause=0 时**与生产语义逐位等价**——不只是"看起来没坏"，
+        //   而是用与 I04 相同的守恒判据（relayed + buffer-dropped == 3）在同一
+        //   批背靠背帧上成立，且 dbg_pause 全程不抬。
+        //=====================================================================
+        wait_eth(400);
+        base_r  = r_frames;
+        d_drop0 = st_rx_drop;
+        req(dbg_pause === 1'b0, "I17 pause off before burst");
+        for (t = 0; t < 3; t = t + 1) begin
+            eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+            ip_hdr_at(14, 4'd5, 16'd128, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                      PC1_IP, PEER_IP, 16'h0400 + t);
+            for (i = 34; i < 14 + 128; i = i + 1) wb[i] = (i + t * 7) & 8'hFF;
+            for (i = 0; i < 14 + 128; i = i + 1) seq3[t*142 + i] = wb[i];
+            rx_frame(14 + 128, 1);
+        end
+        wait_eth(16 * (14 + 128) + 3000);
+        n_rel = r_frames - base_r;
+        d_obs = st_rx_drop - d_drop0;
+        $display("  [INFO] I17: relayed=%0d dropped=%0d pause=%b", n_rel, d_obs, dbg_pause);
+        req(dbg_pause === 1'b0, "I17 pause never asserted during burst");
+        req((n_rel + d_obs) == 3, "I17 conservation: relayed + buffer-dropped == 3");
+        for (j = 0; j < n_rel; j = j + 1) begin
+            ok4 = 1'b1;
+            if (r_frame_len[base_r + j] != 128) begin
+                ok4 = 1'b0;
+                $display("  [DET] I17 frame%0d len=%0d exp=128", j, r_frame_len[base_r + j]);
+            end
+            for (i = 0; i < 128; i = i + 1) begin
+                if (rc[r_off(base_r + j) + i] !== seq3[j*142 + 14 + i]) begin
+                    if (ok4) $display("  [DET] I17 frame%0d byte[%0d]=%02h exp=%02h",
+                                      j, i, rc[r_off(base_r + j) + i], seq3[j*142 + 14 + i]);
+                    ok4 = 1'b0;
+                end
+            end
+            req(ok4, "I17 relayed frame byte-identical");
+        end
+        m_rx     = m_rx + (3 - d_obs);
+        m_relay  = m_relay + n_rel;
+        m_rxdrop = m_rxdrop + d_obs;
+        chk_cnts;
+        end_case("I17_pause_off_equivalence");
+
+        //=====================================================================
+        // ★B2-3  I18_reset_restores_default
+        //   判据：请求保持为 1 的情况下施加一次 eth 域复位 -> dbg_pause 必须回到
+        //   默认 0（解除），且数据面确实恢复（新帧照常转发）；之后必须重新
+        //   0->1 才能再次暂停（不允许"复位后自动又停住"）。
+        //   本用例会清零 eth 域全部计数器，故模型在末尾归零（aur 域未复位）。
+        //=====================================================================
+        wait_eth(300);
+        pause_req = 1'b1;
+        wait_eth(24);
+        req(dbg_pause === 1'b1, "I18 pause asserted before reset");
+
+        eth_rst_n = 1'b0;                         // 请求仍为 1，施加复位
+        wait_eth(8);
+        eth_rst_n = 1'b1;
+        wait_eth(40);
+        req(dbg_pause === 1'b0, "I18 reset forces pause back to default OFF (request held 1)");
+
+        eth_hdr_at(BOARD_MAC, PC1_MAC, 16'h0800);
+        ip_hdr_at(14, 4'd5, 16'd100, 8'd17, 8'd64, 8'd0, 3'b000, 13'd0,
+                  PC1_IP, PEER_IP, 16'h0500);
+        for (i = 34; i < 14 + 100; i = i + 1) wb[i] = (i * 11 + 1) & 8'hFF;
+        base_r = r_frames;
+        rx_frame(14 + 100, 1);
+        wait_eth(14 * (14 + 100) + 3000);
+        req(r_frames == base_r + 1, "I18 post-reset frame relayed (data plane recovered)");
+        chk_relay_bytes(base_r, 14, 100);
+
+        pause_req = 1'b0; wait_eth(10);           // 必须先回 0
+        pause_req = 1'b1; wait_eth(24);
+        req(dbg_pause === 1'b1, "I18 explicit 0->1 re-arms pause after reset");
+        pause_req = 1'b0; wait_eth(16);
+        req(dbg_pause === 1'b0, "I18 pause released at end of case");
+
+        m_rx=0; m_relay=0; m_local=0; m_arp=0; m_rxdrop=0;
+        m_dvlan=0; m_dipv6=0; m_detype=0; m_dbcast=0; m_dmcast=0; m_dunk=0;
+        m_dover=0; m_dcsum=0; m_dtrunc=0; m_dmac=0;
+        m_rx = 1; m_relay = 1;
+        wait_eth(100);
+        chk_cnts;
+        end_case("I18_reset_restores_default");
 
         $display("--------------------------------------------------------------");
         $display("P2_RELAY_TB: PASS=%0d FAIL=%0d", pass_cnt, fail_cnt);
