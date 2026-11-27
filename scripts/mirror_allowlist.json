@@ -5,7 +5,7 @@
     {
       "path": "README.md",
       "kind": "drift",
-      "reason": "docs/README.md 是仓库侧重写过的索引（Header 标「全量文件索引（2026-10-17 重建）」，含 docs/ 90 篇文件表 + CI 口径声明 + vault 目录「不在镜像范围」声明），与 vault 根 README（vault 目录索引 + 里程碑状态表）定位不同 ⇒ 非线性镜像漂移：docs 侧 240 行 vs vault 侧 115 行（2026-10-26 复查后）。",
+      "reason": "docs/README.md 是仓库侧重写过的文档索引（2026-11-27 重写：标题改为「EIF 文档索引」，目录地图只列 docs/ 实际子目录并单列「只在 vault、不在镜像」目录，全量索引按磁盘重建为 99 篇（口径 = 除任意 README.md 外的全部 .md），里程碑表补 2026-11 双板行），与 vault 根 README（vault 目录索引 + 里程碑状态表）定位不同 ⇒ 非线性镜像漂移：docs 侧 269 行 vs vault 侧 115 行（2026-11-27 复查）。",
       "since": "2026-10-24"
     },
     {
@@ -87,5 +87,5 @@
       "since": "2026-11-20"
     }
   ],
-  "updated_at": "2026-10-26"
+  "updated_at": "2026-11-27"
 }
