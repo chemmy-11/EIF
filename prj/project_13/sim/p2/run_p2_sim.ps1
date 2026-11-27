@@ -55,13 +55,21 @@ function Fail([string] $msg, [int] $code) {
 }
 
 # ---- testbench table ----------------------------------------------------
+# 鈽?026-11-27: eth_rewrap 鑷?cbfd304 (D1 淇) 璧蜂緥鍖?rtl/arp/crc32_d8.v 鐢熸垚 FCS锛?
+#   浣嗘湰 runner 鐨?unit/relay 婧愬垪琛ㄤ竴鐩存病璺熺潃琛?鈥斺€?D1 涔嬪悗璇?runner 鐨?xelab
+#   浼氱洿鎺ユ姤 `Module <crc32_d8> not found ... u_fcs_crc`锛堟湰杞疄娴嬶級銆?
+#   杩欓噷鎶?crc32_d8.v 琛ヨ繘涓や釜鐢ㄥ埌 eth_rewrap 鐨?TB銆?
+$rtlArp   = Join-Path (Split-Path -Parent $rtlDir) 'arp'
+$crc32Src = Join-Path $rtlArp 'crc32_d8.v'
+
 $rtl_unit = @('ipv4_packet_extract.v', 'eth_rewrap.v', 'local_steer.v')
-$tb_unit  = @() ; foreach ($f in $rtl_unit) { $tb_unit += (Join-Path $rtlDir $f) }
+$tb_unit  = @($crc32Src)
+foreach ($f in $rtl_unit) { $tb_unit += (Join-Path $rtlDir $f) }
 $tb_unit += (Join-Path $scriptDir 'tb_p2_pipeline.v')
 
 $tb_fbuf  = @((Join-Path $rtlDir 'p2_frame_buf.v'), (Join-Path $scriptDir 'tb_p2_frame_buf.v'))
 
-$tb_relay = @()
+$tb_relay = @($crc32Src)
 foreach ($f in $rtl_unit) { $tb_relay += (Join-Path $rtlDir $f) }
 $tb_relay += (Join-Path $rtlDir 'p2_frame_buf.v')
 $tb_relay += (Join-Path $rtlDir 'p2_relay_top.v')
@@ -73,7 +81,7 @@ $tbs = @(
     @{ key='framebuf'; top='tb_p2_frame_buf'; snap='p2_sim_fbuf';
        srcs=$tb_fbuf;  verdict='P2_FRAMEBUF_TB: PASS='; min=5;  label='framebuf' },
     @{ key='relay';    top='tb_p2_relay_top'; snap='p2_sim_relay';
-       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=13; label='relay' }
+       srcs=$tb_relay; verdict='P2_RELAY_TB: PASS=';    min=29; label='relay' }
 )
 
 Write-Head 'prj13 P2 xsim runner (unit + framebuf + relay)'
@@ -153,7 +161,12 @@ foreach ($tb in $tbs) {
     }
 
     # -- xelab --
-    & (Join-Path $VivadoBin 'xelab.bat') '-debug' 'typical' $tb.top '-s' $tb.snap *> $xelabLog
+    # 鈽?026-11-27: rtl/arp/crc32_d8.v 鏄畼鏂规鐐瑰師瀛愭枃浠讹紙AGENTS.md 搂浜岋細瀹樻柟 RTL
+    #   淇濇寔鍘熸牱锛夛紝瀹冩病鏈?`timescale锛岃€?eth_rewrap / p2_relay_top 閮芥湁 => xelab 鎶?
+    #   [XSIM 43-4099] "Module crc32_d8 doesn't have a timescale but at least one
+    #   module in design has a timescale"銆傜敤 xelab 鑷甫鐨?--timescale 琛ラ粯璁ゅ€艰В鍐筹紝
+    #   涓嶅姩瀹樻柟 RTL锛坸vlog 鐨?-help 閲屾病鏈夎繖涓€椤癸紝--timescale 灞炰簬 xelab锛夈€?
+    & (Join-Path $VivadoBin 'xelab.bat') '-debug' 'typical' '--timescale' '1ns/1ps' $tb.top '-s' $tb.snap *> $xelabLog
     $rc = $LASTEXITCODE
     Write-Host ('  xelab exit = ' + $rc)
     if ($rc -ne 0) {
