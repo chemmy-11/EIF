@@ -138,6 +138,39 @@ wire [31:0]   p2_st_drop_broadcast, p2_st_drop_multicast, p2_st_drop_unknown_dst
 wire [31:0]   p2_st_drop_oversize, p2_st_drop_bad_csum, p2_st_drop_truncated;
 wire [31:0]   p2_st_drop_mac;
 wire [31:0]   p2_st_aur_frames, p2_st_aur_drop, p2_st_lan_frames, p2_st_aur_bad_v4;
+
+//*******************************************************************
+// ★B1 (2026-11-27) 正式 V4：P2 分类/统计计数观测别名（EIF #18 出件判据）
+//   EIF #18 要求的采样域与位宽（**原生域、原生宽度**，不做截断扩展）：
+//     gmii_rx_clk 域：rx_frames/relay/local/arp 各 32 bit；入口缓冲丢弃源 16 bit；
+//                     VLAN/IPv6/EtherType/广播/组播/未知目的/超长/坏校验/截断/错误 MAC
+//                     十类各 32 bit
+//     user_clk 域  ：aur_frames/aur_drop/lan_frames 各 16 bit；aur_bad_v4 32 bit
+//   为什么要别名：这些网只喂调试核（数据面不消费），综合会把它们优化掉；
+//     加 mark_debug 的别名既能保名保住，也让 scripts/iso/b1_ila_ext.tcl 的
+//     connect_debug_port 能按名取到（与既有 dbg_* 别名同一套路）。
+//   上一轮 ILA8 的错配（Aurora 侧计数挂在 gmii_rx_clk 核）在本轮按域拆成两个核。
+//*******************************************************************
+(* mark_debug = "true" *) wire        dbg_b1_ep_ok      = ~aurora_rst;   // 1 = 同一未复位区间
+(* mark_debug = "true" *) wire [31:0] dbg_b1_rx_frames  = p2_st_rx_frames;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_relay      = p2_st_relay;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_local      = p2_st_local;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_arp        = p2_st_arp;
+(* mark_debug = "true" *) wire [15:0] dbg_b1_rx_drop16  = p2_st_rx_drop[15:0];
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_vlan     = p2_st_drop_vlan;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_ipv6     = p2_st_drop_ipv6;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_etype    = p2_st_drop_ethertype;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_bcast    = p2_st_drop_broadcast;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_mcast    = p2_st_drop_multicast;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_unknown  = p2_st_drop_unknown_dst;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_oversize = p2_st_drop_oversize;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_csum     = p2_st_drop_bad_csum;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_trunc    = p2_st_drop_truncated;
+(* mark_debug = "true" *) wire [31:0] dbg_b1_d_mac      = p2_st_drop_mac;
+(* mark_debug = "true" *) wire [15:0] dbg_b1_aur_frames = p2_st_aur_frames[15:0];
+(* mark_debug = "true" *) wire [15:0] dbg_b1_aur_drop   = p2_st_aur_drop[15:0];
+(* mark_debug = "true" *) wire [15:0] dbg_b1_lan_frames = p2_st_lan_frames[15:0];
+(* mark_debug = "true" *) wire [31:0] dbg_b1_bad_v4     = p2_st_aur_bad_v4;
 reg           stack_takeover = 1'b0;      // 本地栈应答接管 RGMII TX（帧级）
 reg           stack_tx_en_d  = 1'b0;
 // ---- W5 命令通道：应答帧注入（同域 mux，见文件头 7）----
@@ -951,7 +984,13 @@ p2_relay_top #(
     .st_aur_frames    (p2_st_aur_frames),
     .st_aur_drop      (p2_st_aur_drop  ),
     .st_lan_frames    (p2_st_lan_frames),
-    .st_aur_bad_v4    (p2_st_aur_bad_v4)
+    .st_aur_bad_v4    (p2_st_aur_bad_v4),
+    // ---- ★B1 正式件：B2 的暂停诊断口在本分支**恒接 0**（不例化 VIO）----
+    //   pause 逻辑对常量 0 完全可折叠：pause_s1/s2/s2_d/pause_q 恒 0
+    //   => `ext_s_ready & ~pause` 退化为 ext_s_ready，`rxbf_vld & ~pause` 退化为
+    //   rxbf_vld，综合后与加入诊断口之前逐位等价（不占逻辑、不改数据面）。
+    //   其余观察输出在正式件里不接（只喂调试，综合会一并优化掉）。
+    .dbg_pause_req     (1'b0)
 );
 
 //*******************************************************************
